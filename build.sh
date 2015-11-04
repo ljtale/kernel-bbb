@@ -1,4 +1,8 @@
 #!/bin/bash
+# Simple build script for this kernel, the script takes 1 or 0
+# arguement, as specified below. The kernel image and device tree blob
+# are compiled into one binary.
+# By Jie Liao
 if [ $1 == clean ]
 then
     make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- clean
