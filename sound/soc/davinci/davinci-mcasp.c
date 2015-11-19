@@ -1021,6 +1021,12 @@ MODULE_DEVICE_TABLE(of, mcasp_dt_ids);
 static struct snd_platform_data *davinci_mcasp_set_pdata_from_of(
 						struct platform_device *pdev)
 {
+    /* ljtale starts */
+    printk(KERN_INFO "platform device name: %s\n", pdev->dev.init_name);
+    printk(KERN_INFO "whose parent device name: %s\n",
+            pdev->dev.parent->init_name);
+    printk(KERN_INFO "bus the device is on: %s\n", pdev->dev.bus->name);
+    /* ljtale ends*/
 	struct device_node *np = pdev->dev.of_node;
 	struct snd_platform_data *pdata = NULL;
 	const struct of_device_id *match =
@@ -1270,12 +1276,37 @@ static int davinci_mcasp_remove(struct platform_device *pdev)
 	return 0;
 }
 
+/* ljtale starts */
+static int davinci_mcasp_runtime_suspend(struct device *dev) {
+    printk(KERN_INFO "jie: runtime suspend for macasp calling...\n");
+    printk(KERN_INFO "jie: driver name: %s, ticks: %lu\n",
+            dev->driver->name, jiffies);
+    return 0;
+}
+
+static int davinci_mcasp_runtime_resume(struct device *dev) {
+    printk(KERN_INFO "jie: runtime resume for macasp calling...\n");
+    printk(KERN_INFO "jie: driver name: %s, ticks: %lu",
+            dev->driver->name, jiffies);
+    return 0;
+}
+
+static const struct dev_pm_ops mcasp_pm_ops = {
+    SET_RUNTIME_PM_OPS(davinci_mcasp_runtime_suspend, 
+                       davinci_mcasp_runtime_resume, NULL)
+};
+
+/* ljtale ends */
+
 static struct platform_driver davinci_mcasp_driver = {
 	.probe		= davinci_mcasp_probe,
 	.remove		= davinci_mcasp_remove,
 	.driver		= {
 		.name	= "davinci-mcasp",
 		.owner	= THIS_MODULE,
+        /* ljtale starts */
+        .pm = &mcasp_pm_ops,
+        /* ljtale ends */
 		.of_match_table = of_match_ptr(mcasp_dt_ids),
 	},
 };

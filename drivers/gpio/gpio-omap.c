@@ -1195,6 +1195,9 @@ static void omap_gpio_restore_context(struct gpio_bank *bank);
 
 static int omap_gpio_runtime_suspend(struct device *dev)
 {
+    /* ljtale starts */
+    printk(KERN_INFO "omap gpio suspend\n");
+    /* ljtale ends */
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = platform_get_drvdata(pdev);
 	u32 l1 = 0, l2 = 0;
@@ -1261,6 +1264,9 @@ update_gpio_context_count:
 
 static int omap_gpio_runtime_resume(struct device *dev)
 {
+    /* ljtale starts */
+    printk(KERN_INFO "omap gpio resumes\n");
+    /* ljtale ends*/
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = platform_get_drvdata(pdev);
 	int context_lost_cnt_after;
