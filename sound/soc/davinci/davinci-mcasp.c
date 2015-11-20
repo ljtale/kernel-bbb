@@ -1022,10 +1022,9 @@ static struct snd_platform_data *davinci_mcasp_set_pdata_from_of(
 						struct platform_device *pdev)
 {
     /* ljtale starts */
-    printk(KERN_INFO "platform device name: %s\n", pdev->dev.init_name);
-    printk(KERN_INFO "whose parent device name: %s\n",
+    printk(KERN_INFO "jie: whose parent device name: %s\n",
             pdev->dev.parent->init_name);
-    printk(KERN_INFO "bus the device is on: %s\n", pdev->dev.bus->name);
+    printk(KERN_INFO "jie: bus the device is on: %s\n", pdev->dev.bus->name);
     /* ljtale ends*/
 	struct device_node *np = pdev->dev.of_node;
 	struct snd_platform_data *pdata = NULL;
@@ -1123,7 +1122,6 @@ static struct snd_platform_data *davinci_mcasp_set_pdata_from_of(
 	ret = of_property_read_u32(np, "sram-size-capture", &val);
 	if (ret >= 0)
 		pdata->sram_size_capture = val;
-
 	return  pdata;
 
 nodata:
@@ -1178,6 +1176,15 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev,
 				"pins are not configured from the driver\n");
 
+    /* ljtale starts */
+    /* before the rpm is enabled, check if the bus type has pm implementation*/
+    if(pdev->dev.bus && pdev->dev.bus->pm) {
+        printk(KERN_INFO "jie: bus pm is populated for %s.\n",
+                pdev->dev.driver->name);
+    } else {
+        printk(KERN_INFO "jie: bus pm is not populated.\n");
+    }
+    /* ljtale ends */
 	pm_runtime_enable(&pdev->dev);
 
 	ret = pm_runtime_get_sync(&pdev->dev);

@@ -63,7 +63,18 @@ EXPORT_SYMBOL_GPL(pm_generic_runtime_suspend);
  */
 int pm_generic_runtime_resume(struct device *dev)
 {
+    /* ljtale starts */
+//    printk(KERN_INFO "jie: device %s calls bus type rpm resume...\n",
+//          dev->driver->name);
+    /* ljtale ends */
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+    /* ljtale starts */
+    if(pm) {
+        printk(KERN_INFO "jie: driver %s has rpm resume implementation\n",
+            dev->driver->name);
+    }
+    /* ljtale ends */
+
 	int ret;
 
 	ret = pm && pm->runtime_resume ? pm->runtime_resume(dev) : 0;
