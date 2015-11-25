@@ -18,7 +18,7 @@ fi
 # the following two lines should only execute once unless the kernel
 # configuration need to be changed
 
-if [ $1 -eq reconfig ]
+if [ $1 == reconfig ]
 then 
     make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- beaglebone_defconfig
     make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- menuconfig

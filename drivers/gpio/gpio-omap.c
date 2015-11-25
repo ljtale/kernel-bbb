@@ -30,6 +30,12 @@
 
 #include <asm/mach/irq.h>
 
+/* ljtale starts */
+#include "../drivers/ljtale/central-pm.h"
+
+
+/* ljtale ends */
+
 #define OFF_MODE	1
 
 static LIST_HEAD(omap_gpio_list);
@@ -81,6 +87,10 @@ struct gpio_bank {
 	int (*get_context_loss_count)(struct device *dev);
 
 	struct omap_gpio_reg_offs *regs;
+    /* ljtale starts */
+    /* PM restore context for gpio */
+    struct omap_gpio_pm_context *table;
+    /* ljtale ends */
 };
 
 #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
@@ -1164,6 +1174,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
 		dev_err(dev, "Could not ioremap\n");
 		return -ENOMEM;
 	}
+    /* ljtale starts */
+    printk(KERN_INFO "gpio bank base: %lx\n", (unsigned long)bank->base);
+    /* ljtale ends */
 
 	platform_set_drvdata(pdev, bank);
 
@@ -1516,6 +1529,77 @@ static const struct of_device_id omap_gpio_match[] = {
 	{ },
 };
 MODULE_DEVICE_TABLE(of, omap_gpio_match);
+
+/* ljtale starts */
+/* reg base and value are populated at probe function*/
+static const struct pm_context_table_entry omap_gpio_rpm_restore[] = {
+    {.reg_offset = OMAP4_GPIO_IRQWAKEN0,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 1,},
+
+    {.reg_offset = OMAP4_GPIO_CTRL,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 2},
+
+    {.reg_offset = OMAP4_GPIO_LEVELDETECT0,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 3},
+
+    {.reg_offset = OMAP4_GPIO_LEVELDETECT1,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 4},
+
+    {.reg_offset = OMAP4_GPIO_RISINGDETECT,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 5},
+
+    {.reg_offset = OMAP4_GPIO_FALLINGDETECT,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 6},
+
+    {.reg_offset = OMAP4_GPIO_SETDATAOUT,
+     .op = write,
+     .condition = "something",
+     .next_entry = 7},
+
+    {.reg_offset = OMAP4_GPIO_DATAOUT,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 8},
+
+    {.reg_offset = OMAP4_GPIO_OE,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 9},
+
+    {.reg_offset = OMAP4_GPIO_DEBOUNCINGTIME,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 10},
+
+    {.reg_offset = OMAP4_GPIO_DEBOUNCENABLE,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 11},
+
+    {.reg_offset = OMAP4_GPIO_IRQSTATUSSET0,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 12},
+
+    {.reg_offset = OMAP4_GPIO_IRQSTATUSSET1,
+     .op = write,
+     .condition = NULL,
+     .next_entry = 0},
+};
+
+/* ljtale ends */
 #endif
 
 static struct platform_driver omap_gpio_driver = {

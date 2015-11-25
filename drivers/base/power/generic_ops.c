@@ -72,6 +72,9 @@ int pm_generic_runtime_resume(struct device *dev)
     if(pm) {
         printk(KERN_INFO "jie: driver %s has rpm resume implementation\n",
             dev->driver->name);
+    } else {
+        printk(KERN_INFO "jie: driver %s does no rpm resume implementation\n",
+            dev->driver->name);
     }
     /* ljtale ends */
 
