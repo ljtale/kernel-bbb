@@ -11,10 +11,6 @@
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59
- * Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- *
  * The full GNU General Public License is included in this distribution in the
  * file called COPYING.
  */
@@ -123,7 +119,6 @@ static inline u16 ioat2_xferlen_to_descs(struct ioat2_dma_chan *ioat, size_t len
 struct ioat_ring_ent {
 	union {
 		struct ioat_dma_descriptor *hw;
-		struct ioat_fill_descriptor *fill;
 		struct ioat_xor_descriptor *xor;
 		struct ioat_xor_ext_descriptor *xor_ex;
 		struct ioat_pq_descriptor *pq;
@@ -137,6 +132,7 @@ struct ioat_ring_ent {
 	#ifdef DEBUG
 	int id;
 	#endif
+	struct ioat_sed_ent *sed;
 };
 
 static inline struct ioat_ring_ent *

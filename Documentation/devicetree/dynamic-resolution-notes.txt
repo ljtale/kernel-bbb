@@ -21,5 +21,5 @@ In sequence the resolver works by the following steps:
 4. For each property in the __fixups__ node locate the node it references
    in the live tree. This is the label used to tag the node.
 5. Retrieve the phandle of the target of the fixup.
-5. For each fixup in the property locate the node:property:offset location
+6. For each fixup in the property locate the node:property:offset location
    and replace it with the phandle value.

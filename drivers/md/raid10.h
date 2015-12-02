@@ -33,6 +33,11 @@ struct r10conf {
 					       * far_offset, in which case it is
 					       * 1 stripe.
 					       */
+		int             far_set_size; /* The number of devices in a set,
+					       * where a 'set' are devices that
+					       * contain far/offset copies of
+					       * each other.
+					       */
 		int		chunk_shift; /* shift from chunks to sectors */
 		sector_t	chunk_mask;
 	} prev, geo;
@@ -145,7 +150,4 @@ enum r10bio_state {
  */
 	R10BIO_Previous,
 };
-
-extern int md_raid10_congested(struct mddev *mddev, int bits);
-
 #endif

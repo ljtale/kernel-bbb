@@ -27,6 +27,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/version.h>
 
 #include <media/media-device.h>
 #include <media/v4l2-ctrls.h>
@@ -255,8 +256,7 @@ static void camif_unregister_sensor(struct camif_dev *camif)
 	v4l2_device_unregister_subdev(sd);
 	camif->sensor.sd = NULL;
 	i2c_unregister_device(client);
-	if (adapter)
-		i2c_put_adapter(adapter);
+	i2c_put_adapter(adapter);
 }
 
 static int camif_create_media_links(struct camif_dev *camif)
@@ -340,16 +340,20 @@ static void camif_clk_put(struct camif_dev *camif)
 	int i;
 
 	for (i = 0; i < CLK_MAX_NUM; i++) {
-		if (IS_ERR_OR_NULL(camif->clock[i]))
+		if (IS_ERR(camif->clock[i]))
 			continue;
 		clk_unprepare(camif->clock[i]);
 		clk_put(camif->clock[i]);
+		camif->clock[i] = ERR_PTR(-EINVAL);
 	}
 }
 
 static int camif_clk_get(struct camif_dev *camif)
 {
 	int ret, i;
+
+	for (i = 1; i < CLK_MAX_NUM; i++)
+		camif->clock[i] = ERR_PTR(-EINVAL);
 
 	for (i = 0; i < CLK_MAX_NUM; i++) {
 		camif->clock[i] = clk_get(camif->dev, camif_clocks[i]);
@@ -433,11 +437,9 @@ static int s3c_camif_probe(struct platform_device *pdev)
 
 	mres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
-	camif->io_base = devm_request_and_ioremap(dev, mres);
-	if (!camif->io_base) {
-		dev_err(dev, "failed to obtain I/O memory\n");
-		return -ENOENT;
-	}
+	camif->io_base = devm_ioremap_resource(dev, mres);
+	if (IS_ERR(camif->io_base))
+		return PTR_ERR(camif->io_base);
 
 	ret = camif_request_irqs(pdev, camif);
 	if (ret < 0)
@@ -649,7 +651,6 @@ static struct platform_driver s3c_camif_driver = {
 	.id_table	= s3c_camif_driver_ids,
 	.driver = {
 		.name	= S3C_CAMIF_DRIVER_NAME,
-		.owner	= THIS_MODULE,
 		.pm	= &s3c_camif_pm_ops,
 	}
 };

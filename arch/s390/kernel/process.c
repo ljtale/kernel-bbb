@@ -61,44 +61,7 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 	return sf->gprs[8];
 }
 
-/*
- * The idle loop on a S390...
- */
-static void default_idle(void)
-{
-	if (cpu_is_offline(smp_processor_id()))
-		cpu_die();
-	local_irq_disable();
-	if (need_resched()) {
-		local_irq_enable();
-		return;
-	}
-	local_mcck_disable();
-	if (test_thread_flag(TIF_MCCK_PENDING)) {
-		local_mcck_enable();
-		local_irq_enable();
-		return;
-	}
-	/* Halt the cpu and keep track of cpu time accounting. */
-	vtime_stop_cpu();
-}
-
-void cpu_idle(void)
-{
-	for (;;) {
-		tick_nohz_idle_enter();
-		rcu_idle_enter();
-		while (!need_resched() && !test_thread_flag(TIF_MCCK_PENDING))
-			default_idle();
-		rcu_idle_exit();
-		tick_nohz_idle_exit();
-		if (test_thread_flag(TIF_MCCK_PENDING))
-			s390_handle_mcck();
-		schedule_preempt_disabled();
-	}
-}
-
-extern void __kprobes kernel_thread_starter(void);
+extern void kernel_thread_starter(void);
 
 /*
  * Free current thread data structures etc..
@@ -114,6 +77,12 @@ void flush_thread(void)
 
 void release_thread(struct task_struct *dead_task)
 {
+}
+
+void arch_release_task_struct(struct task_struct *tsk)
+{
+	if (tsk->thread.vxrs)
+		kfree(tsk->thread.vxrs);
 }
 
 int copy_thread(unsigned long clone_flags, unsigned long new_stackp,
@@ -136,7 +105,6 @@ int copy_thread(unsigned long clone_flags, unsigned long new_stackp,
 	memset(&p->thread.per_user, 0, sizeof(p->thread.per_user));
 	memset(&p->thread.per_event, 0, sizeof(p->thread.per_event));
 	clear_tsk_thread_flag(p, TIF_SINGLE_STEP);
-	clear_tsk_thread_flag(p, TIF_PER_TRAP);
 	/* Initialize per thread user and system timer values */
 	ti = task_thread_info(p);
 	ti->user_timer = 0;
@@ -152,7 +120,7 @@ int copy_thread(unsigned long clone_flags, unsigned long new_stackp,
 	if (unlikely(p->flags & PF_KTHREAD)) {
 		/* kernel thread */
 		memset(&frame->childregs, 0, sizeof(struct pt_regs));
-		frame->childregs.psw.mask = psw_kernel_bits | PSW_MASK_DAT |
+		frame->childregs.psw.mask = PSW_KERNEL_BITS | PSW_MASK_DAT |
 				PSW_MASK_IO | PSW_MASK_EXT | PSW_MASK_MCHECK;
 		frame->childregs.psw.addr = PSW_ADDR_AMODE |
 				(unsigned long) kernel_thread_starter;
@@ -165,6 +133,7 @@ int copy_thread(unsigned long clone_flags, unsigned long new_stackp,
 	}
 	frame->childregs = *current_pt_regs();
 	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */
+	frame->childregs.flags = 0;
 	if (new_stackp)
 		frame->childregs.gprs[15] = new_stackp;
 
@@ -173,20 +142,11 @@ int copy_thread(unsigned long clone_flags, unsigned long new_stackp,
 	p->thread.ri_signum = 0;
 	frame->childregs.psw.mask &= ~PSW_MASK_RI;
 
-#ifndef CONFIG_64BIT
-	/*
-	 * save fprs to current->thread.fp_regs to merge them with
-	 * the emulated registers and then copy the result to the child.
-	 */
-	save_fp_regs(&current->thread.fp_regs);
-	memcpy(&p->thread.fp_regs, &current->thread.fp_regs,
-	       sizeof(s390_fp_regs));
-	/* Set a new TLS ?  */
-	if (clone_flags & CLONE_SETTLS)
-		p->thread.acrs[0] = frame->childregs.gprs[6];
-#else /* CONFIG_64BIT */
 	/* Save the fpu registers to new thread structure. */
-	save_fp_regs(&p->thread.fp_regs);
+	save_fp_ctl(&p->thread.fp_regs.fpc);
+	save_fp_regs(p->thread.fp_regs.fprs);
+	p->thread.fp_regs.pad = 0;
+	p->thread.vxrs = NULL;
 	/* Set a new TLS ?  */
 	if (clone_flags & CLONE_SETTLS) {
 		unsigned long tls = frame->childregs.gprs[6];
@@ -197,15 +157,13 @@ int copy_thread(unsigned long clone_flags, unsigned long new_stackp,
 			p->thread.acrs[1] = (unsigned int)tls;
 		}
 	}
-#endif /* CONFIG_64BIT */
 	return 0;
 }
 
 asmlinkage void execve_tail(void)
 {
 	current->thread.fp_regs.fpc = 0;
-	if (MACHINE_HAS_IEEE)
-		asm volatile("sfpc %0,%0" : : "d" (0));
+	asm volatile("sfpc %0" : : "d" (0));
 }
 
 /*
@@ -213,16 +171,8 @@ asmlinkage void execve_tail(void)
  */
 int dump_fpu (struct pt_regs * regs, s390_fp_regs *fpregs)
 {
-#ifndef CONFIG_64BIT
-	/*
-	 * save fprs to current->thread.fp_regs to merge them with
-	 * the emulated registers and then copy the result to the dump.
-	 */
-	save_fp_regs(&current->thread.fp_regs);
-	memcpy(fpregs, &current->thread.fp_regs, sizeof(s390_fp_regs));
-#else /* CONFIG_64BIT */
-	save_fp_regs(fpregs);
-#endif /* CONFIG_64BIT */
+	save_fp_ctl(&fpregs->fpc);
+	save_fp_regs(fpregs->fprs);
 	return 1;
 }
 EXPORT_SYMBOL(dump_fpu);
@@ -269,20 +219,8 @@ static inline unsigned long brk_rnd(void)
 
 unsigned long arch_randomize_brk(struct mm_struct *mm)
 {
-	unsigned long ret = PAGE_ALIGN(mm->brk + brk_rnd());
+	unsigned long ret;
 
-	if (ret < mm->brk)
-		return mm->brk;
-	return ret;
-}
-
-unsigned long randomize_et_dyn(unsigned long base)
-{
-	unsigned long ret = PAGE_ALIGN(base + brk_rnd());
-
-	if (!(current->flags & PF_RANDOMIZE))
-		return base;
-	if (ret < base)
-		return base;
-	return ret;
+	ret = PAGE_ALIGN(mm->brk + brk_rnd());
+	return (ret > mm->brk) ? ret : mm->brk;
 }

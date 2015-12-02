@@ -26,19 +26,18 @@
 #include <linux/err.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
-#include <linux/of_irq.h>
-#include <linux/of_gpio.h>
-#include <linux/interrupt.h>
 
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65217.h>
 
-static struct mfd_cell tps65217s[] = {
+static const struct mfd_cell tps65217s[] = {
 	{
 		.name = "tps65217-pmic",
+		.of_compatible = "ti,tps65217-pmic",
 	},
 	{
 		.name = "tps65217-bl",
+		.of_compatible = "ti,tps65217-bl",
 	},
 };
 
@@ -146,9 +145,11 @@ int tps65217_clear_bits(struct tps65217 *tps, unsigned int reg,
 }
 EXPORT_SYMBOL_GPL(tps65217_clear_bits);
 
-static struct regmap_config tps65217_regmap_config = {
+static const struct regmap_config tps65217_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
+
+	.max_register = TPS65217_REG_MAX,
 };
 
 static const struct of_device_id tps65217_of_match[] = {
@@ -156,128 +157,26 @@ static const struct of_device_id tps65217_of_match[] = {
 	{ /* sentinel */ },
 };
 
-static irqreturn_t tps65217_irq(int irq, void *irq_data)
-{
-        struct tps65217 *tps = irq_data;
-        unsigned int int_reg = 0, status_reg = 0;
-
-        tps65217_reg_read(tps, TPS65217_REG_INT, &int_reg);
-        tps65217_reg_read(tps, TPS65217_REG_STATUS, &status_reg);
-        if (status_reg)
-                dev_dbg(tps->dev, "status now: 0x%X\n", status_reg);
-
-        if (!int_reg)
-                return IRQ_NONE;
-
-        if (int_reg & TPS65217_INT_PBI) {
-                /* Handle push button */
-                dev_dbg(tps->dev, "power button status change\n");
-                input_report_key(tps->pwr_but, KEY_POWER,
-                                status_reg & TPS65217_STATUS_PB);
-                input_sync(tps->pwr_but);
-        }
-        if (int_reg & TPS65217_INT_ACI) {
-                /* Handle AC power status change */
-                dev_dbg(tps->dev, "AC power status change\n");
-                /* Press KEY_POWER when AC not present */
-                input_report_key(tps->pwr_but, KEY_POWER,
-                                ~status_reg & TPS65217_STATUS_ACPWR);
-                input_sync(tps->pwr_but);
-        }
-        if (int_reg & TPS65217_INT_USBI) {
-                /* Handle USB power status change */
-                dev_dbg(tps->dev, "USB power status change\n");
-        }
-
-        return IRQ_HANDLED;
-}
-
-static int tps65217_probe_pwr_but(struct tps65217 *tps)
-{
-	int ret;
-        unsigned int int_reg;
-
-	tps->pwr_but = devm_input_allocate_device(tps->dev);
-	if (!tps->pwr_but) {
-		dev_err(tps->dev,
-			"Failed to allocated pwr_but input device\n");
-		return -ENOMEM;
-	}
-
-	tps->pwr_but->evbit[0] = BIT_MASK(EV_KEY);
-	tps->pwr_but->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
-	tps->pwr_but->name = "tps65217_pwr_but";
-	ret = input_register_device(tps->pwr_but);
-	if (ret) {
-		/* NOTE: devm managed device */
-		dev_err(tps->dev, "Failed to register button device\n");
-		return ret;
-	}
-	ret = devm_request_threaded_irq(tps->dev,
-		tps->irq, NULL, tps65217_irq, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-		"tps65217", tps);
-	if (ret != 0) {
-		dev_err(tps->dev, "Failed to request IRQ %d\n", tps->irq);
-		return ret;
-	}
-
-	/* enable the power button interrupt */
-	ret = tps65217_reg_read(tps, TPS65217_REG_INT, &int_reg);
-	if (ret < 0) {
-		dev_err(tps->dev, "Failed to read INT reg\n");
-		return ret;
-	}
-	int_reg &= ~TPS65217_INT_PBM;
-	tps65217_reg_write(tps, TPS65217_REG_INT, int_reg, TPS65217_PROTECT_NONE);
-	return 0;
-}
-
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {
 	struct tps65217 *tps;
 	unsigned int version;
-	unsigned int chip_id = ids->driver_data;
+	unsigned long chip_id = ids->driver_data;
 	const struct of_device_id *match;
-	struct device_node *node;
 	bool status_off = false;
-	int irq = -1, irq_gpio = -1;
 	int ret;
 
-	node = client->dev.of_node;
-	if (node) {
+	if (client->dev.of_node) {
 		match = of_match_device(tps65217_of_match, &client->dev);
 		if (!match) {
 			dev_err(&client->dev,
 				"Failed to find matching dt id\n");
 			return -EINVAL;
 		}
-		chip_id = (unsigned int)match->data;
-		status_off = of_property_read_bool(node,
+		chip_id = (unsigned long)match->data;
+		status_off = of_property_read_bool(client->dev.of_node,
 					"ti,pmic-shutdown-controller");
-
-		/* at first try to get irq via OF method */
-		irq = irq_of_parse_and_map(node, 0);
-		if (irq <= 0) {
-			irq = -1;
-			irq_gpio = of_get_named_gpio(node, "irq-gpio", 0);
-			if (irq_gpio >= 0) {
-				/* valid gpio; convert to irq */
-				ret = devm_gpio_request_one(&client->dev,
-					irq_gpio, GPIOF_DIR_IN,
-					"tps65217-gpio-irq");
-				if (ret != 0)
-					dev_warn(&client->dev, "Failed to "
-						"request gpio #%d\n", irq_gpio);
-				irq = gpio_to_irq(irq_gpio);
-				if (irq <= 0) {
-					dev_warn(&client->dev, "Failed to "
-						"convert gpio #%d to irq\n",
-						irq_gpio);
-					irq = -1;
-				}
-			}
-		}
 	}
 
 	if (!chip_id) {
@@ -299,18 +198,6 @@ static int tps65217_probe(struct i2c_client *client,
 		dev_err(tps->dev, "Failed to allocate register map: %d\n",
 			ret);
 		return ret;
-	}
-
-	tps->irq = irq;
-	tps->irq_gpio = irq_gpio;
-
-	/* we got an irq, request it */
-	if (tps->irq >= 0) {
-		ret = tps65217_probe_pwr_but(tps);
-		if (ret < 0) {
-			dev_err(tps->dev, "Failed to probe pwr_but\n");
-			return ret;
-		}
 	}
 
 	ret = mfd_add_devices(tps->dev, -1, tps65217s,
@@ -362,7 +249,7 @@ static struct i2c_driver tps65217_driver = {
 	.driver		= {
 		.name	= "tps65217",
 		.owner	= THIS_MODULE,
-		.of_match_table = of_match_ptr(tps65217_of_match),
+		.of_match_table = tps65217_of_match,
 	},
 	.id_table	= tps65217_id_table,
 	.probe		= tps65217_probe,

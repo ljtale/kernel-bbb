@@ -16,21 +16,32 @@
  */
 
 #include <linux/i2c.h>
-#include <linux/of_i2c.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/pinctrl/consumer.h>
 #include <drm/drm_encoder_slave.h>
+#include <drm/i2c/tda998x.h>
 
 #include "tilcdc_drv.h"
 
 struct slave_module {
 	struct tilcdc_module base;
-	struct tilcdc_panel_info *info;
 	struct i2c_adapter *i2c;
-	struct pinctrl *pinctrl;
-	char *selected_state_name;
 };
 #define to_slave_module(x) container_of(x, struct slave_module, base)
+
+static const struct tilcdc_panel_info slave_info = {
+		.bpp                    = 16,
+		.ac_bias                = 255,
+		.ac_bias_intrpt         = 0,
+		.dma_burst_sz           = 16,
+		.fdd                    = 0x80,
+		.tft_alt_mode           = 0,
+		.invert_pxl_clk		= 1,
+		.sync_edge              = 1,
+		.sync_ctrl              = 1,
+		.raster_order           = 0,
+};
+
 
 /*
  * Encoder:
@@ -59,16 +70,20 @@ static void slave_encoder_destroy(struct drm_encoder *encoder)
 
 static void slave_encoder_prepare(struct drm_encoder *encoder)
 {
-	struct slave_encoder *slave_encoder = to_slave_encoder(encoder);
-
 	drm_i2c_encoder_prepare(encoder);
-	tilcdc_crtc_set_panel_info(encoder->crtc, slave_encoder->mod->info);
+	tilcdc_crtc_set_panel_info(encoder->crtc, &slave_info);
 }
 
 static bool slave_encoder_fixup(struct drm_encoder *encoder,
 		const struct drm_display_mode *mode,
 		struct drm_display_mode *adjusted_mode)
 {
+	/*
+	 * tilcdc does not generate VESA-complient sync but aligns
+	 * VS on the second edge of HS instead of first edge.
+	 * We use adjusted_mode, to fixup sync by aligning both rising
+	 * edges and add HSKEW offset to let the slave encoder fix it up.
+	 */
 	adjusted_mode->hskew = mode->hsync_end - mode->hsync_start;
 	adjusted_mode->flags |= DRM_MODE_FLAG_HSKEW;
 
@@ -82,6 +97,7 @@ static bool slave_encoder_fixup(struct drm_encoder *encoder,
 
 	return drm_i2c_encoder_mode_fixup(encoder, mode, adjusted_mode);
 }
+
 
 static const struct drm_encoder_funcs slave_encoder_funcs = {
 		.destroy        = slave_encoder_destroy,
@@ -97,8 +113,29 @@ static const struct drm_encoder_helper_funcs slave_encoder_helper_funcs = {
 		.restore        = drm_i2c_encoder_restore,
 };
 
+static struct tda998x_encoder_params tda998x_pdata = {
+	.swap_b = 0x3,
+	.mirr_b = 0x0,
+	.swap_a = 0x2,
+	.mirr_a = 0x0,
+	.swap_d = 0x1,
+	.mirr_d = 0x0,
+	.swap_c = 0x0,
+	.mirr_c = 0x0,
+	.swap_f = 0x5,
+	.mirr_f = 0x0,
+	.swap_e = 0x4,
+	.mirr_e = 0x0,
+	.audio_cfg = 0x3,	/* I2S mode */
+	.audio_clk_cfg = 1,	/* select clock pin */
+	.audio_frame[1] = 1,	/* channels - 1 */
+	.audio_format = AFMT_I2S,
+	.audio_sample_rate = 48000,
+};
+
 static const struct i2c_board_info info = {
-		I2C_BOARD_INFO("tda998x", 0x70)
+		I2C_BOARD_INFO("tda998x", 0x70),
+		.platform_data = &tda998x_pdata,
 };
 
 static struct drm_encoder *slave_encoder_create(struct drm_device *dev,
@@ -152,6 +189,7 @@ struct slave_connector {
 static void slave_connector_destroy(struct drm_connector *connector)
 {
 	struct slave_connector *slave_connector = to_slave_connector(connector);
+	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	kfree(slave_connector);
 }
@@ -177,12 +215,7 @@ static int slave_connector_mode_valid(struct drm_connector *connector,
 	struct tilcdc_drm_private *priv = connector->dev->dev_private;
 	int ret;
 
-	ret = tilcdc_crtc_mode_valid(priv->crtc, mode,
-			priv->allow_non_rblank ? 0 : 1,
-			priv->allow_non_audio ? 0 : 1,
-			connector->edid_blob_ptr ?
-				(struct edid *)connector->edid_blob_ptr->data :
-				NULL);
+	ret = tilcdc_crtc_mode_valid(priv->crtc, mode);
 	if (ret != MODE_OK)
 		return ret;
 
@@ -252,7 +285,7 @@ static struct drm_connector *slave_connector_create(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-	drm_sysfs_connector_add(connector);
+	drm_connector_register(connector);
 
 	return connector;
 
@@ -286,18 +319,8 @@ static int slave_modeset_init(struct tilcdc_module *mod, struct drm_device *dev)
 	return 0;
 }
 
-static void slave_destroy(struct tilcdc_module *mod)
-{
-	struct slave_module *slave_mod = to_slave_module(mod);
-
-	tilcdc_module_cleanup(mod);
-	kfree(slave_mod->info);
-	kfree(slave_mod);
-}
-
 static const struct tilcdc_module_ops slave_module_ops = {
 		.modeset_init = slave_modeset_init,
-		.destroy = slave_destroy,
 };
 
 /*
@@ -306,84 +329,15 @@ static const struct tilcdc_module_ops slave_module_ops = {
 
 static struct of_device_id slave_of_match[];
 
-static ssize_t pinmux_show_state(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct slave_module *slave_mod = platform_get_drvdata(pdev);
-	const char *name;
-
-	name = slave_mod->selected_state_name;
-	if (name == NULL || strlen(name) == 0)
-		name = "none";
-	return sprintf(buf, "%s\n", name);
-}
-
-static ssize_t pinmux_store_state(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct slave_module *slave_mod = platform_get_drvdata(pdev);
-	struct pinctrl_state *state;
-	char *state_name;
-	char *s;
-	int err;
-
-	/* duplicate (as a null terminated string) */
-	state_name = kmalloc(count + 1, GFP_KERNEL);
-	if (state_name == NULL)
-		return -ENOMEM;
-	memcpy(state_name, buf, count);
-	state_name[count] = '\0';
-
-	/* and chop off newline */
-	s = strchr(state_name, '\n');
-	if (s != NULL)
-		*s = '\0';
-
-	/* try to select default state at first (if it exists) */
-	state = pinctrl_lookup_state(slave_mod->pinctrl, state_name);
-	if (!IS_ERR(state)) {
-		err = pinctrl_select_state(slave_mod->pinctrl, state);
-		if (err != 0)
-			dev_err(dev, "Failed to select state %s\n",
-					state_name);
-	} else {
-		dev_err(dev, "Failed to find state %s\n", state_name);
-		err = PTR_RET(state);
-	}
-
-	if (err == 0) {
-		kfree(slave_mod->selected_state_name);
-		slave_mod->selected_state_name = state_name;
-	}
-
-	return err ? err : count;
-}
-
-static DEVICE_ATTR(pinmux_state, S_IWUSR | S_IRUGO,
-		   pinmux_show_state, pinmux_store_state);
-
-static struct attribute *pinmux_attributes[] = {
-	&dev_attr_pinmux_state.attr,
-	NULL
-};
-
-static const struct attribute_group pinmux_attr_group = {
-	.attrs = pinmux_attributes,
-};
-
 static int slave_probe(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *i2c_node;
 	struct slave_module *slave_mod;
 	struct tilcdc_module *mod;
-	struct pinctrl_state *state;
-	struct i2c_adapter *slavei2c;
+	struct pinctrl *pinctrl;
 	uint32_t i2c_phandle;
-	char *state_name;
+	struct i2c_adapter *slavei2c;
 	int ret = -EINVAL;
 
 	/* bail out early if no DT data: */
@@ -407,6 +361,7 @@ static int slave_probe(struct platform_device *pdev)
 	/* but defer the probe if it can't be initialized it might come later */
 	slavei2c = of_find_i2c_adapter_by_node(i2c_node);
 	of_node_put(i2c_node);
+
 	if (!slavei2c) {
 		ret = -EPROBE_DEFER;
 		tilcdc_slave_probedefer(true);
@@ -415,75 +370,48 @@ static int slave_probe(struct platform_device *pdev)
 	}
 
 	slave_mod = kzalloc(sizeof(*slave_mod), GFP_KERNEL);
-	if (!slave_mod)
-		return -ENOMEM;
+	if (!slave_mod) {
+		ret = -ENOMEM;
+		goto fail_adapter;
+	}
 
 	mod = &slave_mod->base;
+	pdev->dev.platform_data = mod;
+
+	mod->preferred_bpp = slave_info.bpp;
 
 	slave_mod->i2c = slavei2c;
 
-	platform_set_drvdata(pdev, slave_mod);
-
 	tilcdc_module_init(mod, "slave", &slave_module_ops);
 
-	state_name = kmalloc(strlen(PINCTRL_STATE_DEFAULT) + 1,
-			GFP_KERNEL);
-	if (state_name == NULL) {
-		dev_err(dev, "Failed to allocate state name\n");
-		ret = -ENOMEM;
-		return ret;
-	}
-	slave_mod->selected_state_name = state_name;
-	strcpy(slave_mod->selected_state_name, PINCTRL_STATE_DEFAULT);
-
-	slave_mod->pinctrl = devm_pinctrl_get(dev);
-	if (IS_ERR(slave_mod->pinctrl)) {
-		dev_err(dev, "Failed to get pinctrl\n");
-		ret = PTR_RET(slave_mod->pinctrl);
-		return ret;
-	}
-
-	/* try to select default state at first (if it exists) */
-	state = pinctrl_lookup_state(slave_mod->pinctrl,
-			slave_mod->selected_state_name);
-	if (!IS_ERR(state)) {
-		ret = pinctrl_select_state(slave_mod->pinctrl, state);
-		if (ret != 0) {
-			dev_err(dev, "Failed to select default state\n");
-			return ret;
-		}
-	} else {
-		slave_mod->selected_state_name = '\0';
-	}
-
-	/* Register sysfs hooks */
-	ret = sysfs_create_group(&dev->kobj, &pinmux_attr_group);
-	if (ret) {
-		dev_err(dev, "Failed to create sysfs group\n");
-		return ret;
-	}
-
-	slave_mod->info = tilcdc_of_get_panel_info(node);
-	if (!slave_mod->info) {
-		dev_err(&pdev->dev, "could not get panel info\n");
-		return ret;
-	}
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl))
+		dev_warn(&pdev->dev, "pins are not configured\n");
 
 	tilcdc_slave_probedefer(false);
 
 	return 0;
+
+fail_adapter:
+	i2c_put_adapter(slavei2c);
+	return ret;
 }
 
 static int slave_remove(struct platform_device *pdev)
 {
+	struct tilcdc_module *mod = dev_get_platdata(&pdev->dev);
+	struct slave_module *slave_mod = to_slave_module(mod);
+
+	tilcdc_module_cleanup(mod);
+	kfree(slave_mod);
+
 	return 0;
 }
 
 static struct of_device_id slave_of_match[] = {
-		{ .compatible = "tilcdc,slave", },
+		{ .compatible = "ti,tilcdc,slave", },
 		{ },
 };
-MODULE_DEVICE_TABLE(of, slave_of_match);
 
 struct platform_driver slave_driver = {
 	.probe = slave_probe,

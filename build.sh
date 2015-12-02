@@ -20,10 +20,10 @@ fi
 
 if [ $1 == reconfig ]
 then 
-    make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- beaglebone_defconfig
+    make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- bb.org_defconfig
     make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- menuconfig
 fi
  
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- uImage dtbs
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- uImage-dtb.am335x-boneblack
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- modules
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -j4
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- uImage dtbs LOADADDR=0X80008000 -j4
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- modules -j4

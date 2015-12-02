@@ -62,7 +62,7 @@ enum sh_vou_status {
 
 struct sh_vou_device {
 	struct v4l2_device v4l2_dev;
-	struct video_device *vdev;
+	struct video_device vdev;
 	atomic_t use_count;
 	struct sh_vou_pdata *pdata;
 	spinlock_t lock;
@@ -207,6 +207,7 @@ static void sh_vou_stream_start(struct sh_vou_device *vou_dev,
 #endif
 
 	switch (vou_dev->pix.pixelformat) {
+	default:
 	case V4L2_PIX_FMT_NV12:
 	case V4L2_PIX_FMT_NV16:
 		row_coeff = 1;
@@ -253,7 +254,8 @@ static int sh_vou_buf_setup(struct videobuf_queue *vq, unsigned int *count,
 	if (PAGE_ALIGN(*size) * *count > 4 * 1024 * 1024)
 		*count = 4 * 1024 * 1024 / PAGE_ALIGN(*size);
 
-	dev_dbg(vq->dev, "%s(): count=%d, size=%d\n", __func__, *count, *size);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s(): count=%d, size=%d\n", __func__,
+		*count, *size);
 
 	return 0;
 }
@@ -269,7 +271,7 @@ static int sh_vou_buf_prepare(struct videobuf_queue *vq,
 	int bytes_per_line = vou_fmt[vou_dev->pix_idx].bpp * pix->width / 8;
 	int ret;
 
-	dev_dbg(vq->dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	if (vb->width	!= pix->width ||
 	    vb->height	!= pix->height ||
@@ -284,7 +286,7 @@ static int sh_vou_buf_prepare(struct videobuf_queue *vq,
 	vb->size = vb->height * bytes_per_line;
 	if (vb->baddr && vb->bsize < vb->size) {
 		/* User buffer too small */
-		dev_warn(vq->dev, "User buffer too small: [%u] @ %lx\n",
+		dev_warn(vq->dev, "User buffer too small: [%zu] @ %lx\n",
 			 vb->bsize, vb->baddr);
 		return -EINVAL;
 	}
@@ -299,10 +301,11 @@ static int sh_vou_buf_prepare(struct videobuf_queue *vq,
 		vb->state = VIDEOBUF_PREPARED;
 	}
 
-	dev_dbg(vq->dev,
-		"%s(): fmt #%d, %u bytes per line, phys 0x%x, type %d, state %d\n",
+	dev_dbg(vou_dev->v4l2_dev.dev,
+		"%s(): fmt #%d, %u bytes per line, phys %pad, type %d, state %d\n",
 		__func__, vou_dev->pix_idx, bytes_per_line,
-		videobuf_to_dma_contig(vb), vb->memory, vb->state);
+		({ dma_addr_t addr = videobuf_to_dma_contig(vb); &addr; }),
+		vb->memory, vb->state);
 
 	return 0;
 }
@@ -314,7 +317,7 @@ static void sh_vou_buf_queue(struct videobuf_queue *vq,
 	struct video_device *vdev = vq->priv_data;
 	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
 
-	dev_dbg(vq->dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	vb->state = VIDEOBUF_QUEUED;
 	list_add_tail(&vb->queue, &vou_dev->queue);
@@ -325,8 +328,8 @@ static void sh_vou_buf_queue(struct videobuf_queue *vq,
 		vou_dev->active = vb;
 		/* Start from side A: we use mirror addresses, so, set B */
 		sh_vou_reg_a_write(vou_dev, VOURPR, 1);
-		dev_dbg(vq->dev, "%s: first buffer status 0x%x\n", __func__,
-			sh_vou_reg_a_read(vou_dev, VOUSTR));
+		dev_dbg(vou_dev->v4l2_dev.dev, "%s: first buffer status 0x%x\n",
+			__func__, sh_vou_reg_a_read(vou_dev, VOUSTR));
 		sh_vou_schedule_next(vou_dev, vb);
 		/* Only activate VOU after the second buffer */
 	} else if (vou_dev->active->queue.next == &vb->queue) {
@@ -336,8 +339,8 @@ static void sh_vou_buf_queue(struct videobuf_queue *vq,
 
 		/* Register side switching with frame VSYNC */
 		sh_vou_reg_a_write(vou_dev, VOURCR, 5);
-		dev_dbg(vq->dev, "%s: second buffer status 0x%x\n", __func__,
-			sh_vou_reg_a_read(vou_dev, VOUSTR));
+		dev_dbg(vou_dev->v4l2_dev.dev, "%s: second buffer status 0x%x\n",
+			__func__, sh_vou_reg_a_read(vou_dev, VOUSTR));
 
 		/* Enable End-of-Frame (VSYNC) interrupts */
 		sh_vou_reg_a_write(vou_dev, VOUIR, 0x10004);
@@ -355,7 +358,7 @@ static void sh_vou_buf_release(struct videobuf_queue *vq,
 	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
 	unsigned long flags;
 
-	dev_dbg(vq->dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	spin_lock_irqsave(&vou_dev->lock, flags);
 
@@ -388,12 +391,13 @@ static struct videobuf_queue_ops sh_vou_video_qops = {
 static int sh_vou_querycap(struct file *file, void  *priv,
 			   struct v4l2_capability *cap)
 {
-	struct sh_vou_file *vou_file = priv;
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	strlcpy(cap->card, "SuperH VOU", sizeof(cap->card));
-	cap->capabilities = V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_STREAMING;
+	cap->device_caps = V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_STREAMING;
+	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
 	return 0;
 }
 
@@ -401,12 +405,12 @@ static int sh_vou_querycap(struct file *file, void  *priv,
 static int sh_vou_enum_fmt_vid_out(struct file *file, void  *priv,
 				   struct v4l2_fmtdesc *fmt)
 {
-	struct sh_vou_file *vou_file = priv;
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 
 	if (fmt->index >= ARRAY_SIZE(vou_fmt))
 		return -EINVAL;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	fmt->type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
 	strlcpy(fmt->description, vou_fmt[fmt->index].desc,
@@ -419,8 +423,7 @@ static int sh_vou_enum_fmt_vid_out(struct file *file, void  *priv,
 static int sh_vou_g_fmt_vid_out(struct file *file, void *priv,
 				struct v4l2_format *fmt)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 
 	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
@@ -441,7 +444,7 @@ static void sh_vou_configure_geometry(struct sh_vou_device *vou_dev,
 				      int pix_idx, int w_idx, int h_idx)
 {
 	struct sh_vou_fmt *fmt = vou_fmt + pix_idx;
-	unsigned int black_left, black_top, width_max, height_max,
+	unsigned int black_left, black_top, width_max,
 		frame_in_height, frame_out_height, frame_out_top;
 	struct v4l2_rect *rect = &vou_dev->rect;
 	struct v4l2_pix_format *pix = &vou_dev->pix;
@@ -449,10 +452,10 @@ static void sh_vou_configure_geometry(struct sh_vou_device *vou_dev,
 
 	if (vou_dev->std & V4L2_STD_525_60) {
 		width_max = 858;
-		height_max = 262;
+		/* height_max = 262; */
 	} else {
 		width_max = 864;
-		height_max = 312;
+		/* height_max = 312; */
 	}
 
 	frame_in_height = pix->height / 2;
@@ -595,9 +598,9 @@ static void vou_adjust_input(struct sh_vou_geometry *geo, v4l2_std_id std)
  */
 static void vou_adjust_output(struct sh_vou_geometry *geo, v4l2_std_id std)
 {
-	unsigned int best_err = UINT_MAX, best, width_max, height_max,
-		img_height_max;
-	int i, idx;
+	unsigned int best_err = UINT_MAX, best = geo->in_width,
+		width_max, height_max, img_height_max;
+	int i, idx = 0;
 
 	if (std & V4L2_STD_525_60) {
 		width_max = 858;
@@ -671,15 +674,14 @@ static void vou_adjust_output(struct sh_vou_geometry *geo, v4l2_std_id std)
 static int sh_vou_s_fmt_vid_out(struct file *file, void *priv,
 				struct v4l2_format *fmt)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct v4l2_pix_format *pix = &fmt->fmt.pix;
 	unsigned int img_height_max;
 	int pix_idx;
 	struct sh_vou_geometry geo;
 	struct v4l2_mbus_framefmt mbfmt = {
 		/* Revisit: is this the correct code? */
-		.code = V4L2_MBUS_FMT_YUYV8_2X8,
+		.code = MEDIA_BUS_FMT_YUYV8_2X8,
 		.field = V4L2_FIELD_INTERLACED,
 		.colorspace = V4L2_COLORSPACE_SMPTE170M,
 	};
@@ -732,7 +734,7 @@ static int sh_vou_s_fmt_vid_out(struct file *file, void *priv,
 	/* Sanity checks */
 	if ((unsigned)mbfmt.width > VOU_MAX_IMAGE_WIDTH ||
 	    (unsigned)mbfmt.height > img_height_max ||
-	    mbfmt.code != V4L2_MBUS_FMT_YUYV8_2X8)
+	    mbfmt.code != MEDIA_BUS_FMT_YUYV8_2X8)
 		return -EIO;
 
 	if (mbfmt.width != geo.output.width ||
@@ -764,11 +766,11 @@ static int sh_vou_s_fmt_vid_out(struct file *file, void *priv,
 static int sh_vou_try_fmt_vid_out(struct file *file, void *priv,
 				  struct v4l2_format *fmt)
 {
-	struct sh_vou_file *vou_file = priv;
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct v4l2_pix_format *pix = &fmt->fmt.pix;
 	int i;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	fmt->type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
 	pix->field = V4L2_FIELD_NONE;
@@ -776,7 +778,7 @@ static int sh_vou_try_fmt_vid_out(struct file *file, void *priv,
 	v4l_bound_align_image(&pix->width, 0, VOU_MAX_IMAGE_WIDTH, 1,
 			      &pix->height, 0, VOU_MAX_IMAGE_HEIGHT, 1, 0);
 
-	for (i = 0; ARRAY_SIZE(vou_fmt); i++)
+	for (i = 0; i < ARRAY_SIZE(vou_fmt); i++)
 		if (vou_fmt[i].pfmt == pix->pixelformat)
 			return 0;
 
@@ -788,9 +790,10 @@ static int sh_vou_try_fmt_vid_out(struct file *file, void *priv,
 static int sh_vou_reqbufs(struct file *file, void *priv,
 			  struct v4l2_requestbuffers *req)
 {
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = priv;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	if (req->type != V4L2_BUF_TYPE_VIDEO_OUTPUT)
 		return -EINVAL;
@@ -801,27 +804,30 @@ static int sh_vou_reqbufs(struct file *file, void *priv,
 static int sh_vou_querybuf(struct file *file, void *priv,
 			   struct v4l2_buffer *b)
 {
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = priv;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	return videobuf_querybuf(&vou_file->vbq, b);
 }
 
 static int sh_vou_qbuf(struct file *file, void *priv, struct v4l2_buffer *b)
 {
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = priv;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	return videobuf_qbuf(&vou_file->vbq, b);
 }
 
 static int sh_vou_dqbuf(struct file *file, void *priv, struct v4l2_buffer *b)
 {
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = priv;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	return videobuf_dqbuf(&vou_file->vbq, b, file->f_flags & O_NONBLOCK);
 }
@@ -829,12 +835,11 @@ static int sh_vou_dqbuf(struct file *file, void *priv, struct v4l2_buffer *b)
 static int sh_vou_streamon(struct file *file, void *priv,
 			   enum v4l2_buf_type buftype)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = priv;
 	int ret;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	ret = v4l2_device_call_until_err(&vou_dev->v4l2_dev, 0,
 					 video, s_stream, 1);
@@ -848,11 +853,10 @@ static int sh_vou_streamon(struct file *file, void *priv,
 static int sh_vou_streamoff(struct file *file, void *priv,
 			    enum v4l2_buf_type buftype)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = priv;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	/*
 	 * This calls buf_release from host driver's videobuf_queue_ops for all
@@ -879,38 +883,36 @@ static u32 sh_vou_ntsc_mode(enum sh_vou_bus_fmt bus_fmt)
 	}
 }
 
-static int sh_vou_s_std(struct file *file, void *priv, v4l2_std_id *std_id)
+static int sh_vou_s_std(struct file *file, void *priv, v4l2_std_id std_id)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	int ret;
 
-	dev_dbg(vou_dev->v4l2_dev.dev, "%s(): 0x%llx\n", __func__, *std_id);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s(): 0x%llx\n", __func__, std_id);
 
-	if (*std_id & ~vdev->tvnorms)
+	if (std_id & ~vou_dev->vdev.tvnorms)
 		return -EINVAL;
 
 	ret = v4l2_device_call_until_err(&vou_dev->v4l2_dev, 0, video,
-					 s_std_output, *std_id);
+					 s_std_output, std_id);
 	/* Shall we continue, if the subdev doesn't support .s_std_output()? */
 	if (ret < 0 && ret != -ENOIOCTLCMD)
 		return ret;
 
-	if (*std_id & V4L2_STD_525_60)
+	if (std_id & V4L2_STD_525_60)
 		sh_vou_reg_ab_set(vou_dev, VOUCR,
 			sh_vou_ntsc_mode(vou_dev->pdata->bus_fmt) << 29, 7 << 29);
 	else
 		sh_vou_reg_ab_set(vou_dev, VOUCR, 5 << 29, 7 << 29);
 
-	vou_dev->std = *std_id;
+	vou_dev->std = std_id;
 
 	return 0;
 }
 
 static int sh_vou_g_std(struct file *file, void *priv, v4l2_std_id *std)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 
 	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
@@ -921,8 +923,7 @@ static int sh_vou_g_std(struct file *file, void *priv, v4l2_std_id *std)
 
 static int sh_vou_g_crop(struct file *file, void *fh, struct v4l2_crop *a)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 
 	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
@@ -936,15 +937,14 @@ static int sh_vou_g_crop(struct file *file, void *fh, struct v4l2_crop *a)
 static int sh_vou_s_crop(struct file *file, void *fh, const struct v4l2_crop *a)
 {
 	struct v4l2_crop a_writable = *a;
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct v4l2_rect *rect = &a_writable.c;
 	struct v4l2_crop sd_crop = {.type = V4L2_BUF_TYPE_VIDEO_OUTPUT};
 	struct v4l2_pix_format *pix = &vou_dev->pix;
 	struct sh_vou_geometry geo;
 	struct v4l2_mbus_framefmt mbfmt = {
 		/* Revisit: is this the correct code? */
-		.code = V4L2_MBUS_FMT_YUYV8_2X8,
+		.code = MEDIA_BUS_FMT_YUYV8_2X8,
 		.field = V4L2_FIELD_INTERLACED,
 		.colorspace = V4L2_COLORSPACE_SMPTE170M,
 	};
@@ -995,7 +995,7 @@ static int sh_vou_s_crop(struct file *file, void *fh, const struct v4l2_crop *a)
 	/* Sanity checks */
 	if ((unsigned)mbfmt.width > VOU_MAX_IMAGE_WIDTH ||
 	    (unsigned)mbfmt.height > img_height_max ||
-	    mbfmt.code != V4L2_MBUS_FMT_YUYV8_2X8)
+	    mbfmt.code != MEDIA_BUS_FMT_YUYV8_2X8)
 		return -EIO;
 
 	geo.output.width = mbfmt.width;
@@ -1028,9 +1028,9 @@ static int sh_vou_s_crop(struct file *file, void *fh, const struct v4l2_crop *a)
 static int sh_vou_cropcap(struct file *file, void *priv,
 			  struct v4l2_cropcap *a)
 {
-	struct sh_vou_file *vou_file = priv;
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	a->type				= V4L2_BUF_TYPE_VIDEO_OUTPUT;
 	a->bounds.left			= 0;
@@ -1054,7 +1054,6 @@ static irqreturn_t sh_vou_isr(int irq, void *dev_id)
 	static unsigned long j;
 	struct videobuf_buffer *vb;
 	static int cnt;
-	static int side;
 	u32 irq_status = sh_vou_reg_a_read(vou_dev, VOUIR), masked;
 	u32 vou_status = sh_vou_reg_a_read(vou_dev, VOUSTR);
 
@@ -1082,7 +1081,7 @@ static irqreturn_t sh_vou_isr(int irq, void *dev_id)
 		irq_status, masked, vou_status, cnt);
 
 	cnt++;
-	side = vou_status & 0x10000;
+	/* side = vou_status & 0x10000; */
 
 	/* Clear only set interrupts */
 	sh_vou_reg_a_write(vou_dev, VOUIR, masked);
@@ -1091,7 +1090,7 @@ static irqreturn_t sh_vou_isr(int irq, void *dev_id)
 	list_del(&vb->queue);
 
 	vb->state = VIDEOBUF_DONE;
-	do_gettimeofday(&vb->ts);
+	v4l2_get_timestamp(&vb->ts);
 	vb->field_count++;
 	wake_up(&vb->done);
 
@@ -1160,8 +1159,7 @@ static int sh_vou_hw_init(struct sh_vou_device *vou_dev)
 /* File operations */
 static int sh_vou_open(struct file *file)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = kzalloc(sizeof(struct sh_vou_file),
 					       GFP_KERNEL);
 
@@ -1170,21 +1168,22 @@ static int sh_vou_open(struct file *file)
 
 	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
-	file->private_data = vou_file;
-
-	if (mutex_lock_interruptible(&vou_dev->fop_lock))
+	if (mutex_lock_interruptible(&vou_dev->fop_lock)) {
+		kfree(vou_file);
 		return -ERESTARTSYS;
+	}
 	if (atomic_inc_return(&vou_dev->use_count) == 1) {
 		int ret;
 		/* First open */
 		vou_dev->status = SH_VOU_INITIALISING;
-		pm_runtime_get_sync(vdev->v4l2_dev->dev);
+		pm_runtime_get_sync(vou_dev->v4l2_dev.dev);
 		ret = sh_vou_hw_init(vou_dev);
 		if (ret < 0) {
 			atomic_dec(&vou_dev->use_count);
-			pm_runtime_put(vdev->v4l2_dev->dev);
+			pm_runtime_put(vou_dev->v4l2_dev.dev);
 			vou_dev->status = SH_VOU_IDLE;
 			mutex_unlock(&vou_dev->fop_lock);
+			kfree(vou_file);
 			return ret;
 		}
 	}
@@ -1193,27 +1192,28 @@ static int sh_vou_open(struct file *file)
 				       vou_dev->v4l2_dev.dev, &vou_dev->lock,
 				       V4L2_BUF_TYPE_VIDEO_OUTPUT,
 				       V4L2_FIELD_NONE,
-				       sizeof(struct videobuf_buffer), vdev,
-				       &vou_dev->fop_lock);
+				       sizeof(struct videobuf_buffer),
+				       &vou_dev->vdev, &vou_dev->fop_lock);
 	mutex_unlock(&vou_dev->fop_lock);
+
+	file->private_data = vou_file;
 
 	return 0;
 }
 
 static int sh_vou_release(struct file *file)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = file->private_data;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	if (!atomic_dec_return(&vou_dev->use_count)) {
 		mutex_lock(&vou_dev->fop_lock);
 		/* Last close */
 		vou_dev->status = SH_VOU_IDLE;
 		sh_vou_reg_a_set(vou_dev, VOUER, 0, 0x101);
-		pm_runtime_put(vdev->v4l2_dev->dev);
+		pm_runtime_put(vou_dev->v4l2_dev.dev);
 		mutex_unlock(&vou_dev->fop_lock);
 	}
 
@@ -1225,12 +1225,11 @@ static int sh_vou_release(struct file *file)
 
 static int sh_vou_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = file->private_data;
 	int ret;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	if (mutex_lock_interruptible(&vou_dev->fop_lock))
 		return -ERESTARTSYS;
@@ -1241,47 +1240,17 @@ static int sh_vou_mmap(struct file *file, struct vm_area_struct *vma)
 
 static unsigned int sh_vou_poll(struct file *file, poll_table *wait)
 {
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
+	struct sh_vou_device *vou_dev = video_drvdata(file);
 	struct sh_vou_file *vou_file = file->private_data;
 	unsigned int res;
 
-	dev_dbg(vou_file->vbq.dev, "%s()\n", __func__);
+	dev_dbg(vou_dev->v4l2_dev.dev, "%s()\n", __func__);
 
 	mutex_lock(&vou_dev->fop_lock);
 	res = videobuf_poll_stream(file, &vou_file->vbq, wait);
 	mutex_unlock(&vou_dev->fop_lock);
 	return res;
 }
-
-static int sh_vou_g_chip_ident(struct file *file, void *fh,
-				   struct v4l2_dbg_chip_ident *id)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
-
-	return v4l2_device_call_until_err(&vou_dev->v4l2_dev, 0, core, g_chip_ident, id);
-}
-
-#ifdef CONFIG_VIDEO_ADV_DEBUG
-static int sh_vou_g_register(struct file *file, void *fh,
-				 struct v4l2_dbg_register *reg)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
-
-	return v4l2_device_call_until_err(&vou_dev->v4l2_dev, 0, core, g_register, reg);
-}
-
-static int sh_vou_s_register(struct file *file, void *fh,
-				 struct v4l2_dbg_register *reg)
-{
-	struct video_device *vdev = video_devdata(file);
-	struct sh_vou_device *vou_dev = video_get_drvdata(vdev);
-
-	return v4l2_device_call_until_err(&vou_dev->v4l2_dev, 0, core, s_register, reg);
-}
-#endif
 
 /* sh_vou display ioctl operations */
 static const struct v4l2_ioctl_ops sh_vou_ioctl_ops = {
@@ -1301,11 +1270,6 @@ static const struct v4l2_ioctl_ops sh_vou_ioctl_ops = {
 	.vidioc_cropcap			= sh_vou_cropcap,
 	.vidioc_g_crop			= sh_vou_g_crop,
 	.vidioc_s_crop			= sh_vou_s_crop,
-	.vidioc_g_chip_ident		= sh_vou_g_chip_ident,
-#ifdef CONFIG_VIDEO_ADV_DEBUG
-	.vidioc_g_register		= sh_vou_g_register,
-	.vidioc_s_register		= sh_vou_s_register,
-#endif
 };
 
 static const struct v4l2_file_operations sh_vou_fops = {
@@ -1322,7 +1286,6 @@ static const struct video_device sh_vou_video_template = {
 	.fops		= &sh_vou_fops,
 	.ioctl_ops	= &sh_vou_ioctl_ops,
 	.tvnorms	= V4L2_STD_525_60, /* PAL only supported in 8-bit non-bt656 mode */
-	.current_norm	= V4L2_STD_NTSC_M,
 	.vfl_dir	= VFL_DIR_TX,
 };
 
@@ -1361,7 +1324,7 @@ static int sh_vou_probe(struct platform_device *pdev)
 	pix = &vou_dev->pix;
 
 	/* Fill in defaults */
-	vou_dev->std		= sh_vou_video_template.current_norm;
+	vou_dev->std		= V4L2_STD_NTSC_M;
 	rect->left		= 0;
 	rect->top		= 0;
 	rect->width		= VOU_MAX_IMAGE_WIDTH;
@@ -1398,21 +1361,14 @@ static int sh_vou_probe(struct platform_device *pdev)
 		goto ev4l2devreg;
 	}
 
-	/* Allocate memory for video device */
-	vdev = video_device_alloc();
-	if (vdev == NULL) {
-		ret = -ENOMEM;
-		goto evdevalloc;
-	}
-
+	vdev = &vou_dev->vdev;
 	*vdev = sh_vou_video_template;
 	if (vou_pdata->bus_fmt == SH_VOU_BUS_8BIT)
 		vdev->tvnorms |= V4L2_STD_PAL;
 	vdev->v4l2_dev = &vou_dev->v4l2_dev;
-	vdev->release = video_device_release;
+	vdev->release = video_device_release_empty;
 	vdev->lock = &vou_dev->fop_lock;
 
-	vou_dev->vdev = vdev;
 	video_set_drvdata(vdev, vou_dev);
 
 	pm_runtime_enable(&pdev->dev);
@@ -1446,9 +1402,7 @@ ei2cnd:
 ereset:
 	i2c_put_adapter(i2c_adap);
 ei2cgadap:
-	video_device_release(vdev);
 	pm_runtime_disable(&pdev->dev);
-evdevalloc:
 	v4l2_device_unregister(&vou_dev->v4l2_dev);
 ev4l2devreg:
 	free_irq(irq, vou_dev);
@@ -1475,7 +1429,7 @@ static int sh_vou_remove(struct platform_device *pdev)
 	if (irq > 0)
 		free_irq(irq, vou_dev);
 	pm_runtime_disable(&pdev->dev);
-	video_unregister_device(vou_dev->vdev);
+	video_unregister_device(&vou_dev->vdev);
 	i2c_put_adapter(client->adapter);
 	v4l2_device_unregister(&vou_dev->v4l2_dev);
 	iounmap(vou_dev->base);
@@ -1490,22 +1444,10 @@ static struct platform_driver __refdata sh_vou = {
 	.remove  = sh_vou_remove,
 	.driver  = {
 		.name	= "sh-vou",
-		.owner	= THIS_MODULE,
 	},
 };
 
-static int __init sh_vou_init(void)
-{
-	return platform_driver_probe(&sh_vou, sh_vou_probe);
-}
-
-static void __exit sh_vou_exit(void)
-{
-	platform_driver_unregister(&sh_vou);
-}
-
-module_init(sh_vou_init);
-module_exit(sh_vou_exit);
+module_platform_driver_probe(sh_vou, sh_vou_probe);
 
 MODULE_DESCRIPTION("SuperH VOU driver");
 MODULE_AUTHOR("Guennadi Liakhovetski <g.liakhovetski@gmx.de>");

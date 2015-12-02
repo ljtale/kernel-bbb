@@ -4,10 +4,10 @@
 
 # Create $(fwabs) from $(CONFIG_EXTRA_FIRMWARE_DIR) -- if it doesn't have a
 # leading /, it's relative to $(srctree).
-fwdir := $(subst ",,$(CONFIG_EXTRA_FIRMWARE_DIR))
+fwdir := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE_DIR))
 fwabs := $(addprefix $(srctree)/,$(filter-out /%,$(fwdir)))$(filter /%,$(fwdir))
 
-fw-external-y := $(subst ",,$(CONFIG_EXTRA_FIRMWARE))
+fw-external-y := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE))
 
 # There are three cases to care about:
 # 1. Building kernel with CONFIG_FIRMWARE_IN_KERNEL=y -- $(fw-shipped-y) should
@@ -136,162 +136,10 @@ fw-shipped-$(CONFIG_USB_VICAM) += vicam/firmware.fw
 fw-shipped-$(CONFIG_VIDEO_CPIA2) += cpia2/stv0672_vp4.bin
 fw-shipped-$(CONFIG_YAM) += yam/1200.bin yam/9600.bin
 
-# all the generic capes
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	cape-bebopr-R2.dtbo \
-	cape-bebopr-ena-R2.dtbo \
-	cape-bebopr-brdg-R2.dtbo \
-	cape-bone-2g-emmc1.dtbo \
-	cape-bone-adafruit-lcd-00A0.dtbo \
-	cape-bone-dvi-00A0.dtbo \
-	cape-bone-dvi-00A1.dtbo \
-	cape-bone-dvi-00A2.dtbo \
-	cape-bone-hexy-00A0.dtbo \
-	cape-bone-lcd3-00A0.dtbo \
-	cape-bone-lcd3-00A2.dtbo \
-	BB-BONE-AUDI-01-00A0.dtbo \
-	BB-BONE-AUDI-02-00A0.dtbo \
-	BB-BONE-LCD4-01-00A0.dtbo \
-	BB-BONE-LCD4-01-00A1.dtbo \
-	BB-BONE-LCD7-01-00A2.dtbo \
-	BB-BONE-LCD7-01-00A3.dtbo \
-	BB-BONE-LCD7-01-00A4.dtbo \
-	BB-BONE-eMMC1-01-00A0.dtbo \
-	BB-BONE-GPEVT-00A0.dtbo \
-	BB-BONE-RTC-00A0.dtbo \
-	BB-BONE-GPS-00A0.dtbo \
-	BB-BONE-RS232-00A0.dtbo \
-	BB-BONE-SERL-01-00A1.dtbo \
-	BB-BONE-SERL-01-00A2.dtbo \
-	cape-bone-iio-00A0.dtbo \
-	cape-bone-pinmux-test-00A0.dtbo \
-	cape-bone-exptest-00A0.dtbo \
-	cape-bone-mrf24j40-00A0.dtbo \
-	BB-BONELT-BT-00A0.dtbo \
-	am33xx_pwm-00A0.dtbo \
-	bone_pwm_P8_13-00A0.dtbo \
-	bone_pwm_P8_19-00A0.dtbo \
-	bone_pwm_P8_34-00A0.dtbo \
-	bone_pwm_P8_36-00A0.dtbo \
-	bone_pwm_P8_45-00A0.dtbo \
-	bone_pwm_P8_46-00A0.dtbo \
-	bone_pwm_P9_14-00A0.dtbo \
-	bone_pwm_P9_16-00A0.dtbo \
-	bone_pwm_P9_21-00A0.dtbo \
-	bone_pwm_P9_22-00A0.dtbo \
-	bone_pwm_P9_28-00A0.dtbo \
-	bone_pwm_P9_29-00A0.dtbo \
-	bone_pwm_P9_31-00A0.dtbo \
-	bone_pwm_P9_42-00A0.dtbo \
-	BB-BONE-LOGIBONE-00R1.dtbo \
-	BB-BONE-PWMT-00A0.dtbo \
-	BB-BEAGLELOGIC-00A0.dtbo \
-	BB-BONE-PRU-01-00A0.dtbo \
-	BB-BONE-PRU-02-00A0.dtbo \
-	BB-BONE-PRU-03-00A0.dtbo \
-	BB-BONE-PRU-04-00A0.dtbo \
-	BB-BONE-RST-00A0.dtbo \
-	BB-BONE-RST2-00A0.dtbo \
-	BB-BONE-CAM3-01-00A2.dtbo \
-	BB-BONE-CAM-VVDN-00A0.dtbo \
-	TT3201-001-01.dtbo \
-	cape-bone-proto-00A0.dtbo \
-	BB-BONE-SERL-03-00A1.dtbo \
-	BB-BONE-BACON-00A0.dtbo \
-	BB-BONE-BACONE-00A0.dtbo \
-	BB-BONE-BACONE2-00A0.dtbo \
-	DNIL-AMPCAPE-1-00R1.dtbo \
-	BB-BONE-REPLICAP-00A1.dtbo \
-	BB-BONE-REPLICAP-00A2.dtbo \
-	BB-BONE-REPLICAP-00A3.dtbo \
-	BB-BONE-REPLICAP-00A4.dtbo \
-	BB-BONE-REPLICAP-0A4A.dtbo \
-	cape-univ-emmc-00A0.dtbo \
-	cape-universal-00A0.dtbo \
-	cape-universaln-00A0.dtbo \
-	cape-bone-ibb-00A0.dtbo \
-	BB-BONE-HAS-00R1.dtbo \
-	BB-BONE-CRYPTO-00A0.dtbo \
-	bone_eqep0-00A0.dtbo \
-	bone_eqep1-00A0.dtbo \
-	bone_eqep2-00A0.dtbo \
-	BB-VIEW-LCD4-01-00A0.dtbo \
-	BB-VIEW-LCD7-01-00A0.dtbo
-
-# the geiger cape
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE_GEIGER) += \
-	cape-bone-geiger-00A0.dtbo
-
-# the Argus UPS cape
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE_ARGUS) += \
-	cape-bone-argus-00A0.dtbo
-
-# the nixie cape
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE_NIXIE) += \
-	cape-bone-nixie-00A0.dtbo
-
-# the weather cape
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	cape-bone-weather-00A0.dtbo \
-	cape-bone-weather-00B0.dtbo
-
-# the HDMI virtual capes on the beaglebone-black
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	cape-boneblack-hdmi-00A0.dtbo cape-boneblack-hdmin-00A0.dtbo
-
-# the Tester cape (tester-side)
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += cape-bone-tester-00A0.dtbo
-
-# the CBB-Serial cape
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	cape-CBB-Serial-r01.dtbo \
-	BB-UART2-RTSCTS-00A0.dtbo \
-	BB-UART4-RTSCTS-00A0.dtbo
-
-# the CBB-Relay cape
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	CBB-Relay-00A0.dtbo
-
-# the virtual peripheral capes for the UARTs
-# UART3 is not routed to the connectors, no cape for it
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	BB-UART1-00A0.dtbo BB-UART2-00A0.dtbo \
-	BB-UART4-00A0.dtbo BB-UART5-00A0.dtbo
-
-# the virtual peripheral capes for the I2Cs
-# I2C0 & I2C2 are enabled by default, no capes for them
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	BB-I2C1-00A0.dtbo BB-I2C1A1-00A0.dtbo
-
-# the virtual peripheral capes for the SPIDEVs
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	BB-SPIDEV0-00A0.dtbo BB-SPIDEV1-00A0.dtbo BB-SPIDEV1A1-00A0.dtbo
-
-# the virtual peripheral capes for ADC
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	BB-ADC-00A0.dtbo
-
-# the virtual peripheral capes for GPIO
-fw-shipped-$(CONFIG_CAPE_BEAGLEBONE) += \
-	BB-GPIOHELP-00A0.dtbo
-
-# PRU firmware
-#fw-shipped-$(CONFIG_PRU_RPROC) += \
-#	prutest.bin
-
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
-
-# Directories which we _might_ need to create, so we have a rule for them.
-firmware-dirs := $(sort $(addprefix $(objtree)/$(obj)/,$(dir $(fw-external-y) $(fw-shipped-all))))
-
-quiet_cmd_mkdir = MKDIR   $(patsubst $(objtree)/%,%,$@)
-      cmd_mkdir = mkdir -p $@
 
 quiet_cmd_ihex  = IHEX    $@
       cmd_ihex  = $(OBJCOPY) -Iihex -Obinary $< $@
-
-quiet_cmd_dtco	= DTCO $@
-      cmd_dtco	= $(objtree)/scripts/dtc/dtc -O dtb -o $@ -b 0 $(DTC_FLAGS) -@ $<
 
 quiet_cmd_ihex2fw  = IHEX2FW $@
       cmd_ihex2fw  = $(objtree)/$(obj)/ihex2fw $< $@
@@ -330,21 +178,10 @@ wordsize_deps := $(wildcard include/config/64bit.h include/config/32bit.h \
 		include/config/superh32.h include/config/superh64.h \
 		include/config/x86_32.h include/config/x86_64.h)
 
-# Workaround for make < 3.81, where .SECONDEXPANSION doesn't work.
-# It'll end up depending on these targets, so make them a PHONY rule which
-# depends on _all_ the directories in $(firmware-dirs), and it'll work out OK.
-PHONY += $(objtree)/$$(%) $(objtree)/$(obj)/$$(%)
-$(objtree)/$$(%) $(objtree)/$(obj)/$$(%): $(firmware-dirs)
-	@true
-
-# For the $$(dir %) trick, where we need % to be expanded first.
-.SECONDEXPANSION:
-
-$(patsubst %,$(obj)/%.gen.S, $(fw-shipped-y)): %: $(wordsize_deps) \
-		| $(objtree)/$$(dir %)
+$(patsubst %,$(obj)/%.gen.S, $(fw-shipped-y)): %: $(wordsize_deps)
 	$(call cmd,fwbin,$(patsubst %.gen.S,%,$@))
 $(patsubst %,$(obj)/%.gen.S, $(fw-external-y)): %: $(wordsize_deps) \
-		include/config/extra/firmware/dir.h | $(objtree)/$$(dir %)
+		include/config/extra/firmware/dir.h
 	$(call cmd,fwbin,$(fwabs)/$(patsubst $(obj)/%.gen.S,%,$@))
 
 # The .o files depend on the binaries directly; the .S files don't.
@@ -353,7 +190,7 @@ $(patsubst %,$(obj)/%.gen.o, $(fw-external-y)): $(obj)/%.gen.o: $(fwdir)/%
 
 # .ihex is used just as a simple way to hold binary files in a source tree
 # where binaries are frowned upon. They are directly converted with objcopy.
-$(obj)/%: $(obj)/%.ihex | $(objtree)/$(obj)/$$(dir %)
+$(obj)/%: $(obj)/%.ihex
 	$(call cmd,ihex)
 
 # Don't depend on ihex2fw if we're installing and it already exists.
@@ -372,22 +209,21 @@ endif
 # is actually meaningful, because the firmware has to be loaded in a certain
 # order rather than as a single binary blob. Thus, we convert them into our
 # more compact binary representation of ihex records (<linux/ihex.h>)
-$(obj)/%.fw: $(obj)/%.HEX $(ihex2fw_dep) | $(objtree)/$(obj)/$$(dir %)
+$(obj)/%.fw: $(obj)/%.HEX $(ihex2fw_dep)
 	$(call cmd,ihex2fw)
 
 # .H16 is our own modified form of Intel HEX, with 16-bit length for records.
-$(obj)/%.fw: $(obj)/%.H16 $(ihex2fw_dep) | $(objtree)/$(obj)/$$(dir %)
+$(obj)/%.fw: $(obj)/%.H16 $(ihex2fw_dep)
 	$(call cmd,h16tofw)
-
-# DTBO is device tree blob object
-$(obj)/%.dtbo: $(obj)/capes/%.dts | $(objtree)/$(obj)/$$(dir %)
-	$(call cmd,dtco)
-
-$(firmware-dirs):
-	$(call cmd,mkdir)
 
 obj-y				 += $(patsubst %,%.gen.o, $(fw-external-y))
 obj-$(CONFIG_FIRMWARE_IN_KERNEL) += $(patsubst %,%.gen.o, $(fw-shipped-y))
+
+ifeq ($(KBUILD_SRC),)
+# Makefile.build only creates subdirectories for O= builds, but external
+# firmware might live outside the kernel source tree
+_dummy := $(foreach d,$(addprefix $(obj)/,$(dir $(fw-external-y))), $(shell [ -d $(d) ] || mkdir -p $(d)))
+endif
 
 # Remove .S files and binaries created from ihex
 # (during 'make clean' .config isn't included so they're all in $(fw-shipped-))
@@ -396,6 +232,6 @@ targets := $(fw-shipped-) $(patsubst $(obj)/%,%, \
 
 # Without this, built-in.o won't be created when it's empty, and the
 # final vmlinux link will fail.
-obj-n := dummy
+obj- := dummy
 
 hostprogs-y := ihex2fw

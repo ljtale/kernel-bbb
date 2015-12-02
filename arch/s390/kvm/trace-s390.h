@@ -10,6 +10,13 @@
 #define TRACE_INCLUDE_FILE trace-s390
 
 /*
+ * The TRACE_SYSTEM_VAR defaults to TRACE_SYSTEM, but must be a
+ * legitimate C variable. It is not exported to user space.
+ */
+#undef TRACE_SYSTEM_VAR
+#define TRACE_SYSTEM_VAR kvm_s390
+
+/*
  * Trace point for the creation of the kvm instance.
  */
 TRACE_EVENT(kvm_s390_create_vm,
@@ -65,6 +72,27 @@ TRACE_EVENT(kvm_s390_destroy_vcpu,
 		    ),
 
 	    TP_printk("destroy cpu %d", __entry->id)
+	);
+
+/*
+ * Trace point for start and stop of vpcus.
+ */
+TRACE_EVENT(kvm_s390_vcpu_start_stop,
+	    TP_PROTO(unsigned int id, int state),
+	    TP_ARGS(id, state),
+
+	    TP_STRUCT__entry(
+		    __field(unsigned int, id)
+		    __field(int, state)
+		    ),
+
+	    TP_fast_assign(
+		    __entry->id = id;
+		    __entry->state = state;
+		    ),
+
+	    TP_printk("%s cpu %d", __entry->state ? "starting" : "stopping",
+		      __entry->id)
 	);
 
 /*
@@ -141,13 +169,13 @@ TRACE_EVENT(kvm_s390_inject_vcpu,
  * Trace point for the actual delivery of interrupts.
  */
 TRACE_EVENT(kvm_s390_deliver_interrupt,
-	    TP_PROTO(unsigned int id, __u64 type, __u32 data0, __u64 data1),
+	    TP_PROTO(unsigned int id, __u64 type, __u64 data0, __u64 data1),
 	    TP_ARGS(id, type, data0, data1),
 
 	    TP_STRUCT__entry(
 		    __field(int, id)
 		    __field(__u32, inttype)
-		    __field(__u32, data0)
+		    __field(__u64, data0)
 		    __field(__u64, data1)
 		    ),
 
@@ -159,7 +187,7 @@ TRACE_EVENT(kvm_s390_deliver_interrupt,
 		    ),
 
 	    TP_printk("deliver interrupt (vcpu %d): type:%x (%s) "	\
-		      "data:%08x %016llx",
+		      "data:%08llx %016llx",
 		      __entry->id, __entry->inttype,
 		      __print_symbolic(__entry->inttype, kvm_s390_int_type),
 		      __entry->data0, __entry->data1)
@@ -188,19 +216,63 @@ TRACE_EVENT(kvm_s390_request_resets,
  * Trace point for a vcpu's stop requests.
  */
 TRACE_EVENT(kvm_s390_stop_request,
-	    TP_PROTO(unsigned int action_bits),
-	    TP_ARGS(action_bits),
+	    TP_PROTO(unsigned char stop_irq, unsigned char flags),
+	    TP_ARGS(stop_irq, flags),
 
 	    TP_STRUCT__entry(
-		    __field(unsigned int, action_bits)
+		    __field(unsigned char, stop_irq)
+		    __field(unsigned char, flags)
 		    ),
 
 	    TP_fast_assign(
-		    __entry->action_bits = action_bits;
+		    __entry->stop_irq = stop_irq;
+		    __entry->flags = flags;
 		    ),
 
-	    TP_printk("stop request, action_bits = %08x",
-		      __entry->action_bits)
+	    TP_printk("stop request, stop irq = %u, flags = %08x",
+		      __entry->stop_irq, __entry->flags)
+	);
+
+
+/*
+ * Trace point for enabling channel I/O instruction support.
+ */
+TRACE_EVENT(kvm_s390_enable_css,
+	    TP_PROTO(void *kvm),
+	    TP_ARGS(kvm),
+
+	    TP_STRUCT__entry(
+		    __field(void *, kvm)
+		    ),
+
+	    TP_fast_assign(
+		    __entry->kvm = kvm;
+		    ),
+
+	    TP_printk("enabling channel I/O support (kvm @ %p)\n",
+		      __entry->kvm)
+	);
+
+/*
+ * Trace point for enabling and disabling interlocking-and-broadcasting
+ * suppression.
+ */
+TRACE_EVENT(kvm_s390_enable_disable_ibs,
+	    TP_PROTO(unsigned int id, int state),
+	    TP_ARGS(id, state),
+
+	    TP_STRUCT__entry(
+		    __field(unsigned int, id)
+		    __field(int, state)
+		    ),
+
+	    TP_fast_assign(
+		    __entry->id = id;
+		    __entry->state = state;
+		    ),
+
+	    TP_printk("%s ibs on cpu %d",
+		      __entry->state ? "enabling" : "disabling", __entry->id)
 	);
 
 

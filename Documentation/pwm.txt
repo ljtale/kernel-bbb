@@ -19,7 +19,8 @@ should instead register a static mapping that can be used to match PWM
 consumers to providers, as given in the following example:
 
 	static struct pwm_lookup board_pwm_lookup[] = {
-		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight", NULL),
+		PWM_LOOKUP("tegra-pwm", 0, "pwm-backlight", NULL,
+			   50000, PWM_POLARITY_NORMAL),
 	};
 
 	static void __init board_init(void)
@@ -39,7 +40,7 @@ New users should use the pwm_get() function and pass to it the consumer
 device or a consumer name. pwm_put() is used to free the PWM device. Managed
 variants of these functions, devm_pwm_get() and devm_pwm_put(), also exist.
 
-After being requested a PWM has to be configured using:
+After being requested, a PWM has to be configured using:
 
 int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
 
@@ -48,48 +49,39 @@ To start/stop toggling the PWM output use pwm_enable()/pwm_disable().
 Using PWMs with the sysfs interface
 -----------------------------------
 
-You have to enable CONFIG_PWM_SYSFS in your kernel configuration to use
-the sysfs interface. It is exposed at /sys/class/pwm/. If there are pwm
-drivers loaded and these drivers successfully probed a chip, this chip
-is exported as pwmchipX . Note that a single driver can probe multiple chips.
-Inside the directory you can read these properties:
+If CONFIG_SYSFS is enabled in your kernel configuration a simple sysfs
+interface is provided to use the PWMs from userspace. It is exposed at
+/sys/class/pwm/. Each probed PWM controller/chip will be exported as
+pwmchipN, where N is the base of the PWM chip. Inside the directory you
+will find:
 
-base - This is the linux global start where the chips pwm channels get
-exposed.
+npwm - The number of PWM channels this chip supports (read-only).
 
-npwm - This is the number of pwm channels this chip supports.
+export - Exports a PWM channel for use with sysfs (write-only).
 
-If you want to start using a pwm channel with sysfs first you have to
-export it. If you are finished with it and want to free the pwm for other
-uses, you can unexport it:
+unexport - Unexports a PWM channel from sysfs (write-only).
 
-export - Write the global pwm channel number to this file to start using
-the channel with sysfs.
+The PWM channels are numbered using a per-chip index from 0 to npwm-1.
 
-unexport - Write the global pwm channel number of the channel you are finshed
-with to this file to make the channel available for other uses.
+When a PWM channel is exported a pwmX directory will be created in the
+pwmchipN directory it is associated with, where X is the number of the
+channel that was exported. The following properties will then be available:
 
-Once a pwm is exported a pwmX (X ranging from 0 to MAX_PWMS) directory appears
-with the following read/write properties inside to control the pwm:
+period - The total period of the PWM signal (read/write).
+	Value is in nanoseconds and is the sum of the active and inactive
+	time of the PWM.
 
-duty_ns - Write the number of nanoseconds the active portion of the pwm period
-should last to this file. This can not be longer than the period_ns.
+duty_cycle - The active time of the PWM signal (read/write).
+	Value is in nanoseconds and must be less than the period.
 
-period_ns - Write the length of the pwm period in nanoseconds to this file.
-This includes the active and inactive portion of the pwm period and can not
-be smaller than duty_ns.
+polarity - Changes the polarity of the PWM signal (read/write).
+	Writes to this property only work if the PWM chip supports changing
+	the polarity. The polarity can only be changed if the PWM is not
+	enabled. Value is the string "normal" or "inversed".
 
-polarity - The normal behaviour is to put out a high for the active portion of
-the pwm period. Write a 1 to this file to inverse the signal and output a low
-on the active portion. Write a 0 to switch back to the normal behaviour. The
-polarity can only be changed if the pwm is not running. This file is only
-visible if the underlying driver/device supports changing the polarity.
-
-run - Write a 1 to this file to start the pwm signal generation, write a 0 to
-stop it. Set your desired period_ns, duty_ns and polarity before starting the
-pwm.
-
-It is recommend to set the period_ns at first and duty_ns after that.
+enable - Enable/disable the PWM signal (read/write).
+	0 - disabled
+	1 - enabled
 
 Implementing a PWM driver
 -------------------------
@@ -103,8 +95,15 @@ for new drivers to use the generic PWM framework.
 A new PWM controller/chip can be added using pwmchip_add() and removed
 again with pwmchip_remove(). pwmchip_add() takes a filled in struct
 pwm_chip as argument which provides a description of the PWM chip, the
-number of PWM devices provider by the chip and the chip-specific
+number of PWM devices provided by the chip and the chip-specific
 implementation of the supported PWM operations to the framework.
+
+When implementing polarity support in a PWM driver, make sure to respect the
+signal conventions in the PWM framework. By definition, normal polarity
+characterizes a signal starts high for the duration of the duty cycle and
+goes low for the remainder of the period. Conversely, a signal with inversed
+polarity starts low for the duration of the duty cycle and goes high for the
+remainder of the period.
 
 Locking
 -------

@@ -39,13 +39,12 @@ struct pinctrl_dev;
  *	name can be used with the generic @pinctrl_ops to retrieve the
  *	actual pins affected. The applicable groups will be returned in
  *	@groups and the number of groups in @num_groups
- * @enable: enable a certain muxing function with a certain pin group. The
+ * @set_mux: enable a certain muxing function with a certain pin group. The
  *	driver does not need to figure out whether enabling this function
  *	conflicts some other use of the pins in that group, such collisions
  *	are handled by the pinmux subsystem. The @func_selector selects a
  *	certain function whereas @group_selector selects a certain set of pins
  *	to be used. On simple controllers the latter argument may be ignored
- * @disable: disable a certain muxing selector with a certain pin group
  * @gpio_request_enable: requests and enables GPIO on a certain pin.
  *	Implement this only if you can mux every pin individually as GPIO. The
  *	affected GPIO range is passed along with an offset(pin number) into that
@@ -68,13 +67,13 @@ struct pinmux_ops {
 				  unsigned selector,
 				  const char * const **groups,
 				  unsigned * const num_groups);
-	int (*enable) (struct pinctrl_dev *pctldev, unsigned func_selector,
-		       unsigned group_selector);
-	void (*disable) (struct pinctrl_dev *pctldev, unsigned func_selector,
-			 unsigned group_selector);
+	int (*set_mux) (struct pinctrl_dev *pctldev, unsigned func_selector,
+			unsigned group_selector);
 	int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
 				    struct pinctrl_gpio_range *range,
 				    unsigned offset);
+	int (*save_context)(struct pinctrl_dev *pctldev);
+	void (*restore_context)(struct pinctrl_dev *pctldev);
 	void (*gpio_disable_free) (struct pinctrl_dev *pctldev,
 				   struct pinctrl_gpio_range *range,
 				   unsigned offset);
@@ -83,6 +82,20 @@ struct pinmux_ops {
 				   unsigned offset,
 				   bool input);
 };
+
+int pinmux_save_context(struct pinctrl_dev *pctldev, const char *function);
+void pinmux_restore_context(struct pinctrl_dev *pctldev, const char *function);
+
+#else /* !CONFIG_PINMUX */
+
+static inline int pinmux_save_context(struct pinctrl_dev *pctldev,
+				      const char *function)
+{
+	return 0;
+}
+
+static inline void pinmux_restore_context(struct pinctrl_dev *pctldev,
+					  const char *function) {}
 
 #endif /* CONFIG_PINMUX */
 

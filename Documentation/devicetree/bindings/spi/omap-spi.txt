@@ -2,8 +2,8 @@ OMAP2+ McSPI device
 
 Required properties:
 - compatible :
-  - "ti,omap2-spi" for OMAP2 & OMAP3.
-  - "ti,omap4-spi" for OMAP4+.
+  - "ti,omap2-mcspi" for OMAP2 & OMAP3.
+  - "ti,omap4-mcspi" for OMAP4+.
 - ti,spi-num-cs : Number of chipselect supported  by the instance.
 - ti,hwmods: Name of the hwmod associated to the McSPI
 - ti,pindir-d0-out-d1-in: Select the D0 pin as output and D1 as
@@ -11,12 +11,12 @@ Required properties:
 			  D1 as output.
 
 Optional properties:
-- dmas: List of DMA controller phandle and DMA request ordered
-	pairs. One tx and one rx pair is required for each chip
-	select.
+- dmas: List of DMA specifiers with the controller specific format
+	as described in the generic DMA client binding. A tx and rx
+	specifier is required for each chip select.
 - dma-names: List of DMA request names. These strings correspond
-	1:1 with the ordered pairs in dmas. The string naming is
-	to be "rxN" and "txN" for RX and TX requests,
+	1:1 with the DMA specifiers listed in dmas. The string naming
+	is to be "rxN" and "txN" for RX and TX requests,
 	respectively, where N equals the chip select number.
 
 Examples:

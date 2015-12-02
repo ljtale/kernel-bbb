@@ -727,9 +727,9 @@ static int get_vpd_params(struct adapter *adapter, struct vpd_params *p)
 		p->xauicfg[1] = simple_strtoul(vpd.xaui1cfg_data, NULL, 16);
 	}
 
-	for (i = 0; i < 6; i++)
-		p->eth_base[i] = hex_to_bin(vpd.na_data[2 * i]) * 16 +
-				 hex_to_bin(vpd.na_data[2 * i + 1]);
+	ret = hex2bin(p->eth_base, vpd.na_data, 6);
+	if (ret < 0)
+		return -EINVAL;
 	return 0;
 }
 
@@ -840,7 +840,7 @@ static int flash_wait_op(struct adapter *adapter, int attempts, int delay)
  *	Read the specified number of 32-bit words from the serial flash.
  *	If @byte_oriented is set the read data is stored as a byte array
  *	(i.e., big-endian), otherwise as 32-bit words in the platform's
- *	natural endianess.
+ *	natural endianness.
  */
 static int t3_read_flash(struct adapter *adapter, unsigned int addr,
 			 unsigned int nwords, u32 *data, int byte_oriented)
@@ -3724,8 +3724,6 @@ int t3_prep_adapter(struct adapter *adapter, const struct adapter_info *ai,
 		hw_addr[5] = adapter->params.vpd.eth_base[5] + i;
 
 		memcpy(adapter->port[i]->dev_addr, hw_addr,
-		       ETH_ALEN);
-		memcpy(adapter->port[i]->perm_addr, hw_addr,
 		       ETH_ALEN);
 		init_link_config(&p->link_config, p->phy.caps);
 		p->phy.ops->power_down(&p->phy, 1);

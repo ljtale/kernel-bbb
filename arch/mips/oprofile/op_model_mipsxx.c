@@ -11,37 +11,39 @@
 #include <linux/interrupt.h>
 #include <linux/smp.h>
 #include <asm/irq_regs.h>
+#include <asm/time.h>
 
 #include "op_impl.h"
 
-#define M_PERFCTL_EXL			(1UL      <<  0)
-#define M_PERFCTL_KERNEL		(1UL      <<  1)
-#define M_PERFCTL_SUPERVISOR		(1UL      <<  2)
-#define M_PERFCTL_USER			(1UL      <<  3)
-#define M_PERFCTL_INTERRUPT_ENABLE	(1UL      <<  4)
+#define M_PERFCTL_EXL			(1UL	  <<  0)
+#define M_PERFCTL_KERNEL		(1UL	  <<  1)
+#define M_PERFCTL_SUPERVISOR		(1UL	  <<  2)
+#define M_PERFCTL_USER			(1UL	  <<  3)
+#define M_PERFCTL_INTERRUPT_ENABLE	(1UL	  <<  4)
 #define M_PERFCTL_EVENT(event)		(((event) & 0x3ff)  << 5)
-#define M_PERFCTL_VPEID(vpe)		((vpe)    << 16)
+#define M_PERFCTL_VPEID(vpe)		((vpe)	  << 16)
 #define M_PERFCTL_MT_EN(filter)		((filter) << 20)
-#define    M_TC_EN_ALL			M_PERFCTL_MT_EN(0)
-#define    M_TC_EN_VPE			M_PERFCTL_MT_EN(1)
-#define    M_TC_EN_TC			M_PERFCTL_MT_EN(2)
-#define M_PERFCTL_TCID(tcid)		((tcid)   << 22)
-#define M_PERFCTL_WIDE			(1UL      << 30)
-#define M_PERFCTL_MORE			(1UL      << 31)
+#define	   M_TC_EN_ALL			M_PERFCTL_MT_EN(0)
+#define	   M_TC_EN_VPE			M_PERFCTL_MT_EN(1)
+#define	   M_TC_EN_TC			M_PERFCTL_MT_EN(2)
+#define M_PERFCTL_TCID(tcid)		((tcid)	  << 22)
+#define M_PERFCTL_WIDE			(1UL	  << 30)
+#define M_PERFCTL_MORE			(1UL	  << 31)
 
-#define M_COUNTER_OVERFLOW		(1UL      << 31)
+#define M_COUNTER_OVERFLOW		(1UL	  << 31)
 
 /* Netlogic XLR specific, count events in all threads in a core */
-#define M_PERFCTL_COUNT_ALL_THREADS	(1UL      << 13)
+#define M_PERFCTL_COUNT_ALL_THREADS	(1UL	  << 13)
 
 static int (*save_perf_irq)(void);
+static int perfcount_irq;
 
 /*
  * XLR has only one set of counters per core. Designate the
  * first hardware thread in the core for setup and init.
  * Skip CPUs with non-zero hardware thread id (4 hwt per core)
  */
-#ifdef CONFIG_CPU_XLR
+#if defined(CONFIG_CPU_XLR) && defined(CONFIG_SMP)
 #define oprofile_skip_cpu(c)	((cpu_logical_map(c) & 0x3) != 0)
 #else
 #define oprofile_skip_cpu(c)	0
@@ -143,7 +145,7 @@ static struct mipsxx_register_config {
 	unsigned int counter[4];
 } reg;
 
-/* Compute all of the registers in preparation for enabling profiling.  */
+/* Compute all of the registers in preparation for enabling profiling.	*/
 
 static void mipsxx_reg_setup(struct op_counter_config *ctr)
 {
@@ -159,20 +161,20 @@ static void mipsxx_reg_setup(struct op_counter_config *ctr)
 			continue;
 
 		reg.control[i] = M_PERFCTL_EVENT(ctr[i].event) |
-		                 M_PERFCTL_INTERRUPT_ENABLE;
+				 M_PERFCTL_INTERRUPT_ENABLE;
 		if (ctr[i].kernel)
 			reg.control[i] |= M_PERFCTL_KERNEL;
 		if (ctr[i].user)
 			reg.control[i] |= M_PERFCTL_USER;
 		if (ctr[i].exl)
 			reg.control[i] |= M_PERFCTL_EXL;
-		if (current_cpu_type() == CPU_XLR)
+		if (boot_cpu_type() == CPU_XLR)
 			reg.control[i] |= M_PERFCTL_COUNT_ALL_THREADS;
 		reg.counter[i] = 0x80000000 - ctr[i].count;
 	}
 }
 
-/* Program all of the registers in preparation for enabling profiling.  */
+/* Program all of the registers in preparation for enabling profiling.	*/
 
 static void mipsxx_cpu_setup(void *args)
 {
@@ -244,7 +246,7 @@ static int mipsxx_perfcount_handler(void)
 	unsigned int counter;
 	int handled = IRQ_NONE;
 
-	if (cpu_has_mips_r2 && !(read_c0_cause() & (1 << 26)))
+	if (cpu_has_mips_r2 && !(read_c0_cause() & CAUSEF_PCI))
 		return handled;
 
 	switch (counters) {
@@ -294,6 +296,7 @@ static inline int n_counters(void)
 
 	case CPU_R12000:
 	case CPU_R14000:
+	case CPU_R16000:
 		counters = 4;
 		break;
 
@@ -351,6 +354,10 @@ static int __init mipsxx_init(void)
 		op_model_mipsxx_ops.cpu_type = "mips/M14Kc";
 		break;
 
+	case CPU_M14KEC:
+		op_model_mipsxx_ops.cpu_type = "mips/M14KEc";
+		break;
+
 	case CPU_20KC:
 		op_model_mipsxx_ops.cpu_type = "mips/20K";
 		break;
@@ -368,8 +375,25 @@ static int __init mipsxx_init(void)
 		op_model_mipsxx_ops.cpu_type = "mips/34K";
 		break;
 
+	case CPU_1074K:
 	case CPU_74K:
 		op_model_mipsxx_ops.cpu_type = "mips/74K";
+		break;
+
+	case CPU_INTERAPTIV:
+		op_model_mipsxx_ops.cpu_type = "mips/interAptiv";
+		break;
+
+	case CPU_PROAPTIV:
+		op_model_mipsxx_ops.cpu_type = "mips/proAptiv";
+		break;
+
+	case CPU_P5600:
+		op_model_mipsxx_ops.cpu_type = "mips/P5600";
+		break;
+
+	case CPU_M5150:
+		op_model_mipsxx_ops.cpu_type = "mips/M5150";
 		break;
 
 	case CPU_5KC:
@@ -386,6 +410,10 @@ static int __init mipsxx_init(void)
 	case CPU_R12000:
 	case CPU_R14000:
 		op_model_mipsxx_ops.cpu_type = "mips/r12000";
+		break;
+
+	case CPU_R16000:
+		op_model_mipsxx_ops.cpu_type = "mips/r16000";
 		break;
 
 	case CPU_SB1:
@@ -410,9 +438,19 @@ static int __init mipsxx_init(void)
 	save_perf_irq = perf_irq;
 	perf_irq = mipsxx_perfcount_handler;
 
-	if ((cp0_perfcount_irq >= 0) && (cp0_compare_irq != cp0_perfcount_irq))
-		return request_irq(cp0_perfcount_irq, mipsxx_perfcount_int,
-			0, "Perfcounter", save_perf_irq);
+	if (get_c0_perfcount_int)
+		perfcount_irq = get_c0_perfcount_int();
+	else if (cp0_perfcount_irq >= 0)
+		perfcount_irq = MIPS_CPU_IRQ_BASE + cp0_perfcount_irq;
+	else
+		perfcount_irq = -1;
+
+	if (perfcount_irq >= 0)
+		return request_irq(perfcount_irq, mipsxx_perfcount_int,
+				   IRQF_PERCPU | IRQF_NOBALANCING |
+				   IRQF_NO_THREAD | IRQF_NO_SUSPEND |
+				   IRQF_SHARED,
+				   "Perfcounter", save_perf_irq);
 
 	return 0;
 }
@@ -421,8 +459,8 @@ static void mipsxx_exit(void)
 {
 	int counters = op_model_mipsxx_ops.num_counters;
 
-	if ((cp0_perfcount_irq >= 0) && (cp0_compare_irq != cp0_perfcount_irq))
-		free_irq(cp0_perfcount_irq, save_perf_irq);
+	if (perfcount_irq >= 0)
+		free_irq(perfcount_irq, save_perf_irq);
 
 	counters = counters_per_cpu_to_total(counters);
 	on_each_cpu(reset_counters, (void *)(long)counters, 1);

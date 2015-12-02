@@ -54,7 +54,6 @@ void pcibios_set_cache_line_size(void);
 /* pci-pc.c */
 
 extern int pcibios_last_bus;
-extern struct pci_bus *pci_root_bus;
 extern struct pci_ops pci_root_ops;
 
 void pcibios_scan_specific_bus(int busn);
@@ -93,6 +92,8 @@ extern raw_spinlock_t pci_config_lock;
 
 extern int (*pcibios_enable_irq)(struct pci_dev *dev);
 extern void (*pcibios_disable_irq)(struct pci_dev *dev);
+
+extern bool mp_should_keep_irq(struct device *dev);
 
 struct pci_raw_ops {
 	int (*read)(unsigned int domain, unsigned int bus, unsigned int devfn,

@@ -53,7 +53,7 @@ struct check {
 	void *data;
 	bool warn, error;
 	enum checkstatus status;
-	int inprogress;
+	bool inprogress;
 	int num_prereqs;
 	struct check **prereq;
 };
@@ -113,6 +113,7 @@ static inline void check_msg(struct check *c, const char *fmt, ...)
 		vfprintf(stderr, fmt, ap);
 		fprintf(stderr, "\n");
 	}
+	va_end(ap);
 }
 
 #define FAIL(c, ...) \
@@ -141,9 +142,9 @@ static void check_nodes_props(struct check *c, struct node *dt, struct node *nod
 		check_nodes_props(c, dt, child);
 }
 
-static int run_check(struct check *c, struct node *dt)
+static bool run_check(struct check *c, struct node *dt)
 {
-	int error = 0;
+	bool error = false;
 	int i;
 
 	assert(!c->inprogress);
@@ -151,11 +152,11 @@ static int run_check(struct check *c, struct node *dt)
 	if (c->status != UNCHECKED)
 		goto out;
 
-	c->inprogress = 1;
+	c->inprogress = true;
 
 	for (i = 0; i < c->num_prereqs; i++) {
 		struct check *prq = c->prereq[i];
-		error |= run_check(prq, dt);
+		error = error || run_check(prq, dt);
 		if (prq->status != PASSED) {
 			c->status = PREREQ;
 			check_msg(c, "Failed prerequisite '%s'",
@@ -177,9 +178,9 @@ static int run_check(struct check *c, struct node *dt)
 	TRACE(c, "\tCompleted, status %d", c->status);
 
 out:
-	c->inprogress = 0;
+	c->inprogress = false;
 	if ((c->status != PASSED) && (c->error))
-		error = 1;
+		error = true;
 	return error;
 }
 
@@ -461,28 +462,18 @@ static void fixup_phandle_references(struct check *c, struct node *dt,
 	struct fixup_entry *fe, **fep;
 	struct node *refnode;
 	cell_t phandle;
-	int has_phandle_refs;
-
-	has_phandle_refs = 0;
-	for_each_marker_of_type(m, REF_PHANDLE) {
-		has_phandle_refs = 1;
-		break;
-	}
-
-	if (!has_phandle_refs)
-		return;
 
 	for_each_marker_of_type(m, REF_PHANDLE) {
 		assert(m->offset + sizeof(cell_t) <= prop->val.len);
 
 		refnode = get_node_by_ref(dt, m->ref);
-		if (!refnode && !symbol_fixup_support) {
-			FAIL(c, "Reference to non-existent node or label \"%s\"\n",
-				m->ref);
-			continue;
-		}
+		if (! refnode) {
+			if (!dt->is_plugin) {
+				FAIL(c, "Reference to non-existent node or label \"%s\"\n",
+					m->ref);
+				continue;
+			}
 
-		if (!refnode) {
 			/* allocate fixup entry */
 			fe = xmalloc(sizeof(*fe));
 
@@ -517,31 +508,31 @@ static void fixup_phandle_references(struct check *c, struct node *dt,
 			*fep = fe;
 
 			/* mark the entry as unresolved */
-			phandle = 0xdeadbeef;
-		} else {
-			phandle = get_node_phandle(dt, refnode);
-
-			/* if it's a plugin, we need to record it */
-			if (symbol_fixup_support && dt->is_plugin) {
-
-				/* allocate a new local fixup entry */
-				fe = xmalloc(sizeof(*fe));
-
-				fe->node = node;
-				fe->prop = prop;
-				fe->offset = m->offset;
-				fe->next = NULL;
-
-				/* append it to the local fixups */
-				fep = &dt->local_fixups;
-				while (*fep)
-					fep = &(*fep)->next;
-				*fep = fe;
-			}
+			*((cell_t *)(prop->val.val + m->offset)) =
+				cpu_to_fdt32(0xdeadbeef);
+			continue;
 		}
 
-		*((cell_t *)(prop->val.val + m->offset)) =
-			cpu_to_fdt32(phandle);
+		/* if it's a local reference, we need to record it */
+		if (symbol_fixup_support) {
+
+			/* allocate a new local fixup entry */
+			fe = xmalloc(sizeof(*fe));
+
+			fe->node = node;
+			fe->prop = prop;
+			fe->offset = m->offset;
+			fe->next = NULL;
+
+			/* append it to the local fixups */
+			fep = &dt->local_fixups;
+			while (*fep)
+				fep = &(*fep)->next;
+			*fep = fe;
+		}
+
+		phandle = get_node_phandle(dt, refnode);
+		*((cell_t *)(prop->val.val + m->offset)) = cpu_to_fdt32(phandle);
 	}
 
 }
@@ -630,7 +621,7 @@ static void check_reg_format(struct check *c, struct node *dt,
 	size_cells = node_size_cells(node->parent);
 	entrylen = (addr_cells + size_cells) * sizeof(cell_t);
 
-	if ((prop->val.len % entrylen) != 0)
+	if (!entrylen || (prop->val.len % entrylen) != 0)
 		FAIL(c, "\"reg\" property in %s has invalid length (%d bytes) "
 		     "(#address-cells == %d, #size-cells == %d)",
 		     node->fullpath, prop->val.len, addr_cells, size_cells);
@@ -695,11 +686,11 @@ static void check_avoid_default_addr_size(struct check *c, struct node *dt,
 	if (!reg && !ranges)
 		return;
 
-	if ((node->parent->addr_cells == -1))
+	if (node->parent->addr_cells == -1)
 		FAIL(c, "Relying on default #address-cells value for %s",
 		     node->fullpath);
 
-	if ((node->parent->size_cells == -1))
+	if (node->parent->size_cells == -1)
 		FAIL(c, "Relying on default #size-cells value for %s",
 		     node->fullpath);
 }
@@ -818,15 +809,15 @@ static void disable_warning_error(struct check *c, bool warn, bool error)
 	c->error = c->error && !error;
 }
 
-void parse_checks_option(bool warn, bool error, const char *optarg)
+void parse_checks_option(bool warn, bool error, const char *arg)
 {
 	int i;
-	const char *name = optarg;
+	const char *name = arg;
 	bool enable = true;
 
-	if ((strncmp(optarg, "no-", 3) == 0)
-	    || (strncmp(optarg, "no_", 3) == 0)) {
-		name = optarg + 3;
+	if ((strncmp(arg, "no-", 3) == 0)
+	    || (strncmp(arg, "no_", 3) == 0)) {
+		name = arg + 3;
 		enable = false;
 	}
 
@@ -845,7 +836,7 @@ void parse_checks_option(bool warn, bool error, const char *optarg)
 	die("Unrecognized check name \"%s\"\n", name);
 }
 
-void process_checks(int force, struct boot_info *bi)
+void process_checks(bool force, struct boot_info *bi)
 {
 	struct node *dt = bi->dt;
 	int i;

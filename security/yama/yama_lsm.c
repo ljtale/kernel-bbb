@@ -347,10 +347,8 @@ int yama_ptrace_traceme(struct task_struct *parent)
 	/* Only disallow PTRACE_TRACEME on more aggressive settings. */
 	switch (ptrace_scope) {
 	case YAMA_SCOPE_CAPABILITY:
-		rcu_read_lock();
-		if (!ns_capable(__task_cred(parent)->user_ns, CAP_SYS_PTRACE))
+		if (!has_ns_capability(parent, current_user_ns(), CAP_SYS_PTRACE))
 			rc = -EPERM;
-		rcu_read_unlock();
 		break;
 	case YAMA_SCOPE_NO_ATTACH:
 		rc = -EPERM;
@@ -381,20 +379,17 @@ static struct security_operations yama_ops = {
 static int yama_dointvec_minmax(struct ctl_table *table, int write,
 				void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int rc;
+	struct ctl_table table_copy;
 
 	if (write && !capable(CAP_SYS_PTRACE))
 		return -EPERM;
 
-	rc = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
-	if (rc)
-		return rc;
-
 	/* Lock the max value if it ever gets set. */
-	if (write && *(int *)table->data == *(int *)table->extra2)
-		table->extra1 = table->extra2;
+	table_copy = *table;
+	if (*(int *)table_copy.data == *(int *)table_copy.extra2)
+		table_copy.extra1 = table_copy.extra2;
 
-	return rc;
+	return proc_dointvec_minmax(&table_copy, write, buffer, lenp, ppos);
 }
 
 static int zero;

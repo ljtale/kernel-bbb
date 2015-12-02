@@ -1,3 +1,14 @@
+config TTY
+	bool "Enable TTY" if EXPERT
+	default y
+	---help---
+	  Allows you to remove TTY support which can save space, and
+	  blocks features that require TTY from inclusion in the kernel.
+	  TTY is required for any text terminals or serial port
+	  communication. Most users should leave this enabled.
+
+if TTY
+
 config VT
 	bool "Virtual terminal" if EXPERT
 	depends on !S390 && !UML
@@ -163,16 +174,6 @@ config BFIN_JTAG_COMM
 config BFIN_JTAG_COMM_CONSOLE
 	bool "Console on Blackfin JTAG"
 	depends on BFIN_JTAG_COMM=y
-
-config JHD629_I2C
-	bool "JHD629 I2C support"
-	depends on I2C && OF
-	select SERIAL_CORE
-	default n
-	help
-	  This selects support for a pseudo TTY on I2Ced JHD629
-
-	  Say Y here if you want to support this.
 
 config SERIAL_NONSTANDARD
 	bool "Non-standard serial port support"
@@ -365,7 +366,7 @@ config TRACE_SINK
 	  "Trace data router for MIPI P1149.7 cJTAG standard".
 
 config PPC_EPAPR_HV_BYTECHAN
-	tristate "ePAPR hypervisor byte channel driver"
+	bool "ePAPR hypervisor byte channel driver"
 	depends on PPC
 	select EPAPR_PARAVIRT
 	help
@@ -398,3 +399,71 @@ config PPC_EARLY_DEBUG_EHV_BC_HANDLE
 	  If the number you specify is not a valid byte channel handle, then
 	  there simply will be no early console output.  This is true also
 	  if you don't boot under a hypervisor at all.
+
+config GOLDFISH_TTY
+	tristate "Goldfish TTY Driver"
+	depends on GOLDFISH
+	help
+	  Console and system TTY driver for the Goldfish virtual platform.
+
+config DA_TTY
+	bool "DA TTY"
+	depends on METAG_DA
+	select SERIAL_NONSTANDARD
+	help
+	  This enables a TTY on a Dash channel.
+
+config DA_CONSOLE
+	bool "DA Console"
+	depends on DA_TTY
+	help
+	  This enables a console on a Dash channel.
+
+config MIPS_EJTAG_FDC_TTY
+	bool "MIPS EJTAG Fast Debug Channel TTY"
+	depends on MIPS_CDMM
+	help
+	  This enables a TTY and console on the MIPS EJTAG Fast Debug Channels,
+	  if they are present. This can be useful when working with an EJTAG
+	  probe which supports it, to get console output and a login prompt via
+	  EJTAG without needing to connect a serial cable.
+
+	  TTY devices are named e.g. ttyFDC3c2 (for FDC channel 2 of the FDC on
+	  CPU3).
+
+	  The console can be enabled with console=fdc1 (for FDC channel 1 on all
+	  CPUs). Do not use the console unless there is a debug probe attached
+	  to drain the FDC TX FIFO.
+
+	  If unsure, say N.
+
+config MIPS_EJTAG_FDC_EARLYCON
+	bool "Early FDC console"
+	depends on MIPS_EJTAG_FDC_TTY
+	help
+	  This registers a console on FDC channel 1 very early during boot (from
+	  MIPS arch code). This is useful for bring-up and debugging early boot
+	  issues.
+
+	  Do not enable unless there is a debug probe attached to drain the FDC
+	  TX FIFO.
+
+	  If unsure, say N.
+
+config MIPS_EJTAG_FDC_KGDB
+	bool "Use KGDB over an FDC channel"
+	depends on MIPS_EJTAG_FDC_TTY && KGDB
+	default y
+	help
+          This enables the use of KGDB over an FDC channel, allowing KGDB to be
+          used remotely or when a serial port isn't available.
+
+config MIPS_EJTAG_FDC_KGDB_CHAN
+	int "KGDB FDC channel"
+	depends on MIPS_EJTAG_FDC_KGDB
+	range 2 15
+	default 3
+	help
+	  FDC channel number to use for KGDB.
+
+endif # TTY

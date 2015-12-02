@@ -156,6 +156,9 @@ struct dvb_ca_private {
 
 	/* Slot to start looking for data to read from in the next user-space read operation */
 	int next_read_slot;
+
+	/* mutex serializing ioctls */
+	struct mutex ioctl_mutex;
 };
 
 static void dvb_ca_en50221_thread_wakeup(struct dvb_ca_private *ca);
@@ -1191,6 +1194,9 @@ static int dvb_ca_en50221_io_do_ioctl(struct file *file,
 
 	dprintk("%s\n", __func__);
 
+	if (mutex_lock_interruptible(&ca->ioctl_mutex))
+		return -ERESTARTSYS;
+
 	switch (cmd) {
 	case CA_RESET:
 		for (slot = 0; slot < ca->slot_count; slot++) {
@@ -1221,8 +1227,10 @@ static int dvb_ca_en50221_io_do_ioctl(struct file *file,
 	case CA_GET_SLOT_INFO: {
 		struct ca_slot_info *info = parg;
 
-		if ((info->num > ca->slot_count) || (info->num < 0))
-			return -EINVAL;
+		if ((info->num > ca->slot_count) || (info->num < 0)) {
+			err = -EINVAL;
+			goto out_unlock;
+		}
 
 		info->type = CA_CI_LINK;
 		info->flags = 0;
@@ -1241,6 +1249,8 @@ static int dvb_ca_en50221_io_do_ioctl(struct file *file,
 		break;
 	}
 
+out_unlock:
+	mutex_unlock(&ca->ioctl_mutex);
 	return err;
 }
 
@@ -1628,14 +1638,16 @@ static const struct file_operations dvb_ca_fops = {
 	.llseek = noop_llseek,
 };
 
-static struct dvb_device dvbdev_ca = {
+static const struct dvb_device dvbdev_ca = {
 	.priv = NULL,
 	.users = 1,
 	.readers = 1,
 	.writers = 1,
+#if defined(CONFIG_MEDIA_CONTROLLER_DVB)
+	.name = "dvb-ca-en50221",
+#endif
 	.fops = &dvb_ca_fops,
 };
-
 
 /* ******************************************************************************** */
 /* Initialisation/shutdown functions */
@@ -1666,14 +1678,14 @@ int dvb_ca_en50221_init(struct dvb_adapter *dvb_adapter,
 	/* initialise the system data */
 	if ((ca = kzalloc(sizeof(struct dvb_ca_private), GFP_KERNEL)) == NULL) {
 		ret = -ENOMEM;
-		goto error;
+		goto exit;
 	}
 	ca->pub = pubca;
 	ca->flags = flags;
 	ca->slot_count = slot_count;
 	if ((ca->slot_info = kcalloc(slot_count, sizeof(struct dvb_ca_slot), GFP_KERNEL)) == NULL) {
 		ret = -ENOMEM;
-		goto error;
+		goto free_ca;
 	}
 	init_waitqueue_head(&ca->wait_queue);
 	ca->open = 0;
@@ -1684,7 +1696,7 @@ int dvb_ca_en50221_init(struct dvb_adapter *dvb_adapter,
 	/* register the DVB device */
 	ret = dvb_register_device(dvb_adapter, &ca->dvbdev, &dvbdev_ca, ca, DVB_DEVICE_CA);
 	if (ret)
-		goto error;
+		goto free_slot_info;
 
 	/* now initialise each slot */
 	for (i = 0; i < slot_count; i++) {
@@ -1695,9 +1707,11 @@ int dvb_ca_en50221_init(struct dvb_adapter *dvb_adapter,
 		mutex_init(&ca->slot_info[i].slot_lock);
 	}
 
+	mutex_init(&ca->ioctl_mutex);
+
 	if (signal_pending(current)) {
 		ret = -EINTR;
-		goto error;
+		goto unregister_device;
 	}
 	mb();
 
@@ -1708,17 +1722,17 @@ int dvb_ca_en50221_init(struct dvb_adapter *dvb_adapter,
 		ret = PTR_ERR(ca->thread);
 		printk("dvb_ca_init: failed to start kernel_thread (%d)\n",
 			ret);
-		goto error;
+		goto unregister_device;
 	}
 	return 0;
 
-error:
-	if (ca != NULL) {
-		if (ca->dvbdev != NULL)
-			dvb_unregister_device(ca->dvbdev);
-		kfree(ca->slot_info);
-		kfree(ca);
-	}
+unregister_device:
+	dvb_unregister_device(ca->dvbdev);
+free_slot_info:
+	kfree(ca->slot_info);
+free_ca:
+	kfree(ca);
+exit:
 	pubca->private = NULL;
 	return ret;
 }

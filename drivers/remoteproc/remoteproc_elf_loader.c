@@ -166,24 +166,25 @@ rproc_elf_load_segments(struct rproc *rproc, const struct firmware *fw)
 			continue;
 
 		dev_dbg(dev, "phdr: type %d da 0x%x memsz 0x%x filesz 0x%x\n",
-					phdr->p_type, da, memsz, filesz);
+			phdr->p_type, da, memsz, filesz);
 
 		if (filesz > memsz) {
 			dev_err(dev, "bad phdr filesz 0x%x memsz 0x%x\n",
-							filesz, memsz);
+				filesz, memsz);
 			ret = -EINVAL;
 			break;
 		}
 
 		if (offset + filesz > fw->size) {
 			dev_err(dev, "truncated fw: need 0x%x avail 0x%zx\n",
-					offset + filesz, fw->size);
+				offset + filesz, fw->size);
 			ret = -EINVAL;
 			break;
 		}
 
 		/* grab the kernel address for this device address */
-		ptr = rproc_da_to_va(rproc, da, memsz);
+		ptr = rproc_da_to_va(rproc, da, memsz,
+				     RPROC_FLAGS_ELF_PHDR | phdr->p_flags);
 		if (!ptr) {
 			dev_err(dev, "bad phdr da 0x%x mem 0x%x\n", da, memsz);
 			ret = -EINVAL;
@@ -208,41 +209,22 @@ rproc_elf_load_segments(struct rproc *rproc, const struct firmware *fw)
 	return ret;
 }
 
-/**
- * rproc_elf_find_rsc_table() - find the resource table
- * @rproc: the rproc handle
- * @fw: the ELF firmware image
- * @tablesz: place holder for providing back the table size
- *
- * This function finds the resource table inside the remote processor's
- * firmware. It is used both upon the registration of @rproc (in order
- * to look for and register the supported virito devices), and when the
- * @rproc is booted.
- *
- * Returns the pointer to the resource table if it is found, and write its
- * size into @tablesz. If a valid table isn't found, NULL is returned
- * (and @tablesz isn't set).
- */
-static struct resource_table *
-rproc_elf_find_rsc_table(struct rproc *rproc, const struct firmware *fw,
-							int *tablesz)
+static struct elf32_shdr *
+find_table(struct device *dev, struct elf32_hdr *ehdr, size_t fw_size)
 {
-	struct elf32_hdr *ehdr;
 	struct elf32_shdr *shdr;
-	const char *name_table;
-	struct device *dev = &rproc->dev;
-	struct resource_table *table = NULL;
 	int i;
-	const u8 *elf_data = fw->data;
+	const char *name_table;
+	struct resource_table *table = NULL;
+	const u8 *elf_data = (void *)ehdr;
 
-	ehdr = (struct elf32_hdr *)elf_data;
+	/* look for the resource table and handle it */
 	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
 	name_table = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
 
-	/* look for the resource table and handle it */
 	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
-		int size = shdr->sh_size;
-		int offset = shdr->sh_offset;
+		u32 size = shdr->sh_size;
+		u32 offset = shdr->sh_offset;
 
 		if (strcmp(name_table + shdr->sh_name, ".resource_table"))
 			continue;
@@ -250,7 +232,7 @@ rproc_elf_find_rsc_table(struct rproc *rproc, const struct firmware *fw,
 		table = (struct resource_table *)(elf_data + offset);
 
 		/* make sure we have the entire table */
-		if (offset + size > fw->size) {
+		if (offset + size > fw_size || offset + size < size) {
 			dev_err(dev, "resource table truncated\n");
 			return NULL;
 		}
@@ -280,16 +262,133 @@ rproc_elf_find_rsc_table(struct rproc *rproc, const struct firmware *fw,
 			return NULL;
 		}
 
-		*tablesz = shdr->sh_size;
+		return shdr;
+	}
+
+	return NULL;
+}
+
+/**
+ * rproc_elf_find_rsc_table() - find the resource table
+ * @rproc: the rproc handle
+ * @fw: the ELF firmware image
+ * @tablesz: place holder for providing back the table size
+ *
+ * This function finds the resource table inside the remote processor's
+ * firmware. It is used both upon the registration of @rproc (in order
+ * to look for and register the supported virito devices), and when the
+ * @rproc is booted.
+ *
+ * Returns the pointer to the resource table if it is found, and write its
+ * size into @tablesz. If a valid table isn't found, NULL is returned
+ * (and @tablesz isn't set).
+ */
+static struct resource_table *
+rproc_elf_find_rsc_table(struct rproc *rproc, const struct firmware *fw,
+			 int *tablesz)
+{
+	struct elf32_hdr *ehdr;
+	struct elf32_shdr *shdr;
+	struct device *dev = &rproc->dev;
+	struct resource_table *table = NULL;
+	const u8 *elf_data = fw->data;
+
+	ehdr = (struct elf32_hdr *)elf_data;
+
+	shdr = find_table(dev, ehdr, fw->size);
+	if (!shdr)
+		return NULL;
+
+	table = (struct resource_table *)(elf_data + shdr->sh_offset);
+	*tablesz = shdr->sh_size;
+
+	return table;
+}
+
+/**
+ * rproc_elf_find_loaded_rsc_table() - find the loaded resource table
+ * @rproc: the rproc handle
+ * @fw: the ELF firmware image
+ *
+ * This function finds the location of the loaded resource table. Don't
+ * call this function if the table wasn't loaded yet - it's a bug if you do.
+ *
+ * Returns the pointer to the resource table if it is found or NULL otherwise.
+ * If the table wasn't loaded yet the result is unspecified.
+ */
+static struct resource_table *
+rproc_elf_find_loaded_rsc_table(struct rproc *rproc, const struct firmware *fw)
+{
+	struct elf32_hdr *ehdr = (struct elf32_hdr *)fw->data;
+	struct elf32_shdr *shdr;
+
+	shdr = find_table(&rproc->dev, ehdr, fw->size);
+	if (!shdr)
+		return NULL;
+
+	return rproc_da_to_va(rproc, shdr->sh_addr, shdr->sh_size,
+			      RPROC_FLAGS_ELF_SHDR | shdr->sh_flags);
+}
+
+/**
+ * rproc_elf_find_version_section() - find the .version section
+ * @rproc: the rproc handle
+ * @fw: the ELF firmware image
+ * @len: firmware size (in bytes)
+ * @versz: place holder for providing back the version size
+ *
+ * This function finds the .version section inside the remote processor's
+ * firmware. It is used to provide any version information for the
+ * firmware.
+ *
+ * Returns the pointer to the .version section if it is found, and write its
+ * size into @versz. If a valid version isn't found, NULL is returned
+ * (and @versz isn't set).
+ */
+static const char *
+rproc_elf_find_version_section(struct rproc *rproc, const struct firmware *fw,
+			       int *versz)
+{
+	struct elf32_hdr *ehdr;
+	struct elf32_shdr *shdr;
+	const char *name_table;
+	struct device *dev = &rproc->dev;
+	const char *vdata = NULL;
+	int i;
+	const u8 *elf_data = fw->data;
+
+	ehdr = (struct elf32_hdr *)elf_data;
+	shdr = (struct elf32_shdr *)(elf_data + ehdr->e_shoff);
+	name_table = elf_data + shdr[ehdr->e_shstrndx].sh_offset;
+
+	/* look for the version section */
+	for (i = 0; i < ehdr->e_shnum; i++, shdr++) {
+		int size = shdr->sh_size;
+		int offset = shdr->sh_offset;
+
+		if (strcmp(name_table + shdr->sh_name, ".version"))
+			continue;
+
+		vdata = (char *)(elf_data + offset);
+
+		/* make sure we have the entire section */
+		if (offset + size > fw->size) {
+			dev_err(dev, "version info truncated\n");
+			return NULL;
+		}
+
+		*versz = shdr->sh_size;
 		break;
 	}
 
-	return table;
+	return vdata;
 }
 
 const struct rproc_fw_ops rproc_elf_fw_ops = {
 	.load = rproc_elf_load_segments,
 	.find_rsc_table = rproc_elf_find_rsc_table,
+	.find_loaded_rsc_table = rproc_elf_find_loaded_rsc_table,
 	.sanity_check = rproc_elf_sanity_check,
-	.get_boot_addr = rproc_elf_get_boot_addr
+	.get_boot_addr = rproc_elf_get_boot_addr,
+	.find_version = rproc_elf_find_version_section
 };

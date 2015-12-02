@@ -1,5 +1,5 @@
 #
-# Hid Sensor common modules
+# STMicroelectronics sensors common library
 #
 
 config IIO_ST_SENSORS_I2C

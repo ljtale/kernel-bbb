@@ -39,6 +39,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/kfifo.h>
+#include <media/v4l2-ctrls.h>
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */
@@ -290,6 +291,7 @@ struct meye_grab_buffer {
 /* Motion Eye device structure */
 struct meye {
 	struct v4l2_device v4l2_dev;	/* Main v4l2_device struct */
+	struct v4l2_ctrl_handler hdl;
 	struct pci_dev *mchip_dev;	/* pci device */
 	u8 mchip_irq;			/* irq */
 	u8 mchip_mode;			/* actual mchip mode: HIC_MODE... */
@@ -309,7 +311,7 @@ struct meye {
 	struct kfifo doneq;		/* queue for grabbed buffers */
 	spinlock_t doneq_lock;		/* lock protecting the queue */
 	wait_queue_head_t proc_list;	/* wait queue */
-	struct video_device *vdev;	/* video device parameters */
+	struct video_device vdev;	/* video device parameters */
 	u16 brightness;
 	u16 hue;
 	u16 contrast;

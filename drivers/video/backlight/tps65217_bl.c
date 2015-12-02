@@ -24,11 +24,8 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-#include <linux/i2c.h>
-#include <linux/of_i2c.h>
 
 struct tps65217_bl {
-	struct i2c_client *i2c_client;
 	struct tps65217 *tps;
 	struct device *dev;
 	struct backlight_device *bl;
@@ -101,6 +98,8 @@ static int tps65217_bl_update_status(struct backlight_device *bl)
 			return rc;
 		}
 
+		dev_dbg(tps65217_bl->dev, "brightness set to %d\n", brightness);
+
 		if (!tps65217_bl->is_enabled)
 			rc = tps65217_bl_enable(tps65217_bl);
 	} else {
@@ -110,15 +109,9 @@ static int tps65217_bl_update_status(struct backlight_device *bl)
 	return rc;
 }
 
-static int tps65217_bl_get_brightness(struct backlight_device *bl)
-{
-	return bl->props.brightness;
-}
-
 static const struct backlight_ops tps65217_bl_ops = {
 	.options	= BL_CORE_SUSPENDRESUME,
 	.update_status	= tps65217_bl_update_status,
-	.get_brightness	= tps65217_bl_get_brightness
 };
 
 static int tps65217_bl_hw_init(struct tps65217_bl *tps65217_bl,
@@ -188,77 +181,19 @@ static int tps65217_bl_hw_init(struct tps65217_bl *tps65217_bl,
 
 #ifdef CONFIG_OF
 static struct tps65217_bl_pdata *
-tps65217_bl_parse_dt(struct platform_device *pdev, struct tps65217 **tpsp,
-		int *brightnessp)
+tps65217_bl_parse_dt(struct platform_device *pdev)
 {
-	struct i2c_client *i2c_client;
-	struct tps65217 *tps;
-	struct device_node *node, *rnode, *pnode;
+	struct tps65217 *tps = dev_get_drvdata(pdev->dev.parent);
+	struct device_node *node = of_node_get(tps->dev->of_node);
 	struct tps65217_bl_pdata *pdata, *err;
-	u32 tps_handle;
 	u32 val;
 
-	tps = NULL;
-	node = NULL;
-	*brightnessp = 0;
-
-	/* our node (compatible) */
-	pnode = pdev->dev.of_node;
-	if (pnode != NULL &&
-		of_property_read_u32(pnode, "tps", &tps_handle) == 0) {
-		/* we are not instantiated from the mfd */
-		node = of_find_node_by_phandle(tps_handle);
-		if (node == NULL) {
-			dev_err(&pdev->dev, "failed to find the tps node\n");
-			err = ERR_PTR(-EINVAL);
-			goto err;
-		}
-		i2c_client = of_find_i2c_device_by_node(node);
-		if (i2c_client == NULL) {
-			dev_err(&pdev->dev, "failed to find the i2c device "
-					"of tps node\n");
-			err = ERR_PTR(-EINVAL);
-			goto err;
-		}
-		/* yeah this is gross; the whole concept is */
-		tps = i2c_get_clientdata(i2c_client);
-		if (tps == NULL) {
-			dev_err(&pdev->dev, "failed to get tps structure\n");
-			err = ERR_PTR(-EINVAL);
-			goto err;
-		}
-
-		/* read default brightness */
-		val = 0;
-		of_property_read_u32(pnode, "brightness", &val);
-		if (val >= 100)
-			val = 100;
-
-		*brightnessp = val;
-
-		/* no need for this anymore */
-		of_node_put(node);
-
-		dev_info(&pdev->dev, "got tps=%p from handle 0x%x\n", tps, tps_handle);
-	}
-
-	if (tps == NULL)
-		tps = dev_get_drvdata(pdev->dev.parent);
-
-	rnode = of_node_get(tps->dev->of_node);
-
-	node = of_get_child_by_name(rnode, "backlight");
-	of_node_put(rnode);
-	rnode = NULL;
-
-	if (!node) {
-		dev_err(&pdev->dev, "failed to find backlight node\n");
+	node = of_find_node_by_name(node, "backlight");
+	if (!node)
 		return ERR_PTR(-ENODEV);
-	}
 
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
-		dev_err(&pdev->dev, "failed to allocate platform data\n");
 		err = ERR_PTR(-ENOMEM);
 		goto err;
 	}
@@ -303,9 +238,20 @@ tps65217_bl_parse_dt(struct platform_device *pdev, struct tps65217 **tpsp,
 		}
 	}
 
+	if (!of_property_read_u32(node, "default-brightness", &val)) {
+		if (val < 0 ||
+			val > 100) {
+			dev_err(&pdev->dev,
+				"invalid 'default-brightness' value in the device tree\n");
+			err = ERR_PTR(-EINVAL);
+			goto err;
+		}
+
+		pdata->dft_brightness = val;
+	}
+
 	of_node_put(node);
 
-	*tpsp = tps;
 	return pdata;
 
 err:
@@ -313,16 +259,9 @@ err:
 
 	return err;
 }
-
-static struct of_device_id tps65217_backlight_of_match[] = {
-	{ .compatible = "tps65217-backlight" },
-	{ }
-};
-MODULE_DEVICE_TABLE(of, tps65217_backlight_of_match);
 #else
 static struct tps65217_bl_pdata *
-tps65217_bl_parse_dt(struct platform_device *pdev, struct tps65217 **tpsp,
-		int *brightnessp)
+tps65217_bl_parse_dt(struct platform_device *pdev)
 {
 	return NULL;
 }
@@ -331,43 +270,27 @@ tps65217_bl_parse_dt(struct platform_device *pdev, struct tps65217 **tpsp,
 static int tps65217_bl_probe(struct platform_device *pdev)
 {
 	int rc;
-	struct tps65217 *tps;
+	struct tps65217 *tps = dev_get_drvdata(pdev->dev.parent);
 	struct tps65217_bl *tps65217_bl;
 	struct tps65217_bl_pdata *pdata;
 	struct backlight_properties bl_props;
-	int brightness = 0;
 
-	tps = NULL;
-
-	if (pdev->dev.of_node) {
-		pdata = tps65217_bl_parse_dt(pdev, &tps, &brightness);
-		if (IS_ERR(pdata)) {
-			dev_err(&pdev->dev, "DT parse failed.\n");
+	if (tps->dev->of_node) {
+		pdata = tps65217_bl_parse_dt(pdev);
+		if (IS_ERR(pdata))
 			return PTR_ERR(pdata);
-		}
 	} else {
-		if (!pdev->dev.platform_data) {
+		pdata = dev_get_platdata(&pdev->dev);
+		if (!pdata) {
 			dev_err(&pdev->dev, "no platform data provided\n");
 			return -EINVAL;
 		}
-
-		pdata = pdev->dev.platform_data;
-
-		/* get the parent device */
-		tps = dev_get_drvdata(pdev->dev.parent);
-	}
-
-	if (tps == NULL) {
-		dev_err(&pdev->dev, "failed to find tps\n");
-		return -EINVAL;
 	}
 
 	tps65217_bl = devm_kzalloc(&pdev->dev, sizeof(*tps65217_bl),
 				GFP_KERNEL);
-	if (tps65217_bl == NULL) {
-		dev_err(&pdev->dev, "allocation of struct tps65217_bl failed\n");
+	if (tps65217_bl == NULL)
 		return -ENOMEM;
-	}
 
 	tps65217_bl->tps = tps;
 	tps65217_bl->dev = &pdev->dev;
@@ -381,7 +304,7 @@ static int tps65217_bl_probe(struct platform_device *pdev)
 	bl_props.type = BACKLIGHT_RAW;
 	bl_props.max_brightness = 100;
 
-	tps65217_bl->bl = backlight_device_register(pdev->name,
+	tps65217_bl->bl = devm_backlight_device_register(&pdev->dev, pdev->name,
 						tps65217_bl->dev, tps65217_bl,
 						&tps65217_bl_ops, &bl_props);
 	if (IS_ERR(tps65217_bl->bl)) {
@@ -390,33 +313,17 @@ static int tps65217_bl_probe(struct platform_device *pdev)
 		return PTR_ERR(tps65217_bl->bl);
 	}
 
-	tps65217_bl->bl->props.brightness = brightness;
+	tps65217_bl->bl->props.brightness = pdata->dft_brightness;
+	backlight_update_status(tps65217_bl->bl);
 	platform_set_drvdata(pdev, tps65217_bl);
-
-	/* update with initial settings */
-	tps65217_bl_update_status(tps65217_bl->bl);
-
-	dev_info(&pdev->dev, "OK.\n");
-
-	return 0;
-}
-
-static int tps65217_bl_remove(struct platform_device *pdev)
-{
-	struct tps65217_bl *tps65217_bl = platform_get_drvdata(pdev);
-
-	backlight_device_unregister(tps65217_bl->bl);
 
 	return 0;
 }
 
 static struct platform_driver tps65217_bl_driver = {
 	.probe		= tps65217_bl_probe,
-	.remove		= tps65217_bl_remove,
 	.driver		= {
-		.owner	= THIS_MODULE,
 		.name	= "tps65217-bl",
-		.of_match_table	= of_match_ptr(tps65217_backlight_of_match),
 	},
 };
 

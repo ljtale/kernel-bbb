@@ -1,26 +1,30 @@
-#ifndef __TDA998X_H__
-#define __TDA998X_H__
-
-#include <linux/types.h>
-
-enum tda998x_audio_format {
-	AFMT_I2S,
-	AFMT_SPDIF,
-};
+#ifndef __DRM_I2C_TDA998X_H__
+#define __DRM_I2C_TDA998X_H__
 
 struct tda998x_encoder_params {
-	uint8_t audio_cfg;
-	uint8_t audio_clk_cfg;
-	enum tda998x_audio_format audio_format;
-	int audio_sample_rate;
-	uint8_t audio_frame[6];
-	uint8_t swap_a, mirr_a;
-	uint8_t swap_b, mirr_b;
-	uint8_t swap_c, mirr_c;
-	uint8_t swap_d, mirr_d;
-	uint8_t swap_e, mirr_e;
-	uint8_t swap_f, mirr_f;
-	uint8_t i2s_fmt;
+	u8 swap_b:3;
+	u8 mirr_b:1;
+	u8 swap_a:3;
+	u8 mirr_a:1;
+	u8 swap_d:3;
+	u8 mirr_d:1;
+	u8 swap_c:3;
+	u8 mirr_c:1;
+	u8 swap_f:3;
+	u8 mirr_f:1;
+	u8 swap_e:3;
+	u8 mirr_e:1;
+
+	u8 audio_cfg;
+	u8 audio_clk_cfg;
+	u8 audio_frame[6];
+
+	enum {
+		AFMT_SPDIF,
+		AFMT_I2S
+	} audio_format;
+
+	unsigned audio_sample_rate;
 };
 
 #endif

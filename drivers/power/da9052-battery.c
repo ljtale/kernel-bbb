@@ -169,7 +169,7 @@ static u32 const vc_tbl[3][68][2] = {
 
 struct da9052_battery {
 	struct da9052 *da9052;
-	struct power_supply psy;
+	struct power_supply *psy;
 	struct notifier_block nb;
 	int charger_type;
 	int status;
@@ -337,7 +337,7 @@ static unsigned char da9052_determine_vc_tbl_index(unsigned char adc_temp)
 	if (adc_temp > vc_tbl_ref[DA9052_VC_TBL_REF_SZ - 1])
 		return DA9052_VC_TBL_REF_SZ - 1;
 
-	for (i = 0; i < DA9052_VC_TBL_REF_SZ; i++) {
+	for (i = 0; i < DA9052_VC_TBL_REF_SZ - 1; i++) {
 		if ((adc_temp > vc_tbl_ref[i]) &&
 		    (adc_temp <= DA9052_MEAN(vc_tbl_ref[i], vc_tbl_ref[i + 1])))
 				return i;
@@ -452,7 +452,7 @@ static irqreturn_t da9052_bat_irq(int irq, void *data)
 
 	if (irq == DA9052_IRQ_CHGEND || irq == DA9052_IRQ_DCIN ||
 	    irq == DA9052_IRQ_VBUS || irq == DA9052_IRQ_TBAT) {
-		power_supply_changed(&bat->psy);
+		power_supply_changed(bat->psy);
 	}
 
 	return IRQ_HANDLED;
@@ -499,8 +499,7 @@ static int da9052_bat_get_property(struct power_supply *psy,
 {
 	int ret;
 	int illegal;
-	struct da9052_battery *bat = container_of(psy, struct da9052_battery,
-						  psy);
+	struct da9052_battery *bat = power_supply_get_drvdata(psy);
 
 	ret = da9052_bat_check_presence(bat, &illegal);
 	if (ret < 0)
@@ -561,7 +560,7 @@ static enum power_supply_property da9052_bat_props[] = {
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 };
 
-static struct power_supply template_battery = {
+static struct power_supply_desc psy_desc = {
 	.name		= "da9052-bat",
 	.type		= POWER_SUPPLY_TYPE_BATTERY,
 	.properties	= da9052_bat_props,
@@ -591,15 +590,18 @@ static s32 da9052_bat_probe(struct platform_device *pdev)
 {
 	struct da9052_pdata *pdata;
 	struct da9052_battery *bat;
+	struct power_supply_config psy_cfg = {};
 	int ret;
 	int i;
 
-	bat = kzalloc(sizeof(struct da9052_battery), GFP_KERNEL);
+	bat = devm_kzalloc(&pdev->dev, sizeof(struct da9052_battery),
+				GFP_KERNEL);
 	if (!bat)
 		return -ENOMEM;
 
+	psy_cfg.drv_data = bat;
+
 	bat->da9052 = dev_get_drvdata(pdev->dev.parent);
-	bat->psy = template_battery;
 	bat->charger_type = DA9052_NOCHARGER;
 	bat->status = POWER_SUPPLY_STATUS_UNKNOWN;
 	bat->health = POWER_SUPPLY_HEALTH_UNKNOWN;
@@ -607,9 +609,9 @@ static s32 da9052_bat_probe(struct platform_device *pdev)
 
 	pdata = bat->da9052->dev->platform_data;
 	if (pdata != NULL && pdata->use_for_apm)
-		bat->psy.use_for_apm = pdata->use_for_apm;
+		psy_desc.use_for_apm = pdata->use_for_apm;
 	else
-		bat->psy.use_for_apm = 1;
+		psy_desc.use_for_apm = 1;
 
 	for (i = 0; i < ARRAY_SIZE(da9052_bat_irqs); i++) {
 		ret = da9052_request_irq(bat->da9052,
@@ -624,9 +626,11 @@ static s32 da9052_bat_probe(struct platform_device *pdev)
 		}
 	}
 
-	ret = power_supply_register(&pdev->dev, &bat->psy);
-	 if (ret)
+	bat->psy = power_supply_register(&pdev->dev, &psy_desc, &psy_cfg);
+	if (IS_ERR(bat->psy)) {
+		ret = PTR_ERR(bat->psy);
 		goto err;
+	}
 
 	platform_set_drvdata(pdev, bat);
 	return 0;
@@ -635,7 +639,6 @@ err:
 	while (--i >= 0)
 		da9052_free_irq(bat->da9052, da9052_bat_irq_bits[i], bat);
 
-	kfree(bat);
 	return ret;
 }
 static int da9052_bat_remove(struct platform_device *pdev)
@@ -646,8 +649,7 @@ static int da9052_bat_remove(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(da9052_bat_irqs); i++)
 		da9052_free_irq(bat->da9052, da9052_bat_irq_bits[i], bat);
 
-	power_supply_unregister(&bat->psy);
-	kfree(bat);
+	power_supply_unregister(bat->psy);
 
 	return 0;
 }
@@ -657,7 +659,6 @@ static struct platform_driver da9052_bat_driver = {
 	.remove = da9052_bat_remove,
 	.driver = {
 		.name = "da9052-bat",
-		.owner = THIS_MODULE,
 	},
 };
 module_platform_driver(da9052_bat_driver);

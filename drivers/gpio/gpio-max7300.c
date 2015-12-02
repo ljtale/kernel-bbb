@@ -35,13 +35,12 @@ static int max7300_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	struct max7301 *ts;
-	int ret;
 
 	if (!i2c_check_functionality(client->adapter,
 			I2C_FUNC_SMBUS_BYTE_DATA))
 		return -EIO;
 
-	ts = kzalloc(sizeof(struct max7301), GFP_KERNEL);
+	ts = devm_kzalloc(&client->dev, sizeof(struct max7301), GFP_KERNEL);
 	if (!ts)
 		return -ENOMEM;
 
@@ -49,10 +48,7 @@ static int max7300_probe(struct i2c_client *client,
 	ts->write = max7300_i2c_write;
 	ts->dev = &client->dev;
 
-	ret = __max730x_probe(ts);
-	if (ret)
-		kfree(ts);
-	return ret;
+	return __max730x_probe(ts);
 }
 
 static int max7300_remove(struct i2c_client *client)

@@ -241,6 +241,8 @@ int kvm_pic_read_irq(struct kvm *kvm)
 	int irq, irq2, intno;
 	struct kvm_pic *s = pic_irqchip(kvm);
 
+	s->output = 0;
+
 	pic_lock(s);
 	irq = pic_get_irq(&s->pics[0]);
 	if (irq >= 0) {
@@ -505,6 +507,7 @@ static int picdev_read(struct kvm_pic *s,
 		return -EOPNOTSUPP;
 
 	if (len != 1) {
+		memset(val, 0, len);
 		pr_pic_unimpl("non byte read\n");
 		return 0;
 	}
@@ -526,42 +529,42 @@ static int picdev_read(struct kvm_pic *s,
 	return 0;
 }
 
-static int picdev_master_write(struct kvm_io_device *dev,
+static int picdev_master_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
 			       gpa_t addr, int len, const void *val)
 {
 	return picdev_write(container_of(dev, struct kvm_pic, dev_master),
 			    addr, len, val);
 }
 
-static int picdev_master_read(struct kvm_io_device *dev,
+static int picdev_master_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
 			      gpa_t addr, int len, void *val)
 {
 	return picdev_read(container_of(dev, struct kvm_pic, dev_master),
 			    addr, len, val);
 }
 
-static int picdev_slave_write(struct kvm_io_device *dev,
+static int picdev_slave_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
 			      gpa_t addr, int len, const void *val)
 {
 	return picdev_write(container_of(dev, struct kvm_pic, dev_slave),
 			    addr, len, val);
 }
 
-static int picdev_slave_read(struct kvm_io_device *dev,
+static int picdev_slave_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
 			     gpa_t addr, int len, void *val)
 {
 	return picdev_read(container_of(dev, struct kvm_pic, dev_slave),
 			    addr, len, val);
 }
 
-static int picdev_eclr_write(struct kvm_io_device *dev,
+static int picdev_eclr_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
 			     gpa_t addr, int len, const void *val)
 {
 	return picdev_write(container_of(dev, struct kvm_pic, dev_eclr),
 			    addr, len, val);
 }
 
-static int picdev_eclr_read(struct kvm_io_device *dev,
+static int picdev_eclr_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
 			    gpa_t addr, int len, void *val)
 {
 	return picdev_read(container_of(dev, struct kvm_pic, dev_eclr),

@@ -12,23 +12,15 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA
  */
 
 #ifndef OMAP3_ISP_CORE_H
 #define OMAP3_ISP_CORE_H
 
 #include <media/omap3isp.h>
+#include <media/v4l2-async.h>
 #include <media/v4l2-device.h>
+#include <linux/clk-provider.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/iommu.h>
@@ -43,8 +35,6 @@
 #include "ispcsiphy.h"
 #include "ispcsi2.h"
 #include "ispccp2.h"
-
-#define IOMMU_FLAG (IOVMF_ENDIAN_LITTLE | IOVMF_ELSZ_8)
 
 #define ISP_TOK_TERM		0xFFFFFFFF	/*
 						 * terminating token for ISP
@@ -70,8 +60,6 @@ enum isp_mem_resources {
 	OMAP3_ISP_IOMEM_CSI2C_REGS1,
 	OMAP3_ISP_IOMEM_CSIPHY1,
 	OMAP3_ISP_IOMEM_CSI2C_REGS2,
-	OMAP3_ISP_IOMEM_343X_CONTROL_CSIRXFE,
-	OMAP3_ISP_IOMEM_3630_CONTROL_CAMERA_PHY_CTRL,
 	OMAP3_ISP_IOMEM_LAST
 };
 
@@ -104,14 +92,25 @@ enum isp_subclk_resource {
 /* ISP2P: OMAP 36xx */
 #define ISP_REVISION_15_0		0xF0
 
+#define ISP_PHY_TYPE_3430		0
+#define ISP_PHY_TYPE_3630		1
+
+struct regmap;
+
 /*
  * struct isp_res_mapping - Map ISP io resources to ISP revision.
  * @isp_rev: ISP_REVISION_x_x
- * @map: bitmap for enum isp_mem_resources
+ * @offset: register offsets of various ISP sub-blocks
+ * @syscon_offset: offset of the syscon register for 343x / 3630
+ *	    (CONTROL_CSIRXFE / CONTROL_CAMERA_PHY_CTRL, respectively)
+ *	    from the syscon base address
+ * @phy_type: ISP_PHY_TYPE_{3430,3630}
  */
 struct isp_res_mapping {
 	u32 isp_rev;
-	u32 map;
+	u32 offset[OMAP3_ISP_IOMEM_LAST];
+	u32 syscon_offset;
+	u32 phy_type;
 };
 
 /*
@@ -125,8 +124,20 @@ struct isp_reg {
 	u32 val;
 };
 
-struct isp_platform_callback {
-	u32 (*set_xclk)(struct isp_device *isp, u32 xclk, u8 xclksel);
+enum isp_xclk_id {
+	ISP_XCLK_A,
+	ISP_XCLK_B,
+};
+
+struct isp_xclk {
+	struct isp_device *isp;
+	struct clk_hw hw;
+	struct clk *clk;
+	enum isp_xclk_id id;
+
+	spinlock_t lock;	/* Protects enabled and divider */
+	bool enabled;
+	unsigned int divider;
 };
 
 /*
@@ -136,20 +147,23 @@ struct isp_platform_callback {
  * @irq_num: Currently used IRQ number.
  * @mmio_base: Array with kernel base addresses for ioremapped ISP register
  *             regions.
- * @mmio_base_phys: Array with physical L4 bus addresses for ISP register
- *                  regions.
- * @mmio_size: Array with ISP register regions size in bytes.
- * @raw_dmamask: Raw DMA mask
+ * @mmio_hist_base_phys: Physical L4 bus address for ISP hist block register
+ *			 region.
+ * @syscon: Regmap for the syscon register space
+ * @syscon_offset: Offset of the CSIPHY control register in syscon
+ * @phy_type: ISP_PHY_TYPE_{3430,3630}
+ * @mapping: IOMMU mapping
  * @stat_lock: Spinlock for handling statistics
  * @isp_mutex: Mutex for serializing requests to ISP.
+ * @stop_failure: Indicates that an entity failed to stop.
  * @crashed: Bitmask of crashed entities (indexed by entity ID)
  * @has_context: Context has been saved at least once and can be restored.
  * @ref_count: Reference count for handling multiple ISP requests.
  * @cam_ick: Pointer to camera interface clock structure.
  * @cam_mclk: Pointer to camera functional clock structure.
- * @dpll4_m5_ck: Pointer to DPLL4 M5 clock structure.
  * @csi2_fck: Pointer to camera CSI2 complexIO clock structure.
  * @l3_ick: Pointer to OMAP3 L3 bus interface clock.
+ * @xclks: External clocks provided by the ISP
  * @irq: Currently attached ISP ISR callbacks information structure.
  * @isp_af: Pointer to current settings for ISP AutoFocus SCM.
  * @isp_hist: Pointer to current settings for ISP Histogram SCM.
@@ -158,13 +172,13 @@ struct isp_platform_callback {
  * @isp_res: Pointer to current settings for ISP Resizer.
  * @isp_prev: Pointer to current settings for ISP Preview.
  * @isp_ccdc: Pointer to current settings for ISP CCDC.
- * @iommu: Pointer to requested IOMMU instance for ISP.
  * @platform_cb: ISP driver callback function pointers for platform code
  *
  * This structure is used to store the OMAP ISP Information.
  */
 struct isp_device {
 	struct v4l2_device v4l2_dev;
+	struct v4l2_async_notifier notifier;
 	struct media_device media_dev;
 	struct device *dev;
 	u32 revision;
@@ -174,25 +188,27 @@ struct isp_device {
 	unsigned int irq_num;
 
 	void __iomem *mmio_base[OMAP3_ISP_IOMEM_LAST];
-	unsigned long mmio_base_phys[OMAP3_ISP_IOMEM_LAST];
-	resource_size_t mmio_size[OMAP3_ISP_IOMEM_LAST];
+	unsigned long mmio_hist_base_phys;
+	struct regmap *syscon;
+	u32 syscon_offset;
+	u32 phy_type;
 
-	u64 raw_dmamask;
+	struct dma_iommu_mapping *mapping;
 
 	/* ISP Obj */
 	spinlock_t stat_lock;	/* common lock for statistic drivers */
 	struct mutex isp_mutex;	/* For handling ref_count field */
+	bool stop_failure;
 	u32 crashed;
 	int has_context;
 	int ref_count;
 	unsigned int autoidle;
-	u32 xclk_divisor[2];	/* Two clocks, a and b. */
 #define ISP_CLK_CAM_ICK		0
 #define ISP_CLK_CAM_MCLK	1
-#define ISP_CLK_DPLL4_M5_CK	2
-#define ISP_CLK_CSI2_FCK	3
-#define ISP_CLK_L3_ICK		4
-	struct clk *clock[5];
+#define ISP_CLK_CSI2_FCK	2
+#define ISP_CLK_L3_ICK		3
+	struct clk *clock[4];
+	struct isp_xclk xclks[2];
 
 	/* ISP modules */
 	struct ispstat isp_af;
@@ -210,9 +226,14 @@ struct isp_device {
 	unsigned int sbl_resources;
 	unsigned int subclk_resources;
 
-	struct iommu_domain *domain;
+#define ISP_MAX_SUBDEVS		8
+	struct v4l2_subdev *subdevs[ISP_MAX_SUBDEVS];
+};
 
-	struct isp_platform_callback platform_cb;
+struct isp_async_subdev {
+	struct v4l2_subdev *sd;
+	struct isp_bus_cfg bus;
+	struct v4l2_async_subdev asd;
 };
 
 #define v4l2_dev_to_isp_device(dev) \
@@ -230,9 +251,10 @@ int omap3isp_module_sync_is_stopping(wait_queue_head_t *wait,
 
 int omap3isp_pipeline_set_stream(struct isp_pipeline *pipe,
 				 enum isp_pipeline_stream_state state);
+void omap3isp_pipeline_cancel_stream(struct isp_pipeline *pipe);
 void omap3isp_configure_bridge(struct isp_device *isp,
 			       enum ccdc_input_entity input,
-			       const struct isp_parallel_platform_data *pdata,
+			       const struct isp_parallel_cfg *buscfg,
 			       unsigned int shift, unsigned int bridge);
 
 struct isp_device *omap3isp_get(struct isp_device *isp);
@@ -256,7 +278,7 @@ void omap3isp_unregister_entities(struct platform_device *pdev);
 
 /*
  * isp_reg_readl - Read value of an OMAP3 ISP register
- * @dev: Device pointer specific to the OMAP3 ISP.
+ * @isp: Device pointer specific to the OMAP3 ISP.
  * @isp_mmio_range: Range to which the register offset refers to.
  * @reg_offset: Register offset to read from.
  *
@@ -271,7 +293,7 @@ u32 isp_reg_readl(struct isp_device *isp, enum isp_mem_resources isp_mmio_range,
 
 /*
  * isp_reg_writel - Write value to an OMAP3 ISP register
- * @dev: Device pointer specific to the OMAP3 ISP.
+ * @isp: Device pointer specific to the OMAP3 ISP.
  * @reg_value: 32 bit value to write to the register.
  * @isp_mmio_range: Range to which the register offset refers to.
  * @reg_offset: Register offset to write into.
@@ -284,8 +306,8 @@ void isp_reg_writel(struct isp_device *isp, u32 reg_value,
 }
 
 /*
- * isp_reg_and - Clear individual bits in an OMAP3 ISP register
- * @dev: Device pointer specific to the OMAP3 ISP.
+ * isp_reg_clr - Clear individual bits in an OMAP3 ISP register
+ * @isp: Device pointer specific to the OMAP3 ISP.
  * @mmio_range: Range to which the register offset refers to.
  * @reg: Register offset to work on.
  * @clr_bits: 32 bit value which would be cleared in the register.
@@ -301,7 +323,7 @@ void isp_reg_clr(struct isp_device *isp, enum isp_mem_resources mmio_range,
 
 /*
  * isp_reg_set - Set individual bits in an OMAP3 ISP register
- * @dev: Device pointer specific to the OMAP3 ISP.
+ * @isp: Device pointer specific to the OMAP3 ISP.
  * @mmio_range: Range to which the register offset refers to.
  * @reg: Register offset to work on.
  * @set_bits: 32 bit value which would be set in the register.
@@ -317,7 +339,7 @@ void isp_reg_set(struct isp_device *isp, enum isp_mem_resources mmio_range,
 
 /*
  * isp_reg_clr_set - Clear and set invidial bits in an OMAP3 ISP register
- * @dev: Device pointer specific to the OMAP3 ISP.
+ * @isp: Device pointer specific to the OMAP3 ISP.
  * @mmio_range: Range to which the register offset refers to.
  * @reg: Register offset to work on.
  * @clr_bits: 32 bit value which would be cleared in the register.

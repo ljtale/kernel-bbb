@@ -18,20 +18,22 @@
 #include <linux/sock_diag.h>
 
 static int sk_diag_dump(struct sock *sk, struct sk_buff *skb,
-		struct netlink_callback *cb, struct inet_diag_req_v2 *req,
-		struct nlattr *bc)
+			struct netlink_callback *cb,
+			const struct inet_diag_req_v2 *req,
+			struct nlattr *bc)
 {
 	if (!inet_diag_bc_sk(bc, sk))
 		return 0;
 
 	return inet_sk_diag_fill(sk, NULL, skb, req,
-			sk_user_ns(NETLINK_CB(cb->skb).ssk),
+			sk_user_ns(NETLINK_CB(cb->skb).sk),
 			NETLINK_CB(cb->skb).portid,
 			cb->nlh->nlmsg_seq, NLM_F_MULTI, cb->nlh);
 }
 
 static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
-		const struct nlmsghdr *nlh, struct inet_diag_req_v2 *req)
+			const struct nlmsghdr *nlh,
+			const struct inet_diag_req_v2 *req)
 {
 	int err = -EINVAL;
 	struct sock *sk;
@@ -56,7 +58,7 @@ static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
 		goto out_nosk;
 
 	err = -ENOENT;
-	if (sk == NULL)
+	if (!sk)
 		goto out_nosk;
 
 	err = sock_diag_check_cookie(sk, req->id.idiag_cookie);
@@ -64,14 +66,14 @@ static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
 		goto out;
 
 	err = -ENOMEM;
-	rep = alloc_skb(NLMSG_SPACE((sizeof(struct inet_diag_msg) +
-				     sizeof(struct inet_diag_meminfo) +
-				     64)), GFP_KERNEL);
+	rep = nlmsg_new(sizeof(struct inet_diag_msg) +
+			sizeof(struct inet_diag_meminfo) + 64,
+			GFP_KERNEL);
 	if (!rep)
 		goto out;
 
 	err = inet_sk_diag_fill(sk, NULL, rep, req,
-			   sk_user_ns(NETLINK_CB(in_skb).ssk),
+			   sk_user_ns(NETLINK_CB(in_skb).sk),
 			   NETLINK_CB(in_skb).portid,
 			   nlh->nlmsg_seq, 0, nlh);
 	if (err < 0) {
@@ -90,8 +92,9 @@ out_nosk:
 	return err;
 }
 
-static void udp_dump(struct udp_table *table, struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req_v2 *r, struct nlattr *bc)
+static void udp_dump(struct udp_table *table, struct sk_buff *skb,
+		     struct netlink_callback *cb,
+		     const struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	int num, s_num, slot, s_slot;
 	struct net *net = sock_net(skb->sk);
@@ -99,10 +102,12 @@ static void udp_dump(struct udp_table *table, struct sk_buff *skb, struct netlin
 	s_slot = cb->args[0];
 	num = s_num = cb->args[1];
 
-	for (slot = s_slot; slot <= table->mask; num = s_num = 0, slot++) {
+	for (slot = s_slot; slot <= table->mask; s_num = 0, slot++) {
 		struct sock *sk;
 		struct hlist_nulls_node *node;
 		struct udp_hslot *hslot = &table->hash[slot];
+
+		num = 0;
 
 		if (hlist_nulls_empty(&hslot->head))
 			continue;
@@ -142,13 +147,13 @@ done:
 }
 
 static void udp_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req_v2 *r, struct nlattr *bc)
+			  const struct inet_diag_req_v2 *r, struct nlattr *bc)
 {
 	udp_dump(&udp_table, skb, cb, r, bc);
 }
 
 static int udp_diag_dump_one(struct sk_buff *in_skb, const struct nlmsghdr *nlh,
-		struct inet_diag_req_v2 *req)
+			     const struct inet_diag_req_v2 *req)
 {
 	return udp_dump_one(&udp_table, in_skb, nlh, req);
 }
@@ -168,13 +173,14 @@ static const struct inet_diag_handler udp_diag_handler = {
 };
 
 static void udplite_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
-		struct inet_diag_req_v2 *r, struct nlattr *bc)
+			      const struct inet_diag_req_v2 *r,
+			      struct nlattr *bc)
 {
 	udp_dump(&udplite_table, skb, cb, r, bc);
 }
 
 static int udplite_diag_dump_one(struct sk_buff *in_skb, const struct nlmsghdr *nlh,
-		struct inet_diag_req_v2 *req)
+				 const struct inet_diag_req_v2 *req)
 {
 	return udp_dump_one(&udplite_table, in_skb, nlh, req);
 }
