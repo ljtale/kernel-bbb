@@ -40,6 +40,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
 
+// #include "../drivers/ljtale/i2c-static.h"
+
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
 
@@ -182,7 +184,40 @@ enum {
 #define I2C_OMAP_ERRATA_I207		(1 << 0)
 #define I2C_OMAP_ERRATA_I462		(1 << 1)
 
+/* for v2 I2C device, only bit [14:13] and [11:0] are valid interrupt
+ * enable bits */
 #define OMAP_I2C_IP_V2_INTERRUPTS_MASK	0x6FFF
+
+/* values that need to be written to I2C register when resuming */
+struct i2c_resume_values {
+    u16 omap_i2c_con_reset_all;
+    u16 omap_i2c_psc_val;
+    u16 omap_i2c_scll_val;
+    u16 omap_i2c_sclh_val;
+    u16 omap_i2c_con_we;
+    u16 omap_i2c_con_en;
+    u16 omap_i2c_ie_val;
+};
+
+/* values that need to be written or read when suspending */
+struct i2c_suspend_values {
+    u16 omap_i2c_ie_val;    /* this value needs to be read */
+    u16 omap_i2c_v2_int_mask;   /* this value needs to be written */
+    u16 omap_i2c_stat_val_w;  /* this value needs to be written */
+    u16 omap_i2c_stat_val_r;    /* this value needs to be read */
+};
+
+/* this context should be on a per-device manner. In a driver that supports
+ * multiple devices, this is not able to describe static context for a
+ * certain device. Thus the values of the context should come in through
+ * something like device tree. Device tree would be a good candidate to
+ * process such values */
+struct i2c_runtime_context {
+    void __iomem *base;
+    int reg_shift;
+    struct i2c_resume_values resume;
+    struct i2c_suspend_values suspend;
+};
 
 struct omap_i2c_dev {
 	spinlock_t		lock;		/* IRQ synchronization */
@@ -230,6 +265,9 @@ struct omap_i2c_dev {
 	u16			syscstate;
 	u16			westate;
 	u16			errata;
+    /* ljtale start */
+    struct i2c_runtime_context rpm_ctx;
+    /* ljtale end */
 };
 
 static const u8 reg_map_ip_v1[] = {
@@ -1381,7 +1419,7 @@ omap_i2c_probe(struct platform_device *pdev)
 	 */
 	rev = readw_relaxed(dev->base + 0x04);
 
-    /* the following line take the [15:14] bits from rev and assign to scheme */
+    /* the following line takes the [15:14] bits from rev and assign to scheme */
 	dev->scheme = OMAP_I2C_SCHEME(rev);
 	switch (dev->scheme) {
 	case OMAP_I2C_SCHEME_0:
@@ -1436,6 +1474,13 @@ omap_i2c_probe(struct platform_device *pdev)
 
 	/* reset ASAP, clearing any IRQs */
 	omap_i2c_init(dev);
+    printk(KERN_INFO "ljtale-i2c: base: 0x%lx, shift: 0x%x\n",
+            (unsigned long)dev->base, dev->reg_shift);
+    printk(KERN_INFO "ljtale-i2c: rev: 0x%x, scheme: 0x%x\n",
+            dev->rev, dev->scheme); 
+    printk(KERN_INFO "ljtale-i2c: psc: 0x%x, scll: 0x%x, sclh: 0x%x\n",
+            dev->pscstate, dev->scllstate, dev->sclhstate); 
+    printk(KERN_INFO "ljtale-i2c: westate: 0x%x\n", dev->westate); 
 
 	if (dev->rev < OMAP_I2C_OMAP1_REV_2)
 		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_omap1_isr,
@@ -1513,6 +1558,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 	if (_dev->scheme == OMAP_I2C_SCHEME_0)
 		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
 	else
+        /* clear all the bits in IRQENABLE */
 		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR,
 				   OMAP_I2C_IP_V2_INTERRUPTS_MASK);
 
