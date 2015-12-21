@@ -1506,6 +1506,7 @@ static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
 
 	/* normalize revision for the driver */
 	revision = UART_BUILD_REVISION(major, minor);
+    printk(KERN_INFO "ljtale-uart: uart revision: 0x%x\n", revision);
 
 	switch (revision) {
 	case OMAP_UART_REV_46:
@@ -1793,6 +1794,7 @@ static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1)
 #ifdef CONFIG_PM
 static void serial_omap_restore_context(struct uart_omap_port *up)
 {
+    /* UART_ERRATA_i202_MDR1_ACCESS is BIT(0) */
 	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
 		serial_omap_mdr1_errataset(up, UART_OMAP_MDR1_DISABLE);
 	else
@@ -1834,15 +1836,22 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	* preventing runtime suspend (by returning error) will keep device
 	* active during suspend.
 	*/
+    /* the console_suspend_enabled is a global parameter,
+     * it is interactive context */
 	if (up->is_suspending && !console_suspend_enabled &&
 	    uart_console(&up->port))
 		return -EBUSY;
 
 	up->context_loss_cnt = serial_omap_get_context_loss_count(up);
 
+    /* this is actually interactive context. The serial drivers calls to
+     * enable the wakeup irq which is obtained in driver probe function.
+     * The IRQ originally comes from device tree node or board file */
 	serial_omap_enable_wakeup(up, true);
 
+    /* this belongs to driver context */
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+    /* the following involve qos framework and work queues */
 	schedule_work(&up->qos_work);
 
 	return 0;
@@ -1856,6 +1865,9 @@ static int serial_omap_runtime_resume(struct device *dev)
 
 	serial_omap_enable_wakeup(up, false);
 
+    /* the following are some optimization, if the loss count has not
+     * changed, then the device do not need to restore the context. Otherwise
+     * the device needs to restore necessary context */
 	if (loss_cnt < 0) {
 		dev_dbg(dev, "serial_omap_get_context_loss_count failed : %d\n",
 			loss_cnt);

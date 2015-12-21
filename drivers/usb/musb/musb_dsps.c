@@ -765,6 +765,7 @@ err:
 
 static int dsps_probe(struct platform_device *pdev)
 {
+    printk(KERN_INFO "ljtale-hdrc: musb-hdrc probe...\n");
 	const struct of_device_id *match;
 	const struct dsps_musb_wrapper *wrp;
 	struct dsps_glue *glue;

@@ -1093,6 +1093,7 @@ MODULE_DEVICE_TABLE(of, omap8250_dt_ids);
 
 static int omap8250_probe(struct platform_device *pdev)
 {
+    printk(KERN_INFO "ljtale-uart: omap8250 probe...\n");
 	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	struct omap8250_priv *priv;
@@ -1376,12 +1377,14 @@ static int omap8250_runtime_suspend(struct device *dev)
 		omap8250_update_mdr1(up, priv);
 	}
 
+    /* DMA feature? */
 	if (up->dma && up->dma->rxchan)
 		omap_8250_rx_dma(up, UART_IIR_RX_TIMEOUT);
 
 	priv->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 	schedule_work(&priv->qos_work);
 
+    /* pin ctrl to select sleep state too */
 	pinctrl_pm_select_sleep_state(dev);
 
 	return 0;

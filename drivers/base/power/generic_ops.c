@@ -22,6 +22,14 @@
 int pm_generic_runtime_suspend(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+    /* ljtale starts */
+#if 0
+    if(pm && pm->runtime_resume) {
+        printk(KERN_INFO "ljtale-pm: driver %s has rpm suspend implementation\n",
+                dev->driver->name);
+    }
+    /* ljtale ends */
+#endif
 	int ret;
 
 	ret = pm && pm->runtime_suspend ? pm->runtime_suspend(dev) : 0;
@@ -41,10 +49,17 @@ EXPORT_SYMBOL_GPL(pm_generic_runtime_suspend);
 int pm_generic_runtime_resume(struct device *dev)
 {
 	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+    /* ljtale starts */
+#if 0
+    if(pm && pm->runtime_resume) {
+        printk(KERN_INFO "ljtale-pm:driver %s has rpm resume implementation\n",
+                dev->driver->name);
+    }
+    /* ljtale ends */
+#endif
 	int ret;
 
 	ret = pm && pm->runtime_resume ? pm->runtime_resume(dev) : 0;
-
 	return ret;
 }
 EXPORT_SYMBOL_GPL(pm_generic_runtime_resume);

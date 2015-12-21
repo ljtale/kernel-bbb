@@ -2601,6 +2601,7 @@ static int omap_hsmmc_get_iodelay_pinctrl_state(struct omap_hsmmc_host *host)
 
 static int omap_hsmmc_probe(struct platform_device *pdev)
 {
+    printk(KERN_INFO "ljtale-mmc: hsmmc probe...\n");
 	struct omap_hsmmc_platform_data *pdata = pdev->dev.platform_data;
 	struct mmc_host *mmc;
 	struct omap_hsmmc_host *host = NULL;

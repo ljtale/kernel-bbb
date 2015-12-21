@@ -2489,6 +2489,7 @@ static int musb_runtime_suspend(struct device *dev)
 
 static int musb_runtime_resume(struct device *dev)
 {
+    printk(KERN_INFO "ljtale-usb: runtime resuming...\n");
 	struct musb	*musb = dev_to_musb(dev);
 	static int	first = 1;
 

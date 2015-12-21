@@ -2484,6 +2484,7 @@ MODULE_DEVICE_TABLE(of, cpsw_of_mtable);
 
 static int cpsw_probe(struct platform_device *pdev)
 {
+    printk(KERN_INFO "ljtale-eth: cpsw probe...\n");
 	struct cpsw_platform_data	*data;
 	struct net_device		*ndev;
 	struct cpsw_priv		*priv;
@@ -2512,7 +2513,7 @@ static int cpsw_probe(struct platform_device *pdev)
 	priv->rx_packet_max = max(rx_packet_max, 128);
 	priv->cpts = devm_kzalloc(&pdev->dev, sizeof(struct cpts), GFP_KERNEL);
 	if (!priv->cpts) {
-		dev_err(&pdev->dev, "error allocating cpts\n");
+		dev_err(&pdev->dev, "error allocating cpts);\n");
 		ret = -ENOMEM;
 		goto clean_ndev_ret;
 	}
