@@ -40,7 +40,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
 
-// #include "../drivers/ljtale/i2c-static.h"
+/* ljtale: central pm header */
+#include "../drivers/ljtale/central-pm.h"
 
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
@@ -188,6 +189,7 @@ enum {
  * enable bits */
 #define OMAP_I2C_IP_V2_INTERRUPTS_MASK	0x6FFF
 
+#if 0
 /* values that need to be written to I2C register when resuming */
 struct i2c_resume_values {
     u16 omap_i2c_con_reset_all;
@@ -218,6 +220,7 @@ struct i2c_runtime_context {
     struct i2c_resume_values resume;
     struct i2c_suspend_values suspend;
 };
+#endif
 
 struct omap_i2c_dev {
 	spinlock_t		lock;		/* IRQ synchronization */
@@ -266,6 +269,8 @@ struct omap_i2c_dev {
 	u16			westate;
 	u16			errata;
     /* ljtale start */
+    /* TODO: this data structure should be allocated by the central pm module
+     * currently it is allocated by device probe function */
     struct i2c_runtime_context rpm_ctx;
     /* ljtale end */
 };
@@ -1403,6 +1408,10 @@ omap_i2c_probe(struct platform_device *pdev)
      * respectively.*/
 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
 
+    /* ljtale starts */
+    /* until here, all the values should be passed to the per-device data */
+    central_pm_omap_i2c_ctx(dev->dev);
+    /* ljtale ends */
 	pm_runtime_enable(dev->dev);
 	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
 	pm_runtime_use_autosuspend(dev->dev);
