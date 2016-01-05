@@ -270,11 +270,11 @@ void atm_dev_release_vccs(struct atm_dev *dev)
 	write_lock_irq(&vcc_sklist_lock);
 	for (i = 0; i < VCC_HTABLE_SIZE; i++) {
 		struct hlist_head *head = &vcc_hash[i];
-		struct hlist_node *node, *tmp;
+		struct hlist_node *tmp;
 		struct sock *s;
 		struct atm_vcc *vcc;
 
-		sk_for_each_safe(s, node, tmp, head) {
+		sk_for_each_safe(s, tmp, head) {
 			vcc = atm_sk(s);
 			if (vcc->dev == dev) {
 				vcc_release_async(vcc, -EPIPE);
@@ -300,7 +300,7 @@ static int adjust_tp(struct atm_trafprm *tp, unsigned char aal)
 		max_sdu = ATM_MAX_AAL34_PDU;
 		break;
 	default:
-		pr_warning("AAL problems ... (%d)\n", aal);
+		pr_warn("AAL problems ... (%d)\n", aal);
 		/* fall through */
 	case ATM_AAL5:
 		max_sdu = ATM_MAX_AAL5_PDU;
@@ -317,11 +317,10 @@ static int adjust_tp(struct atm_trafprm *tp, unsigned char aal)
 static int check_ci(const struct atm_vcc *vcc, short vpi, int vci)
 {
 	struct hlist_head *head = &vcc_hash[vci & (VCC_HTABLE_SIZE - 1)];
-	struct hlist_node *node;
 	struct sock *s;
 	struct atm_vcc *walk;
 
-	sk_for_each(s, node, head) {
+	sk_for_each(s, head) {
 		walk = atm_sk(s);
 		if (walk->dev != vcc->dev)
 			continue;
@@ -524,15 +523,13 @@ int vcc_connect(struct socket *sock, int itf, short vpi, int vci)
 	return 0;
 }
 
-int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
-		size_t size, int flags)
+int vcc_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
+		int flags)
 {
 	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
 	int copied, error = -EINVAL;
-
-	msg->msg_namelen = 0;
 
 	if (sock->state != SS_CONNECTED)
 		return -ENOTCONN;
@@ -557,7 +554,7 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 		msg->msg_flags |= MSG_TRUNC;
 	}
 
-	error = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
+	error = skb_copy_datagram_msg(skb, 0, msg, copied);
 	if (error)
 		return error;
 	sock_recv_ts_and_drops(msg, sk, skb);
@@ -572,16 +569,13 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 	return copied;
 }
 
-int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		size_t total_len)
+int vcc_sendmsg(struct socket *sock, struct msghdr *m, size_t size)
 {
 	struct sock *sk = sock->sk;
 	DEFINE_WAIT(wait);
 	struct atm_vcc *vcc;
 	struct sk_buff *skb;
 	int eff, error;
-	const void __user *buff;
-	int size;
 
 	lock_sock(sk);
 	if (sock->state != SS_CONNECTED) {
@@ -592,12 +586,6 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		error = -EISCONN;
 		goto out;
 	}
-	if (m->msg_iovlen != 1) {
-		error = -ENOSYS; /* fix this later @@@ */
-		goto out;
-	}
-	buff = m->msg_iov->iov_base;
-	size = m->msg_iov->iov_len;
 	vcc = ATM_SD(sock);
 	if (test_bit(ATM_VF_RELEASED, &vcc->flags) ||
 	    test_bit(ATM_VF_CLOSE, &vcc->flags) ||
@@ -610,7 +598,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		error = 0;
 		goto out;
 	}
-	if (size < 0 || size > vcc->qos.txtp.max_sdu) {
+	if (size > vcc->qos.txtp.max_sdu) {
 		error = -EMSGSIZE;
 		goto out;
 	}
@@ -642,7 +630,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		goto out;
 	skb->dev = NULL; /* for paths shared with net_device interfaces */
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
-	if (copy_from_user(skb_put(skb, size), buff, size)) {
+	if (copy_from_iter(skb_put(skb, size), size, &m->msg_iter) != size) {
 		kfree_skb(skb);
 		error = -EFAULT;
 		goto out;

@@ -55,12 +55,6 @@ ath9k_postprocess_radar_event(struct ath_softc *sc,
 	u8 rssi;
 	u16 dur;
 
-	ath_dbg(ath9k_hw_common(sc->sc_ah), DFS,
-		"pulse_bw_info=0x%x, pri,ext len/rssi=(%u/%u, %u/%u)\n",
-		ard->pulse_bw_info,
-		ard->pulse_length_pri, ard->rssi,
-		ard->pulse_length_ext, ard->ext_rssi);
-
 	/*
 	 * Only the last 2 bits of the BW info are relevant, they indicate
 	 * which channel the radar was detected in.
@@ -132,8 +126,19 @@ ath9k_postprocess_radar_event(struct ath_softc *sc,
 	DFS_STAT_INC(sc, pulses_detected);
 	return true;
 }
-#undef PRI_CH_RADAR_FOUND
-#undef EXT_CH_RADAR_FOUND
+
+static void
+ath9k_dfs_process_radar_pulse(struct ath_softc *sc, struct pulse_event *pe)
+{
+	struct dfs_pattern_detector *pd = sc->dfs_detector;
+	DFS_STAT_INC(sc, pulses_processed);
+	if (pd == NULL)
+		return;
+	if (!pd->add_pulse(pd, pe))
+		return;
+	DFS_STAT_INC(sc, radar_detected);
+	ieee80211_radar_detected(sc->hw);
+}
 
 /*
  * DFS: check PHY-error for radar pulse and feed the detector
@@ -164,8 +169,8 @@ void ath9k_dfs_process_phyerr(struct ath_softc *sc, void *data,
 		return;
 	}
 
-	ard.rssi = rs->rs_rssi_ctl0;
-	ard.ext_rssi = rs->rs_rssi_ext0;
+	ard.rssi = rs->rs_rssi_ctl[0];
+	ard.ext_rssi = rs->rs_rssi_ext[0];
 
 	/*
 	 * hardware stores this as 8 bit signed value.
@@ -182,20 +187,21 @@ void ath9k_dfs_process_phyerr(struct ath_softc *sc, void *data,
 	ard.pulse_length_pri = vdata_end[-3];
 	pe.freq = ah->curchan->channel;
 	pe.ts = mactime;
-	if (ath9k_postprocess_radar_event(sc, &ard, &pe)) {
-		struct dfs_pattern_detector *pd = sc->dfs_detector;
-		static u64 last_ts;
-		ath_dbg(common, DFS,
-			"ath9k_dfs_process_phyerr: channel=%d, ts=%llu, "
-			"width=%d, rssi=%d, delta_ts=%llu\n",
-			pe.freq, pe.ts, pe.width, pe.rssi, pe.ts-last_ts);
-		last_ts = pe.ts;
-		DFS_STAT_INC(sc, pulses_processed);
-		if (pd != NULL && pd->add_pulse(pd, &pe)) {
-			DFS_STAT_INC(sc, radar_detected);
-			/*
-			 * TODO: forward radar event to DFS management layer
-			 */
-		}
+	if (!ath9k_postprocess_radar_event(sc, &ard, &pe))
+		return;
+
+	ath_dbg(common, DFS,
+		"ath9k_dfs_process_phyerr: type=%d, freq=%d, ts=%llu, "
+		"width=%d, rssi=%d, delta_ts=%llu\n",
+		ard.pulse_bw_info, pe.freq, pe.ts, pe.width, pe.rssi,
+		pe.ts - sc->dfs_prev_pulse_ts);
+	sc->dfs_prev_pulse_ts = pe.ts;
+	if (ard.pulse_bw_info & PRI_CH_RADAR_FOUND)
+		ath9k_dfs_process_radar_pulse(sc, &pe);
+	if (ard.pulse_bw_info & EXT_CH_RADAR_FOUND) {
+		pe.freq += IS_CHAN_HT40PLUS(ah->curchan) ? 20 : -20;
+		ath9k_dfs_process_radar_pulse(sc, &pe);
 	}
 }
+#undef PRI_CH_RADAR_FOUND
+#undef EXT_CH_RADAR_FOUND

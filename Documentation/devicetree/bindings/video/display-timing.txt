@@ -34,6 +34,7 @@ optional properties:
 			- ignored     = ignored
  - interlaced (bool): boolean to enable interlaced mode
  - doublescan (bool): boolean to enable doublescan mode
+ - doubleclk (bool): boolean to enable doubleclock mode
 
 All the optional properties that are not bool follow the following logic:
     <1>: high active
@@ -48,11 +49,11 @@ can be specified.
 The parameters are defined as:
 
   +----------+-------------------------------------+----------+-------+
-  |          |        .                            |          |       |
+  |          |        ↑                            |          |       |
   |          |        |vback_porch                 |          |       |
-  |          |        .                            |          |       |
+  |          |        ↓                            |          |       |
   +----------#######################################----------+-------+
-  |          #        .                            #          |       |
+  |          #        ↑                            #          |       |
   |          #        |                            #          |       |
   |  hback   #        |                            #  hfront  | hsync |
   |   porch  #        |       hactive              #  porch   |  len  |
@@ -60,15 +61,15 @@ The parameters are defined as:
   |          #        |                            #          |       |
   |          #        |vactive                     #          |       |
   |          #        |                            #          |       |
-  |          #        .                            #          |       |
+  |          #        ↓                            #          |       |
   +----------#######################################----------+-------+
-  |          |        .                            |          |       |
+  |          |        ↑                            |          |       |
   |          |        |vfront_porch                |          |       |
-  |          |        .                            |          |       |
+  |          |        ↓                            |          |       |
   +----------+-------------------------------------+----------+-------+
-  |          |        .                            |          |       |
+  |          |        ↑                            |          |       |
   |          |        |vsync_len                   |          |       |
-  |          |        .                            |          |       |
+  |          |        ↓                            |          |       |
   +----------+-------------------------------------+----------+-------+
 
 Example:

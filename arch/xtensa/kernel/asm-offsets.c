@@ -42,6 +42,7 @@ int main(void)
 	DEFINE(PT_ICOUNTLEVEL, offsetof (struct pt_regs, icountlevel));
 	DEFINE(PT_SYSCALL, offsetof (struct pt_regs, syscall));
 	DEFINE(PT_SCOMPARE1, offsetof(struct pt_regs, scompare1));
+	DEFINE(PT_THREADPTR, offsetof(struct pt_regs, threadptr));
 	DEFINE(PT_AREG, offsetof (struct pt_regs, areg[0]));
 	DEFINE(PT_AREG0, offsetof (struct pt_regs, areg[0]));
 	DEFINE(PT_AREG1, offsetof (struct pt_regs, areg[1]));
@@ -75,6 +76,14 @@ int main(void)
 	DEFINE(TASK_THREAD, offsetof (struct task_struct, thread));
 	DEFINE(TASK_THREAD_INFO, offsetof (struct task_struct, stack));
 	DEFINE(TASK_STRUCT_SIZE, sizeof (struct task_struct));
+
+	/* offsets in thread_info struct */
+	OFFSET(TI_TASK, thread_info, task);
+	OFFSET(TI_FLAGS, thread_info, flags);
+	OFFSET(TI_STSTUS, thread_info, status);
+	OFFSET(TI_CPU, thread_info, cpu);
+	OFFSET(TI_PRE_COUNT, thread_info, preempt_count);
+	OFFSET(TI_ADDR_LIMIT, thread_info, addr_limit);
 
 	/* struct thread_info (offset from start_struct) */
 	DEFINE(THREAD_RA, offsetof (struct task_struct, thread.ra));

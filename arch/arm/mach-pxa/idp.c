@@ -36,6 +36,7 @@
 #include <linux/platform_data/video-pxafb.h>
 #include <mach/bitfield.h>
 #include <linux/platform_data/mmc-pxamci.h>
+#include <linux/smc91x.h>
 
 #include "generic.h"
 #include "devices.h"
@@ -81,11 +82,16 @@ static struct resource smc91x_resources[] = {
 	}
 };
 
+static struct smc91x_platdata smc91x_platdata = {
+	.flags = SMC91X_USE_32BIT | SMC91X_USE_DMA | SMC91X_NOWAIT,
+};
+
 static struct platform_device smc91x_device = {
 	.name		= "smc91x",
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(smc91x_resources),
 	.resource	= smc91x_resources,
+	.dev.platform_data = &smc91x_platdata,
 };
 
 static void idp_backlight_power(int on)
@@ -279,7 +285,7 @@ MACHINE_START(PXA_IDP, "Vibren PXA255 IDP")
 	.nr_irqs	= PXA_NR_IRQS,
 	.init_irq	= pxa25x_init_irq,
 	.handle_irq	= pxa25x_handle_irq,
-	.timer		= &pxa_timer,
+	.init_time	= pxa_timer_init,
 	.init_machine	= idp_init,
 	.restart	= pxa_restart,
 MACHINE_END

@@ -422,8 +422,7 @@ int pvr2_encoder_adjust(struct pvr2_hdw *hdw)
 		pvr2_trace(PVR2_TRACE_ERROR_LEGS,
 			   "Error from cx2341x module code=%d",ret);
 	} else {
-		memcpy(&hdw->enc_cur_state,&hdw->enc_ctl_state,
-		       sizeof(struct cx2341x_mpeg_params));
+		hdw->enc_cur_state = hdw->enc_ctl_state;
 		hdw->enc_cur_valid = !0;
 	}
 	return ret;
@@ -539,14 +538,3 @@ int pvr2_encoder_stop(struct pvr2_hdw *hdw)
 
 	return status;
 }
-
-
-/*
-  Stuff for Emacs to see, in order to encourage consistent editing style:
-  *** Local Variables: ***
-  *** mode: c ***
-  *** fill-column: 70 ***
-  *** tab-width: 8 ***
-  *** c-basic-offset: 8 ***
-  *** End: ***
-  */

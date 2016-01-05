@@ -47,6 +47,7 @@ int cxd2820r_set_frontend_t2(struct dvb_frontend *fe)
 		{ 0x02083, 0x0a, 0xff },
 		{ 0x020cb, priv->cfg.if_agc_polarity << 6, 0x40 },
 		{ 0x02070, priv->cfg.ts_mode, 0xff },
+		{ 0x02071, !priv->cfg.ts_clock_inv << 6, 0x40 },
 		{ 0x020b5, priv->cfg.spec_inv << 4, 0x10 },
 		{ 0x02567, 0x07, 0x0f },
 		{ 0x02569, 0x03, 0x03 },
@@ -119,10 +120,27 @@ int cxd2820r_set_frontend_t2(struct dvb_frontend *fe)
 
 	num = if_freq / 1000; /* Hz => kHz */
 	num *= 0x1000000;
-	if_ctl = cxd2820r_div_u64_round_closest(num, 41000);
+	if_ctl = DIV_ROUND_CLOSEST_ULL(num, 41000);
 	buf[0] = ((if_ctl >> 16) & 0xff);
 	buf[1] = ((if_ctl >>  8) & 0xff);
 	buf[2] = ((if_ctl >>  0) & 0xff);
+
+	/* PLP filtering */
+	if (c->stream_id > 255) {
+		dev_dbg(&priv->i2c->dev, "%s: Disable PLP filtering\n", __func__);
+		ret = cxd2820r_wr_reg(priv, 0x023ad , 0);
+		if (ret)
+			goto error;
+	} else {
+		dev_dbg(&priv->i2c->dev, "%s: Enable PLP filtering = %d\n", __func__,
+				c->stream_id);
+		ret = cxd2820r_wr_reg(priv, 0x023af , c->stream_id & 0xFF);
+		if (ret)
+			goto error;
+		ret = cxd2820r_wr_reg(priv, 0x023ad , 1);
+		if (ret)
+			goto error;
+	}
 
 	ret = cxd2820r_wr_regs(priv, 0x020b6, buf, 3);
 	if (ret)

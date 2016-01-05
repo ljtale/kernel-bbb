@@ -26,11 +26,12 @@
 #include <linux/err.h>
 #include <linux/kref.h>
 #include <linux/slab.h>
+#include <linux/device.h>
 
 #include "remoteproc_internal.h"
 
 /* kick the remote processor, and let it know which virtqueue to poke at */
-static void rproc_virtio_notify(struct virtqueue *vq)
+static bool rproc_virtio_notify(struct virtqueue *vq)
 {
 	struct rproc_vring *rvring = vq->priv;
 	struct rproc *rproc = rvring->rvdev->rproc;
@@ -39,6 +40,7 @@ static void rproc_virtio_notify(struct virtqueue *vq)
 	dev_dbg(&rproc->dev, "kicking vq index: %d\n", notifyid);
 
 	rproc->ops->kick(rproc, notifyid);
+	return true;
 }
 
 /**
@@ -100,14 +102,14 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 	memset(addr, 0, size);
 
 	dev_dbg(dev, "vring%d: va %p qsz %d notifyid %d\n",
-					id, addr, len, rvring->notifyid);
+		id, addr, len, rvring->notifyid);
 
 	/*
 	 * Create the new vq, and tell virtio we're not interested in
 	 * the 'weak' smp barriers, since we're talking with a real device.
 	 */
 	vq = vring_new_virtqueue(id, len, rvring->align, vdev, false, addr,
-					rproc_virtio_notify, callback, name);
+				 rproc_virtio_notify, callback, name);
 	if (!vq) {
 		dev_err(dev, "vring_new_virtqueue %s failed\n", name);
 		rproc_free_vring(rvring);
@@ -144,9 +146,9 @@ static void rproc_virtio_del_vqs(struct virtio_device *vdev)
 }
 
 static int rproc_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
-		       struct virtqueue *vqs[],
-		       vq_callback_t *callbacks[],
-		       const char *names[])
+				 struct virtqueue *vqs[],
+				 vq_callback_t *callbacks[],
+				 const char *names[])
 {
 	struct rproc *rproc = vdev_to_rproc(vdev);
 	int i, ret;
@@ -173,56 +175,108 @@ error:
 	return ret;
 }
 
-/*
- * We don't support yet real virtio status semantics.
- *
- * The plan is to provide this via the VDEV resource entry
- * which is part of the firmware: this way the remote processor
- * will be able to access the status values as set by us.
- */
 static u8 rproc_virtio_get_status(struct virtio_device *vdev)
 {
-	return 0;
+	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
+
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
+
+	return rsc->status;
 }
 
 static void rproc_virtio_set_status(struct virtio_device *vdev, u8 status)
 {
+	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
+
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
+
+	rsc->status = status;
 	dev_dbg(&vdev->dev, "status: %d\n", status);
 }
 
 static void rproc_virtio_reset(struct virtio_device *vdev)
 {
+	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
+
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
+
+	rsc->status = 0;
 	dev_dbg(&vdev->dev, "reset !\n");
 }
 
 /* provide the vdev features as retrieved from the firmware */
-static u32 rproc_virtio_get_features(struct virtio_device *vdev)
+static u64 rproc_virtio_get_features(struct virtio_device *vdev)
 {
 	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
 
-	return rvdev->dfeatures;
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
+
+	return rsc->dfeatures;
 }
 
-static void rproc_virtio_finalize_features(struct virtio_device *vdev)
+static int rproc_virtio_finalize_features(struct virtio_device *vdev)
 {
 	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
+
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
 
 	/* Give virtio_ring a chance to accept features */
 	vring_transport_features(vdev);
 
+	/* Make sure we don't have any features > 32 bits! */
+	BUG_ON((u32)vdev->features != vdev->features);
+
 	/*
 	 * Remember the finalized features of our vdev, and provide it
 	 * to the remote processor once it is powered on.
-	 *
-	 * Similarly to the status field, we don't expose yet the negotiated
-	 * features to the remote processors at this point. This will be
-	 * fixed as part of a small resource table overhaul and then an
-	 * extension of the virtio resource entries.
 	 */
-	rvdev->gfeatures = vdev->features[0];
+	rsc->gfeatures = vdev->features;
+
+	return 0;
 }
 
-static struct virtio_config_ops rproc_virtio_config_ops = {
+static void rproc_virtio_get(struct virtio_device *vdev, unsigned offset,
+			     void *buf, unsigned len)
+{
+	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
+	void *cfg;
+
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
+	cfg = &rsc->vring[rsc->num_of_vrings];
+
+	if (offset + len > rsc->config_len || offset + len < len) {
+		dev_err(&vdev->dev, "rproc_virtio_get: access out of bounds\n");
+		return;
+	}
+
+	memcpy(buf, cfg + offset, len);
+}
+
+static void rproc_virtio_set(struct virtio_device *vdev, unsigned offset,
+			     const void *buf, unsigned len)
+{
+	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
+	struct fw_rsc_vdev *rsc;
+	void *cfg;
+
+	rsc = (void *)rvdev->rproc->table_ptr + rvdev->rsc_offset;
+	cfg = &rsc->vring[rsc->num_of_vrings];
+
+	if (offset + len > rsc->config_len || offset + len < len) {
+		dev_err(&vdev->dev, "rproc_virtio_set: access out of bounds\n");
+		return;
+	}
+
+	memcpy(cfg + offset, buf, len);
+}
+
+static const struct virtio_config_ops rproc_virtio_config_ops = {
 	.get_features	= rproc_virtio_get_features,
 	.finalize_features = rproc_virtio_finalize_features,
 	.find_vqs	= rproc_virtio_find_vqs,
@@ -230,6 +284,8 @@ static struct virtio_config_ops rproc_virtio_config_ops = {
 	.reset		= rproc_virtio_reset,
 	.set_status	= rproc_virtio_set_status,
 	.get_status	= rproc_virtio_get_status,
+	.get		= rproc_virtio_get,
+	.set		= rproc_virtio_set,
 };
 
 /*
@@ -306,3 +362,24 @@ void rproc_remove_virtio_dev(struct rproc_vdev *rvdev)
 {
 	unregister_virtio_device(&rvdev->vdev);
 }
+
+/**
+ * rproc_vdev_to_rproc_safe() - Deduces a remoteproc from a virtio device
+ * @vdev: The virtio_device
+ *
+ * This function deduces the remoteproc from a given virtio device safely. If
+ * the virtio device is not one used by remoteproc, return NULL (as opposed to
+ * vdev_to_rproc which would return an invalid pointer)
+ */
+struct rproc *rproc_vdev_to_rproc_safe(struct virtio_device *vdev)
+{
+	struct rproc_vdev *rvdev;
+
+	if (!vdev->dev.parent || vdev->dev.parent->type != &rproc_type)
+		return NULL;
+
+	rvdev = vdev_to_rvdev(vdev);
+
+	return rvdev->rproc;
+}
+EXPORT_SYMBOL(rproc_vdev_to_rproc_safe);

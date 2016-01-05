@@ -2,7 +2,6 @@
 #define _ASM_X86_SMP_H
 #ifndef __ASSEMBLY__
 #include <linux/cpumask.h>
-#include <linux/init.h>
 #include <asm/percpu.h>
 
 /*
@@ -154,8 +153,10 @@ void cpu_disable_common(void);
 void native_smp_prepare_boot_cpu(void);
 void native_smp_prepare_cpus(unsigned int max_cpus);
 void native_smp_cpus_done(unsigned int max_cpus);
+void common_cpu_up(unsigned int cpunum, struct task_struct *tidle);
 int native_cpu_up(unsigned int cpunum, struct task_struct *tidle);
 int native_cpu_disable(void);
+int common_cpu_die(unsigned int cpu);
 void native_cpu_die(unsigned int cpu);
 void native_play_dead(void);
 void play_dead_common(void);
@@ -179,7 +180,7 @@ static inline int wbinvd_on_all_cpus(void)
 }
 #endif /* CONFIG_SMP */
 
-extern unsigned disabled_cpus __cpuinitdata;
+extern unsigned disabled_cpus;
 
 #ifdef CONFIG_X86_32_SMP
 /*

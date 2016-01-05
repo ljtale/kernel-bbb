@@ -125,7 +125,11 @@
 #define SIOCBRDELIF	0x89a3		/* remove interface from bridge */
 
 /* hardware time stamping: parameters in linux/net_tstamp.h */
-#define SIOCSHWTSTAMP   0x89b0
+#define SIOCSHWTSTAMP	0x89b0		/* set and get config		*/
+#define SIOCGHWTSTAMP	0x89b1		/* get config			*/
+
+/* Switch config calls: parameters in linux/net_switch_config.h */
+#define SIOCSWITCHCONFIG    0x89c0
 
 /* Device private ioctl calls */
 

@@ -1,5 +1,5 @@
 /*
- * Linux network driver for Brocade Converged Network Adapter.
+ * Linux network driver for QLogic BR-series Converged Network Adapter.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License (GPL) Version 2 as
@@ -11,9 +11,10 @@
  * General Public License for more details.
  */
 /*
- * Copyright (c) 2005-2010 Brocade Communications Systems, Inc.
+ * Copyright (c) 2005-2014 Brocade Communications Systems, Inc.
+ * Copyright (c) 2014-2015 QLogic Corporation
  * All rights reserved
- * www.brocade.com
+ * www.qlogic.com
  */
 
 #ifndef __BFA_DEFS_H__
@@ -164,7 +165,8 @@ struct bfa_ioc_attr {
 	u8				port_mode;	/*!< enum bfa_mode */
 	u8				cap_bm;		/*!< capability */
 	u8				port_mode_cfg;	/*!< enum bfa_mode */
-	u8				rsvd[4];	/*!< 64bit align */
+	u8				def_fn;		/*!< 1 if default fn */
+	u8				rsvd[3];	/*!< 64bit align */
 };
 
 /* Adapter capability mask definition */

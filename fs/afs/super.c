@@ -24,6 +24,8 @@
 #include <linux/parser.h>
 #include <linux/statfs.h>
 #include <linux/sched.h>
+#include <linux/nsproxy.h>
+#include <net/net_namespace.h>
 #include "internal.h"
 
 #define AFS_FS_MAGIC 0x6B414653 /* 'kAFS' */
@@ -43,6 +45,7 @@ struct file_system_type afs_fs_type = {
 	.kill_sb	= afs_kill_super,
 	.fs_flags	= 0,
 };
+MODULE_ALIAS_FS("afs");
 
 static const struct super_operations afs_super_ops = {
 	.statfs		= afs_statfs,
@@ -363,6 +366,10 @@ static struct dentry *afs_mount(struct file_system_type *fs_type,
 
 	memset(&params, 0, sizeof(params));
 
+	ret = -EINVAL;
+	if (current->nsproxy->net_ns != &init_net)
+		goto error;
+
 	/* parse the options and device name */
 	if (options) {
 		ret = afs_parse_options(&params, options, &dev_name);
@@ -522,7 +529,7 @@ static void afs_destroy_inode(struct inode *inode)
 static int afs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	struct afs_volume_status vs;
-	struct afs_vnode *vnode = AFS_FS_I(dentry->d_inode);
+	struct afs_vnode *vnode = AFS_FS_I(d_inode(dentry));
 	struct key *key;
 	int ret;
 

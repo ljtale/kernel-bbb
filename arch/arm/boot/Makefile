@@ -12,7 +12,7 @@
 #
 
 ifneq ($(MACHINE),)
-include $(srctree)/$(MACHINE)/Makefile.boot
+include $(MACHINE)/Makefile.boot
 endif
 
 # Note: the following conditions must always be true:
@@ -26,6 +26,10 @@ INITRD_PHYS := $(initrd_phys-y)
 export ZRELADDR INITRD_PHYS PARAMS_PHYS
 
 targets := Image zImage xipImage bootpImage uImage
+
+ifeq ($(CONFIG_OF_OVERLAY),y)
+DTC_FLAGS += -@
+endif
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
 
@@ -55,13 +59,6 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 	@$(kecho) '  Kernel: $@ is ready'
 
-$(obj)/zImage-dtb.%:	$(obj)/dts/%.dtb $(obj)/zImage
-	cat $(obj)/zImage $< > $@
-
-endif
-
-ifeq ($(CONFIG_OF_RESOLVE),y)
-DTC_FLAGS += -@
 endif
 
 ifneq ($(LOADADDR),)
@@ -75,8 +72,8 @@ else
 endif
 
 check_for_multiple_loadaddr = \
-if [ $(words $(UIMAGE_LOADADDR)) -gt 1 ]; then \
-	echo 'multiple load addresses: $(UIMAGE_LOADADDR)'; \
+if [ $(words $(UIMAGE_LOADADDR)) -ne 1 ]; then \
+	echo 'multiple (or no) load addresses: $(UIMAGE_LOADADDR)'; \
 	echo 'This is incompatible with uImages'; \
 	echo 'Specify LOADADDR on the commandline to build an uImage'; \
 	false; \
@@ -86,10 +83,6 @@ $(obj)/uImage:	$(obj)/zImage FORCE
 	@$(check_for_multiple_loadaddr)
 	$(call if_changed,uimage)
 	@$(kecho) '  Image $@ is ready'
-
-$(obj)/uImage-dtb.%:	$(obj)/zImage-dtb.% FORCE
-	$(call if_changed,uimage)
-	@echo '  Image $@ is ready'
 
 $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
@@ -106,24 +99,24 @@ initrd:
 	@test "$(INITRD)" != "" || \
 	(echo You must specify INITRD; exit -1)
 
-install: $(obj)/Image
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+install:
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" \
 	$(obj)/Image System.map "$(INSTALL_PATH)"
 
-zinstall: $(obj)/zImage
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+zinstall:
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" \
 	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
-uinstall: $(obj)/uImage
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+uinstall:
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" \
 	$(obj)/uImage System.map "$(INSTALL_PATH)"
 
 zi:
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" \
 	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
 i:
-	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" \
 	$(obj)/Image System.map "$(INSTALL_PATH)"
 
-subdir-	    := bootp compressed
+subdir-	    := bootp compressed dts

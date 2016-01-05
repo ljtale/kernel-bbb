@@ -12,34 +12,29 @@
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA
  */
 
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 
 #include "isp.h"
 #include "ispreg.h"
 #include "ispcsiphy.h"
 
-static void csiphy_routing_cfg_3630(struct isp_csiphy *phy, u32 iface,
+static void csiphy_routing_cfg_3630(struct isp_csiphy *phy,
+				    enum isp_interface_type iface,
 				    bool ccp2_strobe)
 {
-	u32 reg = isp_reg_readl(
-		phy->isp, OMAP3_ISP_IOMEM_3630_CONTROL_CAMERA_PHY_CTRL, 0);
+	u32 reg;
 	u32 shift, mode;
 
+	regmap_read(phy->isp->syscon, phy->isp->syscon_offset, &reg);
+
 	switch (iface) {
+	default:
+	/* Should not happen in practice, but let's keep the compiler happy. */
 	case ISP_INTERFACE_CCP2B_PHY1:
 		reg &= ~OMAP3630_CONTROL_CAMERA_PHY_CTRL_CSI1_RX_SEL_PHY2;
 		shift = OMAP3630_CONTROL_CAMERA_PHY_CTRL_CAMMODE_PHY1_SHIFT;
@@ -59,9 +54,8 @@ static void csiphy_routing_cfg_3630(struct isp_csiphy *phy, u32 iface,
 	}
 
 	/* Select data/clock or data/strobe mode for CCP2 */
-	switch (iface) {
-	case ISP_INTERFACE_CCP2B_PHY1:
-	case ISP_INTERFACE_CCP2B_PHY2:
+	if (iface == ISP_INTERFACE_CCP2B_PHY1 ||
+	    iface == ISP_INTERFACE_CCP2B_PHY2) {
 		if (ccp2_strobe)
 			mode = OMAP3630_CONTROL_CAMERA_PHY_CTRL_CAMMODE_CCP2_DATA_STROBE;
 		else
@@ -71,8 +65,7 @@ static void csiphy_routing_cfg_3630(struct isp_csiphy *phy, u32 iface,
 	reg &= ~(OMAP3630_CONTROL_CAMERA_PHY_CTRL_CAMMODE_MASK << shift);
 	reg |= mode << shift;
 
-	isp_reg_writel(phy->isp, reg,
-		       OMAP3_ISP_IOMEM_3630_CONTROL_CAMERA_PHY_CTRL, 0);
+	regmap_write(phy->isp->syscon, phy->isp->syscon_offset, reg);
 }
 
 static void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
@@ -86,16 +79,14 @@ static void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
 		return;
 
 	if (!on) {
-		isp_reg_writel(phy->isp, 0,
-			       OMAP3_ISP_IOMEM_343X_CONTROL_CSIRXFE, 0);
+		regmap_write(phy->isp->syscon, phy->isp->syscon_offset, 0);
 		return;
 	}
 
 	if (ccp2_strobe)
 		csirxfe |= OMAP343X_CONTROL_CSIRXFE_SELFORM;
 
-	isp_reg_writel(phy->isp, csirxfe,
-		       OMAP3_ISP_IOMEM_343X_CONTROL_CSIRXFE, 0);
+	regmap_write(phy->isp->syscon, phy->isp->syscon_offset, csirxfe);
 }
 
 /*
@@ -110,13 +101,13 @@ static void csiphy_routing_cfg_3430(struct isp_csiphy *phy, u32 iface, bool on,
  * and 3630, so they will not hold their contents in off-mode. This isn't an
  * issue since the MPU power domain is forced on whilst the ISP is in use.
  */
-static void csiphy_routing_cfg(struct isp_csiphy *phy, u32 iface, bool on,
+static void csiphy_routing_cfg(struct isp_csiphy *phy,
+			       enum isp_interface_type iface, bool on,
 			       bool ccp2_strobe)
 {
-	if (phy->isp->mmio_base[OMAP3_ISP_IOMEM_3630_CONTROL_CAMERA_PHY_CTRL]
-	    && on)
+	if (phy->isp->phy_type == ISP_PHY_TYPE_3630 && on)
 		return csiphy_routing_cfg_3630(phy, iface, ccp2_strobe);
-	if (phy->isp->mmio_base[OMAP3_ISP_IOMEM_343X_CONTROL_CSIRXFE])
+	if (phy->isp->phy_type == ISP_PHY_TYPE_3430)
 		return csiphy_routing_cfg_3430(phy, iface, on, ccp2_strobe);
 }
 
@@ -175,18 +166,25 @@ static int omap3isp_csiphy_config(struct isp_csiphy *phy)
 {
 	struct isp_csi2_device *csi2 = phy->csi2;
 	struct isp_pipeline *pipe = to_isp_pipeline(&csi2->subdev.entity);
-	struct isp_v4l2_subdevs_group *subdevs = pipe->external->host_priv;
+	struct isp_bus_cfg *buscfg = pipe->external->host_priv;
 	struct isp_csiphy_lanes_cfg *lanes;
 	int csi2_ddrclk_khz;
 	unsigned int used_lanes = 0;
 	unsigned int i;
 	u32 reg;
 
-	if (subdevs->interface == ISP_INTERFACE_CCP2B_PHY1
-	    || subdevs->interface == ISP_INTERFACE_CCP2B_PHY2)
-		lanes = &subdevs->bus.ccp2.lanecfg;
+	if (!buscfg) {
+		struct isp_async_subdev *isd =
+			container_of(pipe->external->asd,
+				     struct isp_async_subdev, asd);
+		buscfg = &isd->bus;
+	}
+
+	if (buscfg->interface == ISP_INTERFACE_CCP2B_PHY1
+	    || buscfg->interface == ISP_INTERFACE_CCP2B_PHY2)
+		lanes = &buscfg->bus.ccp2.lanecfg;
 	else
-		lanes = &subdevs->bus.csi2.lanecfg;
+		lanes = &buscfg->bus.csi2.lanecfg;
 
 	/* Clock and data lanes verification */
 	for (i = 0; i < phy->num_data_lanes; i++) {
@@ -210,8 +208,8 @@ static int omap3isp_csiphy_config(struct isp_csiphy *phy)
 	 * issue since the MPU power domain is forced on whilst the
 	 * ISP is in use.
 	 */
-	csiphy_routing_cfg(phy, subdevs->interface, true,
-			   subdevs->bus.ccp2.phy_layer);
+	csiphy_routing_cfg(phy, buscfg->interface, true,
+			   buscfg->bus.ccp2.phy_layer);
 
 	/* DPHY timing configuration */
 	/* CSI-2 is DDR and we only count used lanes. */
@@ -309,11 +307,10 @@ void omap3isp_csiphy_release(struct isp_csiphy *phy)
 		struct isp_csi2_device *csi2 = phy->csi2;
 		struct isp_pipeline *pipe =
 			to_isp_pipeline(&csi2->subdev.entity);
-		struct isp_v4l2_subdevs_group *subdevs =
-			pipe->external->host_priv;
+		struct isp_bus_cfg *buscfg = pipe->external->host_priv;
 
-		csiphy_routing_cfg(phy, subdevs->interface, false,
-				   subdevs->bus.ccp2.phy_layer);
+		csiphy_routing_cfg(phy, buscfg->interface, false,
+				   buscfg->bus.ccp2.phy_layer);
 		csiphy_power_autoswitch_enable(phy, false);
 		csiphy_set_power(phy, ISPCSI2_PHY_CFG_PWR_CMD_OFF);
 		regulator_disable(phy->vdd);

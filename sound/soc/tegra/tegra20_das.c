@@ -128,7 +128,7 @@ static const struct regmap_config tegra20_das_regmap_config = {
 	.max_register = LAST_REG(DAC_INPUT_DATA_CLK_SEL),
 	.writeable_reg = tegra20_das_wr_rd_reg,
 	.readable_reg = tegra20_das_wr_rd_reg,
-	.cache_type = REGCACHE_RBTREE,
+	.cache_type = REGCACHE_FLAT,
 };
 
 static int tegra20_das_probe(struct platform_device *pdev)
@@ -191,6 +191,19 @@ static int tegra20_das_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	ret = tegra20_das_connect_dap_to_dac(TEGRA20_DAS_DAP_ID_3,
+					     TEGRA20_DAS_DAP_SEL_DAC3);
+	if (ret) {
+		dev_err(&pdev->dev, "Can't set up DAS DAP connection\n");
+		goto err;
+	}
+	ret = tegra20_das_connect_dac_to_dap(TEGRA20_DAS_DAC_ID_3,
+					     TEGRA20_DAS_DAC_SEL_DAP3);
+	if (ret) {
+		dev_err(&pdev->dev, "Can't set up DAS DAC connection\n");
+		goto err;
+	}
+
 	platform_set_drvdata(pdev, das);
 
 	return 0;
@@ -220,7 +233,6 @@ static struct platform_driver tegra20_das_driver = {
 	.remove = tegra20_das_remove,
 	.driver = {
 		.name = DRV_NAME,
-		.owner = THIS_MODULE,
 		.of_match_table = tegra20_das_of_match,
 	},
 };

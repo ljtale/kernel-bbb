@@ -12,7 +12,6 @@
  * of this archive for more details.
  */
 #include <linux/module.h>
-#include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
@@ -436,8 +435,6 @@ err_unmap:
 err:
 	kfree(dev);
 
-	platform_set_drvdata(pdev, NULL);
-
 	return ret;
 }
 
@@ -453,15 +450,12 @@ static int highlander_i2c_remove(struct platform_device *pdev)
 	iounmap(dev->base);
 	kfree(dev);
 
-	platform_set_drvdata(pdev, NULL);
-
 	return 0;
 }
 
 static struct platform_driver highlander_i2c_driver = {
 	.driver		= {
 		.name	= "i2c-highlander",
-		.owner	= THIS_MODULE,
 	},
 
 	.probe		= highlander_i2c_probe,

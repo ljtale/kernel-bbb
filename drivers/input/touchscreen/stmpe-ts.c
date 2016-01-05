@@ -15,7 +15,6 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <linux/init.h>
 #include <linux/device.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
@@ -120,6 +119,7 @@ static void stmpe_work(struct work_struct *work)
 	__stmpe_reset_fifo(ts->stmpe);
 
 	input_report_abs(ts->idev, ABS_PRESSURE, 0);
+	input_report_key(ts->idev, BTN_TOUCH, 0);
 	input_sync(ts->idev);
 }
 
@@ -153,6 +153,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
 	input_report_abs(ts->idev, ABS_X, x);
 	input_report_abs(ts->idev, ABS_Y, y);
 	input_report_abs(ts->idev, ABS_PRESSURE, z);
+	input_report_key(ts->idev, BTN_TOUCH, 1);
 	input_sync(ts->idev);
 
        /* flush the FIFO after we have read out our values. */
@@ -163,7 +164,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
 			STMPE_TSC_CTRL_TSC_EN, STMPE_TSC_CTRL_TSC_EN);
 
 	/* start polling for touch_det to detect release */
-	schedule_delayed_work(&ts->work, HZ / 50);
+	schedule_delayed_work(&ts->work, msecs_to_jiffies(50));
 
 	return IRQ_HANDLED;
 }
@@ -383,7 +384,6 @@ static int stmpe_ts_remove(struct platform_device *pdev)
 static struct platform_driver stmpe_ts_driver = {
 	.driver = {
 		   .name = STMPE_TS_NAME,
-		   .owner = THIS_MODULE,
 		   },
 	.probe = stmpe_input_probe,
 	.remove = stmpe_ts_remove,

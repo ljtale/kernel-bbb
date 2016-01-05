@@ -20,12 +20,6 @@ __sys_rt_sigsuspend:
 	mov	r10, sp
 	rjmp	sys_rt_sigsuspend
 
-	.global	__sys_sigaltstack
-	.type	__sys_sigaltstack,@function
-__sys_sigaltstack:
-	mov	r10, sp
-	rjmp	sys_sigaltstack
-
 	.global	__sys_rt_sigreturn
 	.type	__sys_rt_sigreturn,@function
 __sys_rt_sigreturn:
@@ -92,5 +86,41 @@ __sys_sync_file_range:
 	pushm	lr
 	st.w	--sp, ARG6
 	call	sys_sync_file_range
+	sub	sp, -4
+	popm	pc
+
+	.global __sys_fallocate
+	.type	__sys_fallocate,@function
+__sys_fallocate:
+	pushm	lr
+	st.w	--sp, ARG6
+	call	sys_fallocate
+	sub	sp, -4
+	popm	pc
+
+	.global __sys_fanotify_mark
+	.type	__sys_fanotify_mark,@function
+__sys_fanotify_mark:
+	pushm	lr
+	st.w	--sp, ARG6
+	call	sys_fanotify_mark
+	sub	sp, -4
+	popm	pc
+
+	.global __sys_process_vm_readv
+	.type	__sys_process_vm_readv,@function
+__sys_process_vm_readv:
+	pushm	lr
+	st.w	--sp, ARG6
+	call	sys_process_vm_readv
+	sub	sp, -4
+	popm	pc
+
+	.global __sys_process_vm_writev
+	.type	__sys_process_vm_writev,@function
+__sys_process_vm_writev:
+	pushm	lr
+	st.w	--sp, ARG6
+	call	sys_process_vm_writev
 	sub	sp, -4
 	popm	pc

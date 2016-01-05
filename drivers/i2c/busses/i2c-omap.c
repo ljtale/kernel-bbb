@@ -22,10 +22,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include <linux/module.h>
@@ -38,13 +34,14 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/of.h>
-#include <linux/of_i2c.h>
 #include <linux/of_device.h>
 #include <linux/slab.h>
 #include <linux/i2c-omap.h>
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
-#include <linux/err.h>
+
+/* ljtale: central pm header */
+#include "../drivers/ljtale/central-pm.h"
 
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
@@ -60,6 +57,9 @@
 
 /* timeout for pm runtime autosuspend */
 #define OMAP_I2C_PM_TIMEOUT		1000	/* ms */
+
+/* timeout for making decision on bus free status */
+#define OMAP_I2C_BUS_FREE_TIMEOUT (msecs_to_jiffies(10))
 
 /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
 enum {
@@ -105,7 +105,7 @@ enum {
 #define OMAP_I2C_STAT_ROVR	(1 << 11)	/* Receive overrun */
 #define OMAP_I2C_STAT_XUDF	(1 << 10)	/* Transmit underflow */
 #define OMAP_I2C_STAT_AAS	(1 << 9)	/* Address as slave */
-#define OMAP_I2C_STAT_AD0	(1 << 8)	/* Address zero */
+#define OMAP_I2C_STAT_BF	(1 << 8)	/* Bus Free */
 #define OMAP_I2C_STAT_XRDY	(1 << 4)	/* Transmit data ready */
 #define OMAP_I2C_STAT_RRDY	(1 << 3)	/* Receive data ready */
 #define OMAP_I2C_STAT_ARDY	(1 << 2)	/* Register access ready */
@@ -153,16 +153,20 @@ enum {
 #define OMAP_I2C_SCLH_HSSCLH	8
 
 /* I2C System Test Register (OMAP_I2C_SYSTEST): */
-#ifdef DEBUG
 #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
 #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
 #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
 #define OMAP_I2C_SYSTEST_TMODE_SHIFT	(12)		/* Test mode select */
+/* Functional mode */
+#define OMAP_I2C_SYSTEST_SCL_I_FUNC	(1 << 8)	/* SCL line input value */
+#define OMAP_I2C_SYSTEST_SCL_O_FUNC	(1 << 7)	/* SCL line output value */
+#define OMAP_I2C_SYSTEST_SDA_I_FUNC	(1 << 6)	/* SDA line input value */
+#define OMAP_I2C_SYSTEST_SDA_O_FUNC	(1 << 5)	/* SDA line output value */
+/* SDA/SCL IO mode */
 #define OMAP_I2C_SYSTEST_SCL_I		(1 << 3)	/* SCL line sense in */
 #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
 #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
 #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
-#endif
 
 /* OCP_SYSSTATUS bit definitions */
 #define SYSS_RESETDONE_MASK		(1 << 0)
@@ -181,11 +185,51 @@ enum {
 #define I2C_OMAP_ERRATA_I207		(1 << 0)
 #define I2C_OMAP_ERRATA_I462		(1 << 1)
 
+/* for v2 I2C device, only bit [14:13] and [11:0] are valid interrupt
+ * enable bits */
+#define OMAP_I2C_IP_V2_INTERRUPTS_MASK	0x6FFF
+
+#if 0
+/* values that need to be written to I2C register when resuming */
+struct i2c_resume_values {
+    u16 omap_i2c_con_reset_all;
+    u16 omap_i2c_psc_val;
+    u16 omap_i2c_scll_val;
+    u16 omap_i2c_sclh_val;
+    u16 omap_i2c_con_we;
+    u16 omap_i2c_con_en;
+    u16 omap_i2c_ie_val;
+};
+
+/* values that need to be written or read when suspending */
+struct i2c_suspend_values {
+    u16 omap_i2c_ie_val;    /* this value needs to be read */
+    u16 omap_i2c_v2_int_mask;   /* this value needs to be written */
+    u16 omap_i2c_stat_val_w;  /* this value needs to be written */
+    u16 omap_i2c_stat_val_r;    /* this value needs to be read */
+};
+
+/* this context should be on a per-device manner. In a driver that supports
+ * multiple devices, this is not able to describe static context for a
+ * certain device. Thus the values of the context should come in through
+ * something like device tree. Device tree would be a good candidate to
+ * process such values */
+struct i2c_runtime_context {
+    void __iomem *base;
+    int reg_shift;
+    struct i2c_resume_values resume;
+    struct i2c_suspend_values suspend;
+};
+#endif
+
 struct omap_i2c_dev {
 	spinlock_t		lock;		/* IRQ synchronization */
+    /* assigned in probe routine */
 	struct device		*dev;
 	void __iomem		*base;		/* virtual */
+    /* obtained in probe routine */
 	int			irq;
+    /* assigned in probe routine */
 	int			reg_shift;      /* bit shift for I2C register addresses */
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
@@ -194,8 +238,11 @@ struct omap_i2c_dev {
 						    long latency);
 	u32			speed;		/* Speed of bus in kHz */
 	u32			flags;
+	u16			scheme;
 	u16			cmd_err;
 	u8			*buf;
+    /* assigned in probe routine, the regs array is hardcoded in
+     * reg_map_ip_v2, the offset mapping matches with Sitara TRM */
 	u8			*regs;
 	size_t			buf_len;
 	struct i2c_adapter	adapter;
@@ -204,18 +251,28 @@ struct omap_i2c_dev {
 						 * fifo_size==0 implies no fifo
 						 * if set, should be trsh+1
 						 */
-	u32			rev;
+	u32			rev;    /* i2c revision number*/
 	unsigned		b_hw:1;		/* bad h/w fixes */
+	unsigned		bb_valid:1;	/* true when BB-bit reflects
+						 * the I2C bus state
+						 */
 	unsigned		receiver:1;	/* true when we're in receiver mode */
+    /* written at i2c_init */
 	u16			iestate;	/* Saved interrupt register */
+    /* written at i2c_init */
 	u16			pscstate;
+    /* written at i2c_init */
 	u16			scllstate;
+    /* written at i2c_init */
 	u16			sclhstate;
 	u16			syscstate;
 	u16			westate;
 	u16			errata;
-
-	struct pinctrl		*pins;
+    /* ljtale start */
+    /* TODO: this data structure should be allocated by the central pm module
+     * currently it is allocated by device probe function */
+    struct i2c_runtime_context rpm_ctx;
+    /* ljtale end */
 };
 
 static const u8 reg_map_ip_v1[] = {
@@ -268,19 +325,19 @@ static const u8 reg_map_ip_v2[] = {
 static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
 				      int reg, u16 val)
 {
-	__raw_writew(val, i2c_dev->base +
+	writew_relaxed(val, i2c_dev->base +
 			(i2c_dev->regs[reg] << i2c_dev->reg_shift));
 }
 
 static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
 {
-	return __raw_readw(i2c_dev->base +
+	return readw_relaxed(i2c_dev->base +
 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
 }
 
 static void __omap_i2c_init(struct omap_i2c_dev *dev)
 {
-
+    /* reset everything, disable the i2c module */
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 
 	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
@@ -296,10 +353,20 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
 
 	/*
+	 * NOTE: right after setting CON_EN, STAT_BB could be 0 while the
+	 * bus is busy. It will be changed to 1 on the next IP FCLK clock.
+	 * udelay(1) will be enough to fix that.
+	 */
+
+	/*
 	 * Don't write to this register if the IE state is 0 as it can
 	 * cause deadlock.
 	 */
 	if (dev->iestate)
+        /* from the offset mapping in the TRM, OMAP_I2C_IE_REG is
+         * I2C_IRQENABLE_SET register, writing 1 to a bit will enable
+         * the field of triggering an interrupt request, writing 0 to a
+         * bit has no effect */
 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
 }
 
@@ -334,7 +401,12 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
 		/* SYSC register is cleared by the reset; rewrite it */
 		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, sysc);
 
+		if (dev->rev > OMAP_I2C_REV_ON_3430_3530) {
+			/* Schedule I2C-bus monitoring on the next transfer */
+			dev->bb_valid = 0;
+		}
 	}
+
 	return 0;
 }
 
@@ -394,6 +466,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 			internal_clk = 9600;
 		else
 			internal_clk = 4000;
+        /* why to get a clock named "fck" ?*/
 		fclk = clk_get(dev->dev, "fck");
 		fclk_rate = clk_get_rate(fclk) / 1000;
 		clk_put(fclk);
@@ -447,6 +520,11 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 	dev->scllstate = scll;
 	dev->sclhstate = sclh;
 
+	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530) {
+		/* Not implemented */
+		dev->bb_valid = 1;
+	}
+
 	__omap_i2c_init(dev);
 
 	return 0;
@@ -461,13 +539,96 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
 
 	timeout = jiffies + OMAP_I2C_TIMEOUT;
 	while (omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG) & OMAP_I2C_STAT_BB) {
+		if (time_after(jiffies, timeout))
+			return i2c_recover_bus(&dev->adapter);
+		msleep(1);
+	}
+
+	return 0;
+}
+
+/*
+ * Wait while BB-bit doesn't reflect the I2C bus state
+ *
+ * In a multimaster environment, after IP software reset, BB-bit value doesn't
+ * correspond to the current bus state. It may happen what BB-bit will be 0,
+ * while the bus is busy due to another I2C master activity.
+ * Here are BB-bit values after reset:
+ *     SDA   SCL   BB   NOTES
+ *       0     0    0   1, 2
+ *       1     0    0   1, 2
+ *       0     1    1
+ *       1     1    0   3
+ * Later, if IP detect SDA=0 and SCL=1 (ACK) or SDA 1->0 while SCL=1 (START)
+ * combinations on the bus, it set BB-bit to 1.
+ * If IP detect SDA 0->1 while SCL=1 (STOP) combination on the bus,
+ * it set BB-bit to 0 and BF to 1.
+ * BB and BF bits correctly tracks the bus state while IP is suspended
+ * BB bit became valid on the next FCLK clock after CON_EN bit set
+ *
+ * NOTES:
+ * 1. Any transfer started when BB=0 and bus is busy wouldn't be
+ *    completed by IP and results in controller timeout.
+ * 2. Any transfer started when BB=0 and SCL=0 results in IP
+ *    starting to drive SDA low. In that case IP corrupt data
+ *    on the bus.
+ * 3. Any transfer started in the middle of another master's transfer
+ *    results in unpredictable results and data corruption
+ */
+static int omap_i2c_wait_for_bb_valid(struct omap_i2c_dev *dev)
+{
+	unsigned long bus_free_timeout = 0;
+	unsigned long timeout;
+	int bus_free = 0;
+	u16 stat, systest;
+
+	if (dev->bb_valid)
+		return 0;
+
+	timeout = jiffies + OMAP_I2C_TIMEOUT;
+	while (1) {
+		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+		/*
+		 * We will see BB or BF event in a case IP had detected any
+		 * activity on the I2C bus. Now IP correctly tracks the bus
+		 * state. BB-bit value is valid.
+		 */
+		if (stat & (OMAP_I2C_STAT_BB | OMAP_I2C_STAT_BF))
+			break;
+
+		/*
+		 * Otherwise, we must look signals on the bus to make
+		 * the right decision.
+		 */
+		systest = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+		if ((systest & OMAP_I2C_SYSTEST_SCL_I_FUNC) &&
+		    (systest & OMAP_I2C_SYSTEST_SDA_I_FUNC)) {
+			if (!bus_free) {
+				bus_free_timeout = jiffies +
+					OMAP_I2C_BUS_FREE_TIMEOUT;
+				bus_free = 1;
+			}
+
+			/*
+			 * SDA and SCL lines was high for 10 ms without bus
+			 * activity detected. The bus is free. Consider
+			 * BB-bit value is valid.
+			 */
+			if (time_after(jiffies, bus_free_timeout))
+				break;
+		} else {
+			bus_free = 0;
+		}
+
 		if (time_after(jiffies, timeout)) {
 			dev_warn(dev->dev, "timeout waiting for bus ready\n");
 			return -ETIMEDOUT;
 		}
+
 		msleep(1);
 	}
 
+	dev->bb_valid = 1;
 	return 0;
 }
 
@@ -545,7 +706,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	w |= OMAP_I2C_BUF_RXFIF_CLR | OMAP_I2C_BUF_TXFIF_CLR;
 	omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, w);
 
-	INIT_COMPLETION(dev->cmd_complete);
+	reinit_completion(&dev->cmd_complete);
 	dev->cmd_err = 0;
 
 	w = OMAP_I2C_CON_EN | OMAP_I2C_CON_MST | OMAP_I2C_CON_STT;
@@ -563,7 +724,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 
 	if (!dev->b_hw && stop)
 		w |= OMAP_I2C_CON_STP;
-
+	/*
+	 * NOTE: STAT_BB bit could became 1 here if another master occupy
+	 * the bus. IP successfully complete transfer when the bus will be
+	 * free again (BB reset to 0).
+	 */
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
 
 	/*
@@ -606,21 +771,22 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 		return 0;
 
 	/* We have an error */
-	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
-			    OMAP_I2C_STAT_XUDF)) {
+	if (dev->cmd_err & (OMAP_I2C_STAT_ROVR | OMAP_I2C_STAT_XUDF)) {
 		omap_i2c_reset(dev);
 		__omap_i2c_init(dev);
 		return -EIO;
 	}
 
+	if (dev->cmd_err & OMAP_I2C_STAT_AL)
+		return -EAGAIN;
+
 	if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
 		if (msg->flags & I2C_M_IGNORE_NAK)
 			return 0;
-		if (stop) {
-			w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
-			w |= OMAP_I2C_CON_STP;
-			omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
-		}
+
+		w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+		w |= OMAP_I2C_CON_STP;
+		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
 		return -EREMOTEIO;
 	}
 	return -EIO;
@@ -639,7 +805,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	int r;
 
 	r = pm_runtime_get_sync(dev->dev);
-	if (IS_ERR_VALUE(r))
+	if (r < 0)
+		goto out;
+
+	r = omap_i2c_wait_for_bb_valid(dev);
+	if (r < 0)
 		goto out;
 
 	r = omap_i2c_wait_for_bb(dev);
@@ -929,19 +1099,20 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
 		if (stat & OMAP_I2C_STAT_NACK) {
 			err |= OMAP_I2C_STAT_NACK;
 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
-			break;
 		}
 
 		if (stat & OMAP_I2C_STAT_AL) {
 			dev_err(dev->dev, "Arbitration lost\n");
 			err |= OMAP_I2C_STAT_AL;
 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
-			break;
 		}
 
 		/*
 		 * ProDB0017052: Clear ARDY bit twice
 		 */
+		if (stat & OMAP_I2C_STAT_ARDY)
+			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_ARDY);
+
 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
 					OMAP_I2C_STAT_AL)) {
 			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
@@ -958,11 +1129,13 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
 			if (dev->fifo_size)
 				num_bytes = dev->buf_len;
 
-			omap_i2c_receive_data(dev, num_bytes, true);
-
-			if (dev->errata & I2C_OMAP_ERRATA_I207)
+			if (dev->errata & I2C_OMAP_ERRATA_I207) {
 				i2c_omap_errata_i207(dev, stat);
+				num_bytes = (omap_i2c_read_reg(dev,
+					OMAP_I2C_BUFSTAT_REG) >> 8) & 0x3F;
+			}
 
+			omap_i2c_receive_data(dev, num_bytes, true);
 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RDR);
 			continue;
 		}
@@ -1037,11 +1210,27 @@ static const struct i2c_algorithm omap_i2c_algo = {
 };
 
 #ifdef CONFIG_OF
+static struct omap_i2c_bus_platform_data omap2420_pdata = {
+	.rev = OMAP_I2C_IP_VERSION_1,
+	.flags = OMAP_I2C_FLAG_NO_FIFO |
+			OMAP_I2C_FLAG_SIMPLE_CLOCK |
+			OMAP_I2C_FLAG_16BIT_DATA_REG |
+			OMAP_I2C_FLAG_BUS_SHIFT_2,
+};
+
+static struct omap_i2c_bus_platform_data omap2430_pdata = {
+	.rev = OMAP_I2C_IP_VERSION_1,
+	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2 |
+			OMAP_I2C_FLAG_FORCE_19200_INT_CLK,
+};
+
 static struct omap_i2c_bus_platform_data omap3_pdata = {
 	.rev = OMAP_I2C_IP_VERSION_1,
 	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2,
 };
 
+/* on BBB, omap4_pdata is used, platform data does not initialize flags
+ * it has a different register layout from VERSION_1 */
 static struct omap_i2c_bus_platform_data omap4_pdata = {
 	.rev = OMAP_I2C_IP_VERSION_2,
 };
@@ -1054,6 +1243,14 @@ static const struct of_device_id omap_i2c_of_match[] = {
 	{
 		.compatible = "ti,omap3-i2c",
 		.data = &omap3_pdata,
+	},
+	{
+		.compatible = "ti,omap2430-i2c",
+		.data = &omap2430_pdata,
+	},
+	{
+		.compatible = "ti,omap2420-i2c",
+		.data = &omap2420_pdata,
 	},
 	{ },
 };
@@ -1070,28 +1267,99 @@ MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
 #define OMAP_I2C_SCHEME_0		0
 #define OMAP_I2C_SCHEME_1		1
 
+static int omap_i2c_get_scl(struct i2c_adapter *adap)
+{
+	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+	u32 reg;
+
+	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+
+    /* mask out all the bits except SCL_I_FUNC, read-only one-bit status
+     * 0 - read 0 from SCL line, 1 - read 1 from SCL line */
+	return reg & OMAP_I2C_SYSTEST_SCL_I_FUNC;
+}
+
+static int omap_i2c_get_sda(struct i2c_adapter *adap)
+{
+	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+	u32 reg;
+
+	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+
+    /* The similar to omap_i2c_get_scl above */
+	return reg & OMAP_I2C_SYSTEST_SDA_I_FUNC;
+}
+
+static void omap_i2c_set_scl(struct i2c_adapter *adap, int val)
+{
+	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+	u32 reg;
+
+	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+	if (val)
+		reg |= OMAP_I2C_SYSTEST_SCL_O;
+	else
+		reg &= ~OMAP_I2C_SYSTEST_SCL_O;
+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+}
+
+static void omap_i2c_prepare_recovery(struct i2c_adapter *adap)
+{
+	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+	u32 reg;
+
+	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+	/* enable test mode */
+	reg |= OMAP_I2C_SYSTEST_ST_EN;
+	/* select SDA/SCL IO mode */
+	reg |= 3 << OMAP_I2C_SYSTEST_TMODE_SHIFT;
+	/* set SCL to high-impedance state (reset value is 0) */
+	reg |= OMAP_I2C_SYSTEST_SCL_O;
+	/* set SDA to high-impedance state (reset value is 0) */
+	reg |= OMAP_I2C_SYSTEST_SDA_O;
+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+}
+
+static void omap_i2c_unprepare_recovery(struct i2c_adapter *adap)
+{
+	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+	u32 reg;
+
+	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+	/* restore reset values */
+	reg &= ~OMAP_I2C_SYSTEST_ST_EN;
+	reg &= ~OMAP_I2C_SYSTEST_TMODE_MASK;
+	reg &= ~OMAP_I2C_SYSTEST_SCL_O;
+	reg &= ~OMAP_I2C_SYSTEST_SDA_O;
+	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+}
+
+static struct i2c_bus_recovery_info omap_i2c_bus_recovery_info = {
+	.get_scl		= omap_i2c_get_scl,
+	.get_sda		= omap_i2c_get_sda,
+	.set_scl		= omap_i2c_set_scl,
+	.prepare_recovery	= omap_i2c_prepare_recovery,
+	.unprepare_recovery	= omap_i2c_unprepare_recovery,
+	.recover_bus		= i2c_generic_scl_recovery,
+};
+
 static int
 omap_i2c_probe(struct platform_device *pdev)
 {
+    /* the platform_device instance should be allocated and populated during
+     * platform device matching, the platform driver matches the compatible
+     * strings with the device tree */
 	struct omap_i2c_dev	*dev;
 	struct i2c_adapter	*adap;
 	struct resource		*mem;
 	const struct omap_i2c_bus_platform_data *pdata =
-		pdev->dev.platform_data;
+		dev_get_platdata(&pdev->dev);
 	struct device_node	*node = pdev->dev.of_node;
 	const struct of_device_id *match;
 	int irq;
 	int r;
 	u32 rev;
-	u16 minor, major, scheme;
-	struct pinctrl *pinctrl;
-
-	/* NOTE: driver uses the static register mapping */
-	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!mem) {
-		dev_err(&pdev->dev, "no mem resource?\n");
-		return -ENODEV;
-	}
+	u16 minor, major;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
@@ -1100,16 +1368,13 @@ omap_i2c_probe(struct platform_device *pdev)
 	}
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
-	if (!dev) {
-		dev_err(&pdev->dev, "Menory allocation failed\n");
+	if (!dev)
 		return -ENOMEM;
-	}
 
-	dev->base = devm_request_and_ioremap(&pdev->dev, mem);
-	if (!dev->base) {
-		dev_err(&pdev->dev, "I2C region already claimed\n");
-		return -ENOMEM;
-	}
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+	if (IS_ERR(dev->base))
+		return PTR_ERR(dev->base);
 
 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
 	if (match) {
@@ -1127,16 +1392,6 @@ omap_i2c_probe(struct platform_device *pdev)
 		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
 	}
 
-	dev->pins = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(dev->pins)) {
-		if (PTR_ERR(dev->pins) == -EPROBE_DEFER)
-			return -EPROBE_DEFER;
-
-		dev_warn(&pdev->dev, "did not get pins for i2c error: %li\n",
-			 PTR_ERR(dev->pins));
-		dev->pins = NULL;
-	}
-
 	dev->dev = &pdev->dev;
 	dev->irq = irq;
 
@@ -1145,26 +1400,37 @@ omap_i2c_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dev);
 	init_completion(&dev->cmd_complete);
 
+    /* why does it need a reg_shift for register address? For REVISION_2,
+     * the register layout is different from REVISION_1,
+     * OMAP_I2C_FLAG_BUS_SHIFT__SHIFT is 7, which means the 8-th and 9-th
+     * bits in dev->flags determine the reg_shift value. These two bits
+     * are OMAP_I2C_FLAG_BUS_SHIFT_1 and OMAP_I2C_FLAG_BUS_SHIFT_2
+     * respectively.*/
 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
 
+    /* ljtale starts */
+    /* until here, all the values should be passed to the per-device data */
+    central_pm_omap_i2c_ctx(dev->dev);
+    /* ljtale ends */
 	pm_runtime_enable(dev->dev);
 	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
 	pm_runtime_use_autosuspend(dev->dev);
 
 	r = pm_runtime_get_sync(dev->dev);
-	if (IS_ERR_VALUE(r))
+	if (r < 0)
 		goto err_free_mem;
 
 	/*
 	 * Read the Rev hi bit-[15:14] ie scheme this is 1 indicates ver2.
 	 * On omap1/3/2 Offset 4 is IE Reg the bit [15:14] is 0 at reset.
 	 * Also since the omap_i2c_read_reg uses reg_map_ip_* a
-	 * raw_readw is done.
+	 * readw_relaxed is done.
 	 */
-	rev = __raw_readw(dev->base + 0x04);
+	rev = readw_relaxed(dev->base + 0x04);
 
-	scheme = OMAP_I2C_SCHEME(rev);
-	switch (scheme) {
+    /* the following line takes the [15:14] bits from rev and assign to scheme */
+	dev->scheme = OMAP_I2C_SCHEME(rev);
+	switch (dev->scheme) {
 	case OMAP_I2C_SCHEME_0:
 		dev->regs = (u8 *)reg_map_ip_v1;
 		dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG);
@@ -1217,6 +1483,13 @@ omap_i2c_probe(struct platform_device *pdev)
 
 	/* reset ASAP, clearing any IRQs */
 	omap_i2c_init(dev);
+    printk(KERN_INFO "ljtale-i2c: base: 0x%lx, shift: 0x%x\n",
+            (unsigned long)dev->base, dev->reg_shift);
+    printk(KERN_INFO "ljtale-i2c: rev: 0x%x, scheme: 0x%x\n",
+            dev->rev, dev->scheme); 
+    printk(KERN_INFO "ljtale-i2c: psc: 0x%x, scll: 0x%x, sclh: 0x%x\n",
+            dev->pscstate, dev->scllstate, dev->sclhstate); 
+    printk(KERN_INFO "ljtale-i2c: westate: 0x%x\n", dev->westate); 
 
 	if (dev->rev < OMAP_I2C_OMAP1_REV_2)
 		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_omap1_isr,
@@ -1235,11 +1508,12 @@ omap_i2c_probe(struct platform_device *pdev)
 	adap = &dev->adapter;
 	i2c_set_adapdata(adap, dev);
 	adap->owner = THIS_MODULE;
-	adap->class = I2C_CLASS_HWMON;
+	adap->class = I2C_CLASS_DEPRECATED;
 	strlcpy(adap->name, "OMAP I2C adapter", sizeof(adap->name));
 	adap->algo = &omap_i2c_algo;
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
+	adap->bus_recovery_info = &omap_i2c_bus_recovery_info;
 
 	/* i2c device drivers may be active on return from add_adapter() */
 	adap->nr = pdev->id;
@@ -1252,15 +1526,6 @@ omap_i2c_probe(struct platform_device *pdev)
 	dev_info(dev->dev, "bus %d rev%d.%d at %d kHz\n", adap->nr,
 		 major, minor, dev->speed);
 
-	of_i2c_register_devices(adap);
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl))
-		dev_warn(dev->dev, "unable to select pin group\n");
-
-	/* dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", adap->nr,
-		 dev->dtrev, dev->rev >> 4, dev->rev & 0xf, dev->speed); */
-
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
 
@@ -1271,7 +1536,6 @@ err_unuse_clocks:
 	pm_runtime_put(dev->dev);
 	pm_runtime_disable(&pdev->dev);
 err_free_mem:
-	platform_set_drvdata(pdev, NULL);
 
 	return r;
 }
@@ -1281,11 +1545,9 @@ static int omap_i2c_remove(struct platform_device *pdev)
 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
 	int ret;
 
-	platform_set_drvdata(pdev, NULL);
-
 	i2c_del_adapter(&dev->adapter);
 	ret = pm_runtime_get_sync(&pdev->dev);
-	if (IS_ERR_VALUE(ret))
+	if (ret < 0)
 		return ret;
 
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
@@ -1295,7 +1557,6 @@ static int omap_i2c_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-#ifdef CONFIG_PM_RUNTIME
 static int omap_i2c_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1303,16 +1564,25 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 
 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
 
-	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+	if (_dev->scheme == OMAP_I2C_SCHEME_0)
+		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+	else
+        /* clear all the bits in IRQENABLE */
+		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR,
+				   OMAP_I2C_IP_V2_INTERRUPTS_MASK);
 
 	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
 		omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
 	} else {
+        /* reset all the active and enabled events, write 1 to a bit
+         * in OMAP_I2C_STAT_REG will set it to 0 */
 		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
 
 		/* Flush posted write */
 		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
 	}
+
+	pinctrl_pm_select_sleep_state(dev);
 
 	return 0;
 }
@@ -1325,11 +1595,12 @@ static int omap_i2c_runtime_resume(struct device *dev)
 	if (!_dev->regs)
 		return 0;
 
+	pinctrl_pm_select_default_state(dev);
+
 	__omap_i2c_init(_dev);
 
 	return 0;
 }
-#endif /* CONFIG_PM_RUNTIME */
 
 static struct dev_pm_ops omap_i2c_pm_ops = {
 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
@@ -1345,7 +1616,6 @@ static struct platform_driver omap_i2c_driver = {
 	.remove		= omap_i2c_remove,
 	.driver		= {
 		.name	= "omap_i2c",
-		.owner	= THIS_MODULE,
 		.pm	= OMAP_I2C_PM_OPS,
 		.of_match_table = of_match_ptr(omap_i2c_of_match),
 	},

@@ -96,13 +96,13 @@ static void cypress_atacb_passthrough(struct scsi_cmnd *srb, struct us_data *us)
 	if (save_cmnd[1] >> 5) /* MULTIPLE_COUNT */
 		goto invalid_fld;
 	/* check protocol */
-	switch((save_cmnd[1] >> 1) & 0xf) {
-		case 3: /*no DATA */
-		case 4: /* PIO in */
-		case 5: /* PIO out */
-			break;
-		default:
-			goto invalid_fld;
+	switch ((save_cmnd[1] >> 1) & 0xf) {
+	case 3: /*no DATA */
+	case 4: /* PIO in */
+	case 5: /* PIO out */
+		break;
+	default:
+		goto invalid_fld;
 	}
 
 	/* first build the ATACB command */
@@ -132,8 +132,7 @@ static void cypress_atacb_passthrough(struct scsi_cmnd *srb, struct us_data *us)
 					|| save_cmnd[11])
 				goto invalid_fld;
 		}
-	}
-	else { /* ATA12 */
+	} else { /* ATA12 */
 		srb->cmnd[ 6] = save_cmnd[3]; /* features */
 		srb->cmnd[ 7] = save_cmnd[4]; /* sector count */
 		srb->cmnd[ 8] = save_cmnd[5]; /* lba low */
@@ -159,7 +158,7 @@ static void cypress_atacb_passthrough(struct scsi_cmnd *srb, struct us_data *us)
 	if (srb->result == SAM_STAT_CHECK_CONDITION &&
 			memcmp(srb->sense_buffer, usb_stor_sense_invalidCDB,
 				sizeof(usb_stor_sense_invalidCDB)) == 0) {
-		US_DEBUGP("cypress atacb not supported ???\n");
+		usb_stor_dbg(us, "cypress atacb not supported ???\n");
 		goto end;
 	}
 

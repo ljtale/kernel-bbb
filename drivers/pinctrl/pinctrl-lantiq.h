@@ -10,6 +10,7 @@
  */
 
 #ifndef __PINCTRL_LANTIQ_H
+#define __PINCTRL_LANTIQ_H
 
 #include <linux/clkdev.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -34,6 +35,7 @@ enum ltq_pinconf_param {
 	LTQ_PINCONF_PARAM_OPEN_DRAIN,
 	LTQ_PINCONF_PARAM_DRIVE_CURRENT,
 	LTQ_PINCONF_PARAM_SLEW_RATE,
+	LTQ_PINCONF_PARAM_OUTPUT,
 };
 
 struct ltq_cfg_param {
@@ -191,4 +193,4 @@ enum ltq_pin {
 extern int ltq_pinctrl_register(struct platform_device *pdev,
 				   struct ltq_pinmux_info *info);
 extern int ltq_pinctrl_unregister(struct platform_device *pdev);
-#endif	/* __PINCTRL_PXA3XX_H */
+#endif	/* __PINCTRL_LANTIQ_H */

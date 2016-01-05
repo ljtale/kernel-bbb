@@ -14,7 +14,6 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
-#include <linux/init.h>
 #include <linux/input.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
@@ -26,6 +25,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
+#include <linux/pinctrl/consumer.h>
 
 struct matrix_keypad {
 	const struct matrix_keypad_platform_data *pdata;
@@ -281,6 +281,8 @@ static int matrix_keypad_suspend(struct device *dev)
 	if (device_may_wakeup(&pdev->dev))
 		matrix_keypad_enable_wakeup(keypad);
 
+	pinctrl_pm_select_sleep_state(dev);
+
 	return 0;
 }
 
@@ -291,6 +293,8 @@ static int matrix_keypad_resume(struct device *dev)
 
 	if (device_may_wakeup(&pdev->dev))
 		matrix_keypad_disable_wakeup(keypad);
+
+	pinctrl_pm_select_default_state(dev);
 
 	matrix_keypad_start(keypad->input_dev);
 
@@ -333,23 +337,24 @@ static int matrix_keypad_init_gpio(struct platform_device *pdev,
 	}
 
 	if (pdata->clustered_irq > 0) {
-		err = request_irq(pdata->clustered_irq,
+		err = request_any_context_irq(pdata->clustered_irq,
 				matrix_keypad_interrupt,
 				pdata->clustered_irq_flags,
 				"matrix-keypad", keypad);
-		if (err) {
+		if (err < 0) {
 			dev_err(&pdev->dev,
 				"Unable to acquire clustered interrupt\n");
 			goto err_free_rows;
 		}
 	} else {
 		for (i = 0; i < pdata->num_row_gpios; i++) {
-			err = request_irq(gpio_to_irq(pdata->row_gpios[i]),
+			err = request_any_context_irq(
+					gpio_to_irq(pdata->row_gpios[i]),
 					matrix_keypad_interrupt,
 					IRQF_TRIGGER_RISING |
 					IRQF_TRIGGER_FALLING,
 					"matrix-keypad", keypad);
-			if (err) {
+			if (err < 0) {
 				dev_err(&pdev->dev,
 					"Unable to acquire interrupt for GPIO line %i\n",
 					pdata->row_gpios[i]);
@@ -403,7 +408,7 @@ matrix_keypad_parse_dt(struct device *dev)
 	struct matrix_keypad_platform_data *pdata;
 	struct device_node *np = dev->of_node;
 	unsigned int *gpios;
-	int i;
+	int i, nrow, ncol;
 
 	if (!np) {
 		dev_err(dev, "device lacks DT data\n");
@@ -416,9 +421,9 @@ matrix_keypad_parse_dt(struct device *dev)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	pdata->num_row_gpios = of_gpio_named_count(np, "row-gpios");
-	pdata->num_col_gpios = of_gpio_named_count(np, "col-gpios");
-	if (!pdata->num_row_gpios || !pdata->num_col_gpios) {
+	pdata->num_row_gpios = nrow = of_gpio_named_count(np, "row-gpios");
+	pdata->num_col_gpios = ncol = of_gpio_named_count(np, "col-gpios");
+	if (nrow <= 0 || ncol <= 0) {
 		dev_err(dev, "number of keypad rows/columns not specified\n");
 		return ERR_PTR(-EINVAL);
 	}
@@ -549,8 +554,6 @@ static int matrix_keypad_remove(struct platform_device *pdev)
 	input_unregister_device(keypad->input_dev);
 	kfree(keypad);
 
-	platform_set_drvdata(pdev, NULL);
-
 	return 0;
 }
 
@@ -567,7 +570,6 @@ static struct platform_driver matrix_keypad_driver = {
 	.remove		= matrix_keypad_remove,
 	.driver		= {
 		.name	= "matrix-keypad",
-		.owner	= THIS_MODULE,
 		.pm	= &matrix_keypad_pm_ops,
 		.of_match_table = of_match_ptr(matrix_keypad_dt_match),
 	},

@@ -10,14 +10,16 @@ Required properties:
       last value in the array represents a 100% duty cycle (brightest).
   - default-brightness-level: the default brightness level (index into the
       array defined by the "brightness-levels" property)
+  - power-supply: regulator for supply voltage
 
 Optional properties:
   - pwm-names: a list of names for the PWM devices specified in the
                "pwms" property (see PWM binding[0])
-  - low_threshold_brightness: brightness threshold low level. (get linear
-		 scales in brightness in low end of brightness levels)
+  - enable-gpios: contains a single GPIO specifier for the GPIO which enables
+                  and disables the backlight (see GPIO binding[1])
 
 [0]: Documentation/devicetree/bindings/pwm/pwm.txt
+[1]: Documentation/devicetree/bindings/gpio/gpio.txt
 
 Example:
 
@@ -27,23 +29,7 @@ Example:
 
 		brightness-levels = <0 4 8 16 32 64 128 255>;
 		default-brightness-level = <6>;
+
+		power-supply = <&vdd_bl_reg>;
+		enable-gpios = <&gpio 58 0>;
 	};
-
-Example for brightness_threshold_level:
-
-	backlight {
-		compatible	= "pwm-backlight";
-		pwms = <&pwm 0 50000>;
-
-		brightness-levels = <0 4 8 16 32 64 128 255>;
-		default-brightness-level = <6>;
-		low_threshold_brightness = <50>;
-	};
-};
-Note:
-Low threshold support is required to have linear brightness scale from
-0 to max. For some panels, backlight absent on low end of brightness
-scale. So support for Low Threshold been required. So that the scale of
-brightness changed from Low Threshold to Max in scales defined in
-brightness-levels. In this example 20% maximum brightness scale should
-be required to turn on panel backlight.

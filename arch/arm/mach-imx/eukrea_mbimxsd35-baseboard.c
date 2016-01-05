@@ -100,7 +100,7 @@ static struct mx3fb_platform_data mx3fb_pdata __initdata = {
 	.num_modes	= ARRAY_SIZE(fb_modedb),
 };
 
-static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+static const iomux_v3_cfg_t eukrea_mbimxsd_pads[] __initconst = {
 	/* LCD */
 	MX35_PAD_LD0__IPU_DISPB_DAT_0,
 	MX35_PAD_LD1__IPU_DISPB_DAT_1,
@@ -287,7 +287,7 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
 
 	imx35_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
 
-	imx35_add_flexcan1(NULL);
+	imx35_add_flexcan1();
 	imx35_add_sdhci_esdhc_imx(0, &sd1_pdata);
 
 	gpio_request(GPIO_LED1, "LED1");

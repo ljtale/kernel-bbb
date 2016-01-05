@@ -20,6 +20,7 @@
 #include <asm/uaccess.h>
 #include <asm/auxio.h>
 #include <asm/apc.h>
+#include <asm/processor.h>
 
 /* Debugging
  * 
@@ -158,7 +159,7 @@ static int apc_probe(struct platform_device *op)
 
 	/* Assign power management IDLE handler */
 	if (!apc_no_idle)
-		pm_idle = apc_swift_idle;	
+		sparc_idle = apc_swift_idle;
 
 	printk(KERN_INFO "%s: power management initialized%s\n", 
 	       APC_DEVNAME, apc_no_idle ? " (CPU idle disabled)" : "");
@@ -177,7 +178,6 @@ MODULE_DEVICE_TABLE(of, apc_match);
 static struct platform_driver apc_driver = {
 	.driver = {
 		.name = "apc",
-		.owner = THIS_MODULE,
 		.of_match_table = apc_match,
 	},
 	.probe		= apc_probe,

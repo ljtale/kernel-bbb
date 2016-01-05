@@ -31,7 +31,6 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
-#include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 
@@ -39,40 +38,36 @@
 #define TILCDC_DEFAULT_MAX_PIXELCLOCK  126000
 /* Defaulting to max width as defined on AM335x */
 #define TILCDC_DEFAULT_MAX_WIDTH  2048
-/* Default preferred BPP */
-#define TILCDC_DEFAULT_PREFERRED_BPP 16
-
 /*
  * This may need some tweaking, but want to allow at least 1280x1024@60
- * with optimized DDR & EMIF settings tweaked 1920x1080@25 appears to
+ * with optimized DDR & EMIF settings tweaked 1920x1080@24 appears to
  * be supportable
- * Note: 1920x1080x25=49766400 < 1280x1024x60=78643200
  */
-#define TILCDC_DEFAULT_MAX_BANDWIDTH  (1680*1050*60)
+#define TILCDC_DEFAULT_MAX_BANDWIDTH  (1280*1024*60)
+
 
 struct tilcdc_drm_private {
 	void __iomem *mmio;
 
-	struct clk *disp_clk;    /* display dpll */
 	struct clk *clk;         /* functional clock */
 	int rev;                 /* IP revision */
 
 	/* don't attempt resolutions w/ higher W * H * Hz: */
 	uint32_t max_bandwidth;
-	/* Pixel Clock will be restricted to some value as defined in the device datasheet */
-	/* measured in KHz */
+	/*
+	 * Pixel Clock will be restricted to some value as
+	 * defined in the device datasheet measured in KHz
+	 */
 	uint32_t max_pixelclock;
-	/* Max allowable width is limited on a per device basis */
-	/* measured in pixels */
+	/*
+	 * Max allowable width is limited on a per device basis
+	 * measured in pixels
+	 */
 	uint32_t max_width;
 
-	int allow_non_rblank;	/* ATM we don't support non reduced blank modes */
-	int allow_non_audio;	/* allow modes that don't have working audio */
-        int bgrx_16bpp_swap;	/* 16bpp RBGx-to-BGRx workaround (Beagle LCD capes) */
-        int bgrx_24bpp_swap;    /* 24bpp RGBx-to-BGRx workaround (Beagle LCD capes) */
-
 	/* register contents saved across suspend/resume: */
-	u32 saved_register[12];
+	u32 *saved_register;
+	bool ctx_valid;
 
 #ifdef CONFIG_CPU_FREQ
 	struct notifier_block freq_transition;
@@ -81,7 +76,7 @@ struct tilcdc_drm_private {
 
 	struct workqueue_struct *wq;
 
-        struct tilcdc_drm_fbdev /* drm_fbdev_cma */ *fbdev;
+	struct drm_fbdev_cma *fbdev;
 
 	struct drm_crtc *crtc;
 
@@ -90,8 +85,6 @@ struct tilcdc_drm_private {
 
 	unsigned int num_connectors;
 	struct drm_connector *connectors[8];
-
-        struct drm_fb_helper_funcs *drm_fb_helper_funcs;
 };
 
 /* Sub-module for display.  Since we don't know at compile time what panels
@@ -105,7 +98,6 @@ struct tilcdc_module;
 struct tilcdc_module_ops {
 	/* create appropriate encoders/connectors: */
 	int (*modeset_init)(struct tilcdc_module *mod, struct drm_device *dev);
-	void (*destroy)(struct tilcdc_module *mod);
 #ifdef CONFIG_DEBUG_FS
 	/* create debugfs nodes (can be NULL): */
 	int (*debugfs_init)(struct tilcdc_module *mod, struct drm_minor *minor);
@@ -118,12 +110,12 @@ struct tilcdc_module {
 	const char *name;
 	struct list_head list;
 	const struct tilcdc_module_ops *funcs;
+	unsigned int preferred_bpp;
 };
 
 void tilcdc_module_init(struct tilcdc_module *mod, const char *name,
 		const struct tilcdc_module_ops *funcs);
 void tilcdc_module_cleanup(struct tilcdc_module *mod);
-
 void tilcdc_slave_probedefer(bool defered);
 
 /* Panel config that needs to be set in the crtc, but is not coming from
@@ -174,11 +166,8 @@ irqreturn_t tilcdc_crtc_irq(struct drm_crtc *crtc);
 void tilcdc_crtc_update_clk(struct drm_crtc *crtc);
 void tilcdc_crtc_set_panel_info(struct drm_crtc *crtc,
 		const struct tilcdc_panel_info *info);
-int tilcdc_crtc_mode_valid(struct drm_crtc *crtc, struct drm_display_mode *mode,
-		int rb_check, int audio, struct edid *edid);
+int tilcdc_crtc_mode_valid(struct drm_crtc *crtc, struct drm_display_mode *mode);
 int tilcdc_crtc_max_width(struct drm_crtc *crtc);
-
-/* OF helper for reading panel info */
-struct tilcdc_panel_info *tilcdc_of_get_panel_info(struct device_node *np);
+void tilcdc_crtc_dpms(struct drm_crtc *crtc, int mode);
 
 #endif /* __TILCDC_DRV_H__ */

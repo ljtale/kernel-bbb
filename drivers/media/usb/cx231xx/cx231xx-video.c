@@ -22,12 +22,12 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include "cx231xx.h"
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/bitmap.h>
-#include <linux/usb.h>
 #include <linux/i2c.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
@@ -35,16 +35,15 @@
 
 #include <media/v4l2-common.h>
 #include <media/v4l2-ioctl.h>
-#include <media/v4l2-chip-ident.h>
+#include <media/v4l2-event.h>
 #include <media/msp3400.h>
 #include <media/tuner.h>
 
 #include "dvb_frontend.h"
 
-#include "cx231xx.h"
 #include "cx231xx-vbi.h"
 
-#define CX231XX_VERSION "0.0.2"
+#define CX231XX_VERSION "0.0.3"
 
 #define DRIVER_AUTHOR   "Srinivasa Deevi <srinivasa.deevi@conexant.com>"
 #define DRIVER_DESC     "Conexant cx231xx based USB video device driver"
@@ -100,125 +99,75 @@ static struct cx231xx_fmt format[] = {
 	 },
 };
 
-/* supported controls */
-/* Common to all boards */
 
-/* ------------------------------------------------------------------- */
+static int cx231xx_enable_analog_tuner(struct cx231xx *dev)
+{
+#ifdef CONFIG_MEDIA_CONTROLLER
+	struct media_device *mdev = dev->media_dev;
+	struct media_entity  *entity, *decoder = NULL, *source;
+	struct media_link *link, *found_link = NULL;
+	int i, ret, active_links = 0;
 
-static const struct v4l2_queryctrl no_ctl = {
-	.name = "42",
-	.flags = V4L2_CTRL_FLAG_DISABLED,
-};
+	if (!mdev)
+		return 0;
 
-static struct cx231xx_ctrl cx231xx_ctls[] = {
-	/* --- video --- */
-	{
-		.v = {
-			.id = V4L2_CID_BRIGHTNESS,
-			.name = "Brightness",
-			.minimum = 0x00,
-			.maximum = 0xff,
-			.step = 1,
-			.default_value = 0x7f,
-			.type = V4L2_CTRL_TYPE_INTEGER,
-		},
-		.off = 128,
-		.reg = LUMA_CTRL,
-		.mask = 0x00ff,
-		.shift = 0,
-	}, {
-		.v = {
-			.id = V4L2_CID_CONTRAST,
-			.name = "Contrast",
-			.minimum = 0,
-			.maximum = 0xff,
-			.step = 1,
-			.default_value = 0x3f,
-			.type = V4L2_CTRL_TYPE_INTEGER,
-		},
-		.off = 0,
-		.reg = LUMA_CTRL,
-		.mask = 0xff00,
-		.shift = 8,
-	}, {
-		.v = {
-			.id = V4L2_CID_HUE,
-			.name = "Hue",
-			.minimum = 0,
-			.maximum = 0xff,
-			.step = 1,
-			.default_value = 0x7f,
-			.type = V4L2_CTRL_TYPE_INTEGER,
-		},
-		.off = 128,
-		.reg = CHROMA_CTRL,
-		.mask = 0xff0000,
-		.shift = 16,
-	}, {
-	/* strictly, this only describes only U saturation.
-	* V saturation is handled specially through code.
-	*/
-		.v = {
-			.id = V4L2_CID_SATURATION,
-			.name = "Saturation",
-			.minimum = 0,
-			.maximum = 0xff,
-			.step = 1,
-			.default_value = 0x7f,
-			.type = V4L2_CTRL_TYPE_INTEGER,
-		},
-		.off = 0,
-		.reg = CHROMA_CTRL,
-		.mask = 0x00ff,
-		.shift = 0,
-	}, {
-		/* --- audio --- */
-		.v = {
-			.id = V4L2_CID_AUDIO_MUTE,
-			.name = "Mute",
-			.minimum = 0,
-			.maximum = 1,
-			.default_value = 1,
-			.type = V4L2_CTRL_TYPE_BOOLEAN,
-		},
-		.reg = PATH1_CTL1,
-		.mask = (0x1f << 24),
-		.shift = 24,
-	}, {
-		.v = {
-			.id = V4L2_CID_AUDIO_VOLUME,
-			.name = "Volume",
-			.minimum = 0,
-			.maximum = 0x3f,
-			.step = 1,
-			.default_value = 0x3f,
-			.type = V4L2_CTRL_TYPE_INTEGER,
-		},
-		.reg = PATH1_VOL_CTL,
-		.mask = 0xff,
-		.shift = 0,
+	/*
+	 * This will find the tuner that is connected into the decoder.
+	 * Technically, this is not 100% correct, as the device may be
+	 * using an analog input instead of the tuner. However, as we can't
+	 * do DVB streaming while the DMA engine is being used for V4L2,
+	 * this should be enough for the actual needs.
+	 */
+	media_device_for_each_entity(entity, mdev) {
+		if (entity->type == MEDIA_ENT_T_V4L2_SUBDEV_DECODER) {
+			decoder = entity;
+			break;
+		}
 	}
-};
-static const int CX231XX_CTLS = ARRAY_SIZE(cx231xx_ctls);
+	if (!decoder)
+		return 0;
 
-static const u32 cx231xx_user_ctrls[] = {
-	V4L2_CID_USER_CLASS,
-	V4L2_CID_BRIGHTNESS,
-	V4L2_CID_CONTRAST,
-	V4L2_CID_SATURATION,
-	V4L2_CID_HUE,
-	V4L2_CID_AUDIO_VOLUME,
-#if 0
-	V4L2_CID_AUDIO_BALANCE,
+	for (i = 0; i < decoder->num_links; i++) {
+		link = &decoder->links[i];
+		if (link->sink->entity == decoder) {
+			found_link = link;
+			if (link->flags & MEDIA_LNK_FL_ENABLED)
+				active_links++;
+			break;
+		}
+	}
+
+	if (active_links == 1 || !found_link)
+		return 0;
+
+	source = found_link->source->entity;
+	for (i = 0; i < source->num_links; i++) {
+		struct media_entity *sink;
+		int flags = 0;
+
+		link = &source->links[i];
+		sink = link->sink->entity;
+
+		if (sink == entity)
+			flags = MEDIA_LNK_FL_ENABLED;
+
+		ret = media_entity_setup_link(link, flags);
+		if (ret) {
+			dev_err(dev->dev,
+				"Couldn't change link %s->%s to %s. Error %d\n",
+				source->name, sink->name,
+				flags ? "enabled" : "disabled",
+				ret);
+			return ret;
+		} else
+			dev_dbg(dev->dev,
+				"link %s->%s was %s\n",
+				source->name, sink->name,
+				flags ? "ENABLED" : "disabled");
+	}
 #endif
-	V4L2_CID_AUDIO_MUTE,
-	0
-};
-
-static const u32 *ctrl_classes[] = {
-	cx231xx_user_ctrls,
-	NULL
-};
+	return 0;
+}
 
 /* ------------------------------------------------------------------
 	Video buffer and parser functions
@@ -235,7 +184,7 @@ static inline void buffer_filled(struct cx231xx *dev,
 	cx231xx_isocdbg("[%p/%d] wakeup\n", buf, buf->vb.i);
 	buf->vb.state = VIDEOBUF_DONE;
 	buf->vb.field_count++;
-	do_gettimeofday(&buf->vb.ts);
+	v4l2_get_timestamp(&buf->vb.ts);
 
 	if (dev->USE_ISO)
 		dev->video_mode.isoc_ctl.buf = NULL;
@@ -327,7 +276,7 @@ static inline void get_next_buf(struct cx231xx_dmaqueue *dma_q,
 static inline int cx231xx_isoc_copy(struct cx231xx *dev, struct urb *urb)
 {
 	struct cx231xx_dmaqueue *dma_q = urb->context;
-	int i, rc = 1;
+	int i;
 	unsigned char *p_buffer;
 	u32 bytes_parsed = 0, buffer_size = 0;
 	u8 sav_eav = 0;
@@ -418,13 +367,12 @@ static inline int cx231xx_isoc_copy(struct cx231xx *dev, struct urb *urb)
 		bytes_parsed = 0;
 
 	}
-	return rc;
+	return 1;
 }
 
 static inline int cx231xx_bulk_copy(struct cx231xx *dev, struct urb *urb)
 {
 	struct cx231xx_dmaqueue *dma_q = urb->context;
-	int rc = 1;
 	unsigned char *p_buffer;
 	u32 bytes_parsed = 0, buffer_size = 0;
 	u8 sav_eav = 0;
@@ -498,7 +446,7 @@ static inline int cx231xx_bulk_copy(struct cx231xx *dev, struct urb *urb)
 		bytes_parsed = 0;
 
 	}
-	return rc;
+	return 1;
 }
 
 
@@ -788,6 +736,9 @@ buffer_setup(struct videobuf_queue *vq, unsigned int *count, unsigned int *size)
 	if (*count < CX231XX_MIN_BUF)
 		*count = CX231XX_MIN_BUF;
 
+
+	cx231xx_enable_analog_tuner(dev);
+
 	return 0;
 }
 
@@ -857,8 +808,9 @@ buffer_prepare(struct videobuf_queue *vq, struct videobuf_buffer *vb,
 		if (!dev->video_mode.bulk_ctl.num_bufs)
 			urb_init = 1;
 	}
-	/*cx231xx_info("urb_init=%d dev->video_mode.max_pkt_size=%d\n",
-		urb_init, dev->video_mode.max_pkt_size);*/
+	dev_dbg(dev->dev,
+		"urb_init=%d dev->video_mode.max_pkt_size=%d\n",
+		urb_init, dev->video_mode.max_pkt_size);
 	if (urb_init) {
 		dev->mode_tv = 0;
 		if (dev->USE_ISO)
@@ -876,6 +828,7 @@ buffer_prepare(struct videobuf_queue *vq, struct videobuf_buffer *vb,
 	}
 
 	buf->vb.state = VIDEOBUF_PREPARED;
+
 	return 0;
 
 fail:
@@ -929,7 +882,7 @@ void video_mux(struct cx231xx *dev, int index)
 
 	cx231xx_set_audio_input(dev, dev->ctl_ainput);
 
-	cx231xx_info("video_mux : %d\n", index);
+	dev_dbg(dev->dev, "video_mux : %d\n", index);
 
 	/* do mode control overrides if required */
 	cx231xx_do_mode_ctrl_overrides(dev);
@@ -981,7 +934,7 @@ static void res_free(struct cx231xx_fh *fh)
 static int check_dev(struct cx231xx *dev)
 {
 	if (dev->state & DEV_DISCONNECTED) {
-		cx231xx_errdev("v4l2 ioctl: device not present\n");
+		dev_err(dev->dev, "v4l2 ioctl: device not present\n");
 		return -ENODEV;
 	}
 	return 0;
@@ -1045,7 +998,7 @@ static int vidioc_try_fmt_vid_cap(struct file *file, void *priv,
 	f->fmt.pix.width = width;
 	f->fmt.pix.height = height;
 	f->fmt.pix.pixelformat = fmt->fourcc;
-	f->fmt.pix.bytesperline = (dev->width * fmt->depth + 7) >> 3;
+	f->fmt.pix.bytesperline = (width * fmt->depth + 7) >> 3;
 	f->fmt.pix.sizeimage = f->fmt.pix.bytesperline * height;
 	f->fmt.pix.colorspace = V4L2_COLORSPACE_SMPTE170M;
 	f->fmt.pix.field = V4L2_FIELD_INTERLACED;
@@ -1073,12 +1026,13 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 		return -EINVAL;
 
 	if (videobuf_queue_is_busy(&fh->vb_vidq)) {
-		cx231xx_errdev("%s queue busy\n", __func__);
+		dev_err(dev->dev, "%s: queue busy\n", __func__);
 		return -EBUSY;
 	}
 
 	if (dev->stream_on && !fh->stream_on) {
-		cx231xx_errdev("%s device in use by another fh\n", __func__);
+		dev_err(dev->dev,
+			"%s: device in use by another fh\n", __func__);
 		return -EBUSY;
 	}
 
@@ -1087,7 +1041,7 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
 	dev->height = f->fmt.pix.height;
 	dev->format = fmt;
 
-	v4l2_fill_mbus_format(&mbus_fmt, &f->fmt.pix, V4L2_MBUS_FMT_FIXED);
+	v4l2_fill_mbus_format(&mbus_fmt, &f->fmt.pix, MEDIA_BUS_FMT_FIXED);
 	call_all(dev, video, s_mbus_fmt, &mbus_fmt);
 	v4l2_fill_pix_format(&f->fmt.pix, &mbus_fmt);
 
@@ -1103,39 +1057,39 @@ static int vidioc_g_std(struct file *file, void *priv, v4l2_std_id *id)
 	return 0;
 }
 
-static int vidioc_s_std(struct file *file, void *priv, v4l2_std_id *norm)
+static int vidioc_s_std(struct file *file, void *priv, v4l2_std_id norm)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
 	struct v4l2_mbus_framefmt mbus_fmt;
-	struct v4l2_format f;
 	int rc;
 
 	rc = check_dev(dev);
 	if (rc < 0)
 		return rc;
 
-	cx231xx_info("vidioc_s_std : 0x%x\n", (unsigned int)*norm);
+	if (dev->norm == norm)
+		return 0;
 
-	dev->norm = *norm;
+	if (videobuf_queue_is_busy(&fh->vb_vidq))
+		return -EBUSY;
+
+	dev->norm = norm;
 
 	/* Adjusts width/height, if needed */
-	f.fmt.pix.width = dev->width;
-	f.fmt.pix.height = dev->height;
-	vidioc_try_fmt_vid_cap(file, priv, &f);
+	dev->width = 720;
+	dev->height = (dev->norm & V4L2_STD_625_50) ? 576 : 480;
 
-	call_all(dev, core, s_std, dev->norm);
+	call_all(dev, video, s_std, dev->norm);
 
 	/* We need to reset basic properties in the decoder related to
 	   resolution (since a standard change effects things like the number
 	   of lines in VACT, etc) */
-	v4l2_fill_mbus_format(&mbus_fmt, &f.fmt.pix, V4L2_MBUS_FMT_FIXED);
+	memset(&mbus_fmt, 0, sizeof(mbus_fmt));
+	mbus_fmt.code = MEDIA_BUS_FMT_FIXED;
+	mbus_fmt.width = dev->width;
+	mbus_fmt.height = dev->height;
 	call_all(dev, video, s_mbus_fmt, &mbus_fmt);
-	v4l2_fill_pix_format(&f.fmt.pix, &mbus_fmt);
-
-	/* set new image size */
-	dev->width = f.fmt.pix.width;
-	dev->height = f.fmt.pix.height;
 
 	/* do mode control overrides */
 	cx231xx_do_mode_ctrl_overrides(dev);
@@ -1152,7 +1106,7 @@ static const char *iname[] = {
 	[CX231XX_VMUX_DEBUG]      = "for debug only",
 };
 
-static int vidioc_enum_input(struct file *file, void *priv,
+int cx231xx_enum_input(struct file *file, void *priv,
 			     struct v4l2_input *i)
 {
 	struct cx231xx_fh *fh = priv;
@@ -1175,7 +1129,7 @@ static int vidioc_enum_input(struct file *file, void *priv,
 	    (CX231XX_VMUX_CABLE == INPUT(n)->type))
 		i->type = V4L2_INPUT_TYPE_TUNER;
 
-	i->std = dev->vdev->tvnorms;
+	i->std = dev->vdev.tvnorms;
 
 	/* If they are asking about the active input, read signal status */
 	if (n == dev->video_input) {
@@ -1192,7 +1146,7 @@ static int vidioc_enum_input(struct file *file, void *priv,
 	return 0;
 }
 
-static int vidioc_g_input(struct file *file, void *priv, unsigned int *i)
+int cx231xx_g_input(struct file *file, void *priv, unsigned int *i)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
@@ -1202,7 +1156,7 @@ static int vidioc_g_input(struct file *file, void *priv, unsigned int *i)
 	return 0;
 }
 
-static int vidioc_s_input(struct file *file, void *priv, unsigned int i)
+int cx231xx_s_input(struct file *file, void *priv, unsigned int i)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
@@ -1225,123 +1179,13 @@ static int vidioc_s_input(struct file *file, void *priv, unsigned int i)
 		/* There's a tuner, so reset the standard and put it on the
 		   last known frequency (since it was probably powered down
 		   until now */
-		call_all(dev, core, s_std, dev->norm);
+		call_all(dev, video, s_std, dev->norm);
 	}
 
 	return 0;
 }
 
-static int vidioc_g_audio(struct file *file, void *priv, struct v4l2_audio *a)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-
-	switch (a->index) {
-	case CX231XX_AMUX_VIDEO:
-		strcpy(a->name, "Television");
-		break;
-	case CX231XX_AMUX_LINE_IN:
-		strcpy(a->name, "Line In");
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	a->index = dev->ctl_ainput;
-	a->capability = V4L2_AUDCAP_STEREO;
-
-	return 0;
-}
-
-static int vidioc_s_audio(struct file *file, void *priv, const struct v4l2_audio *a)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-	int status = 0;
-
-	/* Doesn't allow manual routing */
-	if (a->index != dev->ctl_ainput)
-		return -EINVAL;
-
-	dev->ctl_ainput = INPUT(a->index)->amux;
-	status = cx231xx_set_audio_input(dev, dev->ctl_ainput);
-
-	return status;
-}
-
-static int vidioc_queryctrl(struct file *file, void *priv,
-			    struct v4l2_queryctrl *qc)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-	int id = qc->id;
-	int i;
-	int rc;
-
-	rc = check_dev(dev);
-	if (rc < 0)
-		return rc;
-
-	qc->id = v4l2_ctrl_next(ctrl_classes, qc->id);
-	if (unlikely(qc->id == 0))
-		return -EINVAL;
-
-	memset(qc, 0, sizeof(*qc));
-
-	qc->id = id;
-
-	if (qc->id < V4L2_CID_BASE || qc->id >= V4L2_CID_LASTP1)
-		return -EINVAL;
-
-	for (i = 0; i < CX231XX_CTLS; i++)
-		if (cx231xx_ctls[i].v.id == qc->id)
-			break;
-
-	if (i == CX231XX_CTLS) {
-		*qc = no_ctl;
-		return 0;
-	}
-	*qc = cx231xx_ctls[i].v;
-
-	call_all(dev, core, queryctrl, qc);
-
-	if (qc->type)
-		return 0;
-	else
-		return -EINVAL;
-}
-
-static int vidioc_g_ctrl(struct file *file, void *priv,
-			 struct v4l2_control *ctrl)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-	int rc;
-
-	rc = check_dev(dev);
-	if (rc < 0)
-		return rc;
-
-	call_all(dev, core, g_ctrl, ctrl);
-	return rc;
-}
-
-static int vidioc_s_ctrl(struct file *file, void *priv,
-			 struct v4l2_control *ctrl)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-	int rc;
-
-	rc = check_dev(dev);
-	if (rc < 0)
-		return rc;
-
-	call_all(dev, core, s_ctrl, ctrl);
-	return rc;
-}
-
-static int vidioc_g_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
+int cx231xx_g_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
@@ -1360,11 +1204,12 @@ static int vidioc_g_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
 	t->capability = V4L2_TUNER_CAP_NORM;
 	t->rangehigh = 0xffffffffUL;
 	t->signal = 0xffff;	/* LOCKED */
+	call_all(dev, tuner, g_tuner, t);
 
 	return 0;
 }
 
-static int vidioc_s_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
+int cx231xx_s_tuner(struct file *file, void *priv, const struct v4l2_tuner *t)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
@@ -1382,31 +1227,32 @@ static int vidioc_s_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
 	return 0;
 }
 
-static int vidioc_g_frequency(struct file *file, void *priv,
+int cx231xx_g_frequency(struct file *file, void *priv,
 			      struct v4l2_frequency *f)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
 
-	f->type = fh->radio ? V4L2_TUNER_RADIO : V4L2_TUNER_ANALOG_TV;
-	f->frequency = dev->ctl_freq;
+	if (f->tuner)
+		return -EINVAL;
 
-	call_all(dev, tuner, g_frequency, f);
+	f->frequency = dev->ctl_freq;
 
 	return 0;
 }
 
-static int vidioc_s_frequency(struct file *file, void *priv,
-			      struct v4l2_frequency *f)
+int cx231xx_s_frequency(struct file *file, void *priv,
+			      const struct v4l2_frequency *f)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
+	struct v4l2_frequency new_freq = *f;
 	int rc;
 	u32 if_frequency = 5400000;
 
-	cx231xx_info("Enter vidioc_s_frequency()f->frequency=%d;f->type=%d\n",
-		 f->frequency, f->type);
-	/*cx231xx_info("f->type:  1-radio 2-analogTV 3-digitalTV\n");*/
+	dev_dbg(dev->dev,
+		"Enter vidioc_s_frequency()f->frequency=%d;f->type=%d\n",
+		f->frequency, f->type);
 
 	rc = check_dev(dev);
 	if (rc < 0)
@@ -1415,16 +1261,12 @@ static int vidioc_s_frequency(struct file *file, void *priv,
 	if (0 != f->tuner)
 		return -EINVAL;
 
-	if (unlikely(0 == fh->radio && f->type != V4L2_TUNER_ANALOG_TV))
-		return -EINVAL;
-	if (unlikely(1 == fh->radio && f->type != V4L2_TUNER_RADIO))
-		return -EINVAL;
-
 	/* set pre channel change settings in DIF first */
 	rc = cx231xx_tuner_pre_channel_change(dev);
 
-	dev->ctl_freq = f->frequency;
 	call_all(dev, tuner, s_frequency, f);
+	call_all(dev, tuner, g_frequency, &new_freq);
+	dev->ctl_freq = new_freq.frequency;
 
 	/* set post channel change settings in DIF first */
 	rc = cx231xx_tuner_post_channel_change(dev);
@@ -1445,342 +1287,152 @@ static int vidioc_s_frequency(struct file *file, void *priv,
 		else if (dev->norm & V4L2_STD_SECAM_LC)
 			if_frequency = 1250000;  /*1.25MHz	*/
 
-		cx231xx_info("if_frequency is set to %d\n", if_frequency);
+		dev_dbg(dev->dev,
+			"if_frequency is set to %d\n", if_frequency);
 		cx231xx_set_Colibri_For_LowIF(dev, if_frequency, 1, 1);
 
 		update_HH_register_after_set_DIF(dev);
 	}
 
-	cx231xx_info("Set New FREQUENCY to %d\n", f->frequency);
+	dev_dbg(dev->dev, "Set New FREQUENCY to %d\n", f->frequency);
 
 	return rc;
 }
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 
-/*
-  -R, --list-registers=type=<host/i2cdrv/i2caddr>,
-				chip=<chip>[,min=<addr>,max=<addr>]
-		     dump registers from <min> to <max> [VIDIOC_DBG_G_REGISTER]
-  -r, --set-register=type=<host/i2cdrv/i2caddr>,
-				chip=<chip>,reg=<addr>,val=<val>
-		     set the register [VIDIOC_DBG_S_REGISTER]
+int cx231xx_g_chip_info(struct file *file, void *fh,
+			struct v4l2_dbg_chip_info *chip)
+{
+	switch (chip->match.addr) {
+	case 0:	/* Cx231xx - internal registers */
+		return 0;
+	case 1:	/* AFE - read byte */
+		strlcpy(chip->name, "AFE (byte)", sizeof(chip->name));
+		return 0;
+	case 2:	/* Video Block - read byte */
+		strlcpy(chip->name, "Video (byte)", sizeof(chip->name));
+		return 0;
+	case 3:	/* I2S block - read byte */
+		strlcpy(chip->name, "I2S (byte)", sizeof(chip->name));
+		return 0;
+	case 4: /* AFE - read dword */
+		strlcpy(chip->name, "AFE (dword)", sizeof(chip->name));
+		return 0;
+	case 5: /* Video Block - read dword */
+		strlcpy(chip->name, "Video (dword)", sizeof(chip->name));
+		return 0;
+	case 6: /* I2S Block - read dword */
+		strlcpy(chip->name, "I2S (dword)", sizeof(chip->name));
+		return 0;
+	}
+	return -EINVAL;
+}
 
-  if type == host, then <chip> is the hosts chip ID (default 0)
-  if type == i2cdrv (default), then <chip> is the I2C driver name or ID
-  if type == i2caddr, then <chip> is the 7-bit I2C address
-*/
-
-static int vidioc_g_register(struct file *file, void *priv,
+int cx231xx_g_register(struct file *file, void *priv,
 			     struct v4l2_dbg_register *reg)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
-	int ret = 0;
+	int ret;
 	u8 value[4] = { 0, 0, 0, 0 };
 	u32 data = 0;
 
-	switch (reg->match.type) {
-	case V4L2_CHIP_MATCH_HOST:
-		switch (reg->match.addr) {
-		case 0:	/* Cx231xx - internal registers */
-			ret = cx231xx_read_ctrl_reg(dev, VRT_GET_REGISTER,
-						  (u16)reg->reg, value, 4);
-			reg->val = value[0] | value[1] << 8 |
-				   value[2] << 16 | value[3] << 24;
-			break;
-		case 1:	/* AFE - read byte */
-			ret = cx231xx_read_i2c_data(dev, AFE_DEVICE_ADDRESS,
-						  (u16)reg->reg, 2, &data, 1);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-		case 14: /* AFE - read dword */
-			ret = cx231xx_read_i2c_data(dev, AFE_DEVICE_ADDRESS,
-						  (u16)reg->reg, 2, &data, 4);
-			reg->val = le32_to_cpu(data);
-			break;
-		case 2:	/* Video Block - read byte */
-			ret = cx231xx_read_i2c_data(dev, VID_BLK_I2C_ADDRESS,
-						  (u16)reg->reg, 2, &data, 1);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-		case 24: /* Video Block - read dword */
-			ret = cx231xx_read_i2c_data(dev, VID_BLK_I2C_ADDRESS,
-						  (u16)reg->reg, 2, &data, 4);
-			reg->val = le32_to_cpu(data);
-			break;
-		case 3:	/* I2S block - read byte */
-			ret = cx231xx_read_i2c_data(dev,
-						    I2S_BLK_DEVICE_ADDRESS,
-						    (u16)reg->reg, 1,
-						    &data, 1);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-		case 34: /* I2S Block - read dword */
-			ret =
-			    cx231xx_read_i2c_data(dev, I2S_BLK_DEVICE_ADDRESS,
-						  (u16)reg->reg, 1, &data, 4);
-			reg->val = le32_to_cpu(data);
-			break;
-		}
-		return ret < 0 ? ret : 0;
-
-	case V4L2_CHIP_MATCH_I2C_DRIVER:
-		call_all(dev, core, g_register, reg);
-		return 0;
-	case V4L2_CHIP_MATCH_I2C_ADDR:/*for register debug*/
-		switch (reg->match.addr) {
-		case 0:	/* Cx231xx - internal registers */
-			ret = cx231xx_read_ctrl_reg(dev, VRT_GET_REGISTER,
-						  (u16)reg->reg, value, 4);
-			reg->val = value[0] | value[1] << 8 |
-				   value[2] << 16 | value[3] << 24;
-
-			break;
-		case 0x600:/* AFE - read byte */
-			ret = cx231xx_read_i2c_master(dev, AFE_DEVICE_ADDRESS,
-						 (u16)reg->reg, 2,
-						 &data, 1 , 0);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-
-		case 0x880:/* Video Block - read byte */
-			if (reg->reg < 0x0b) {
-				ret = cx231xx_read_i2c_master(dev,
-						VID_BLK_I2C_ADDRESS,
-						 (u16)reg->reg, 2,
-						 &data, 1 , 0);
-				reg->val = le32_to_cpu(data & 0xff);
-			} else {
-				ret = cx231xx_read_i2c_master(dev,
-						VID_BLK_I2C_ADDRESS,
-						 (u16)reg->reg, 2,
-						 &data, 4 , 0);
-				reg->val = le32_to_cpu(data);
-			}
-			break;
-		case 0x980:
-			ret = cx231xx_read_i2c_master(dev,
-						I2S_BLK_DEVICE_ADDRESS,
-						(u16)reg->reg, 1,
-						&data, 1 , 0);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-		case 0x400:
-			ret =
-			    cx231xx_read_i2c_master(dev, 0x40,
-						  (u16)reg->reg, 1,
-						 &data, 1 , 0);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-		case 0xc01:
-			ret =
-				cx231xx_read_i2c_master(dev, 0xc0,
-						(u16)reg->reg, 2,
-						 &data, 38, 1);
-			reg->val = le32_to_cpu(data);
-			break;
-		case 0x022:
-			ret =
-				cx231xx_read_i2c_master(dev, 0x02,
-						(u16)reg->reg, 1,
-						 &data, 1, 2);
-			reg->val = le32_to_cpu(data & 0xff);
-			break;
-		case 0x322:
-			ret = cx231xx_read_i2c_master(dev,
-						0x32,
-						 (u16)reg->reg, 1,
-						 &data, 4 , 2);
-				reg->val = le32_to_cpu(data);
-			break;
-		case 0x342:
-			ret = cx231xx_read_i2c_master(dev,
-						0x34,
-						 (u16)reg->reg, 1,
-						 &data, 4 , 2);
-				reg->val = le32_to_cpu(data);
-			break;
-
-		default:
-			cx231xx_info("no match device address!!\n");
-			break;
-			}
-		return ret < 0 ? ret : 0;
-		/*return -EINVAL;*/
+	switch (reg->match.addr) {
+	case 0:	/* Cx231xx - internal registers */
+		ret = cx231xx_read_ctrl_reg(dev, VRT_GET_REGISTER,
+				(u16)reg->reg, value, 4);
+		reg->val = value[0] | value[1] << 8 |
+			value[2] << 16 | value[3] << 24;
+		reg->size = 4;
+		break;
+	case 1:	/* AFE - read byte */
+		ret = cx231xx_read_i2c_data(dev, AFE_DEVICE_ADDRESS,
+				(u16)reg->reg, 2, &data, 1);
+		reg->val = data;
+		reg->size = 1;
+		break;
+	case 2:	/* Video Block - read byte */
+		ret = cx231xx_read_i2c_data(dev, VID_BLK_I2C_ADDRESS,
+				(u16)reg->reg, 2, &data, 1);
+		reg->val = data;
+		reg->size = 1;
+		break;
+	case 3:	/* I2S block - read byte */
+		ret = cx231xx_read_i2c_data(dev, I2S_BLK_DEVICE_ADDRESS,
+				(u16)reg->reg, 1, &data, 1);
+		reg->val = data;
+		reg->size = 1;
+		break;
+	case 4: /* AFE - read dword */
+		ret = cx231xx_read_i2c_data(dev, AFE_DEVICE_ADDRESS,
+				(u16)reg->reg, 2, &data, 4);
+		reg->val = data;
+		reg->size = 4;
+		break;
+	case 5: /* Video Block - read dword */
+		ret = cx231xx_read_i2c_data(dev, VID_BLK_I2C_ADDRESS,
+				(u16)reg->reg, 2, &data, 4);
+		reg->val = data;
+		reg->size = 4;
+		break;
+	case 6: /* I2S Block - read dword */
+		ret = cx231xx_read_i2c_data(dev, I2S_BLK_DEVICE_ADDRESS,
+				(u16)reg->reg, 1, &data, 4);
+		reg->val = data;
+		reg->size = 4;
+		break;
 	default:
-		if (!v4l2_chip_match_host(&reg->match))
-			return -EINVAL;
+		return -EINVAL;
 	}
-
-	call_all(dev, core, g_register, reg);
-
-	return ret;
+	return ret < 0 ? ret : 0;
 }
 
-static int vidioc_s_register(struct file *file, void *priv,
-			     struct v4l2_dbg_register *reg)
+int cx231xx_s_register(struct file *file, void *priv,
+			     const struct v4l2_dbg_register *reg)
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
-	int ret = 0;
-	__le64 buf;
-	u32 value;
+	int ret;
 	u8 data[4] = { 0, 0, 0, 0 };
 
-	buf = cpu_to_le64(reg->val);
-
-	switch (reg->match.type) {
-	case V4L2_CHIP_MATCH_HOST:
-		{
-			value = (u32) buf & 0xffffffff;
-
-			switch (reg->match.addr) {
-			case 0:	/* cx231xx internal registers */
-				data[0] = (u8) value;
-				data[1] = (u8) (value >> 8);
-				data[2] = (u8) (value >> 16);
-				data[3] = (u8) (value >> 24);
-				ret = cx231xx_write_ctrl_reg(dev,
-							   VRT_SET_REGISTER,
-							   (u16)reg->reg, data,
-							   4);
-				break;
-			case 1:	/* AFE - read byte */
-				ret = cx231xx_write_i2c_data(dev,
-							AFE_DEVICE_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 1);
-				break;
-			case 14: /* AFE - read dword */
-				ret = cx231xx_write_i2c_data(dev,
-							AFE_DEVICE_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 4);
-				break;
-			case 2:	/* Video Block - read byte */
-				ret =
-				    cx231xx_write_i2c_data(dev,
-							VID_BLK_I2C_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 1);
-				break;
-			case 24: /* Video Block - read dword */
-				ret =
-				    cx231xx_write_i2c_data(dev,
-							VID_BLK_I2C_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 4);
-				break;
-			case 3:	/* I2S block - read byte */
-				ret =
-				    cx231xx_write_i2c_data(dev,
-							I2S_BLK_DEVICE_ADDRESS,
-							(u16)reg->reg, 1,
-							value, 1);
-				break;
-			case 34: /* I2S block - read dword */
-				ret =
-				    cx231xx_write_i2c_data(dev,
-							I2S_BLK_DEVICE_ADDRESS,
-							(u16)reg->reg, 1,
-							value, 4);
-				break;
-			}
-		}
-		return ret < 0 ? ret : 0;
-	case V4L2_CHIP_MATCH_I2C_ADDR:
-		{
-			value = (u32) buf & 0xffffffff;
-
-			switch (reg->match.addr) {
-			case 0:/*cx231xx internal registers*/
-					data[0] = (u8) value;
-					data[1] = (u8) (value >> 8);
-					data[2] = (u8) (value >> 16);
-					data[3] = (u8) (value >> 24);
-					ret = cx231xx_write_ctrl_reg(dev,
-							   VRT_SET_REGISTER,
-							   (u16)reg->reg, data,
-							   4);
-					break;
-			case 0x600:/* AFE - read byte */
-					ret = cx231xx_write_i2c_master(dev,
-							AFE_DEVICE_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 1 , 0);
-					break;
-
-			case 0x880:/* Video Block - read byte */
-					if (reg->reg < 0x0b)
-						cx231xx_write_i2c_master(dev,
-							VID_BLK_I2C_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 1, 0);
-					else
-						cx231xx_write_i2c_master(dev,
-							VID_BLK_I2C_ADDRESS,
-							(u16)reg->reg, 2,
-							value, 4, 0);
-					break;
-			case 0x980:
-					ret =
-						cx231xx_write_i2c_master(dev,
-							I2S_BLK_DEVICE_ADDRESS,
-							(u16)reg->reg, 1,
-							value, 1, 0);
-					break;
-			case 0x400:
-					ret =
-						cx231xx_write_i2c_master(dev,
-							0x40,
-							(u16)reg->reg, 1,
-							value, 1, 0);
-					break;
-			case 0xc01:
-					ret =
-						cx231xx_write_i2c_master(dev,
-							 0xc0,
-							 (u16)reg->reg, 1,
-							 value, 1, 1);
-					break;
-
-			case 0x022:
-					ret =
-						cx231xx_write_i2c_master(dev,
-							0x02,
-							(u16)reg->reg, 1,
-							value, 1, 2);
-			case 0x322:
-					ret =
-						cx231xx_write_i2c_master(dev,
-							0x32,
-							(u16)reg->reg, 1,
-							value, 4, 2);
-					break;
-
-			case 0x342:
-					ret =
-						cx231xx_write_i2c_master(dev,
-							0x34,
-							(u16)reg->reg, 1,
-							value, 4, 2);
-					break;
-			default:
-				cx231xx_info("no match device address, "
-					"the value is %x\n", reg->match.addr);
-					break;
-
-					}
-
-		}
-	default:
+	switch (reg->match.addr) {
+	case 0:	/* cx231xx internal registers */
+		data[0] = (u8) reg->val;
+		data[1] = (u8) (reg->val >> 8);
+		data[2] = (u8) (reg->val >> 16);
+		data[3] = (u8) (reg->val >> 24);
+		ret = cx231xx_write_ctrl_reg(dev, VRT_SET_REGISTER,
+				(u16)reg->reg, data, 4);
 		break;
+	case 1:	/* AFE - write byte */
+		ret = cx231xx_write_i2c_data(dev, AFE_DEVICE_ADDRESS,
+				(u16)reg->reg, 2, reg->val, 1);
+		break;
+	case 2:	/* Video Block - write byte */
+		ret = cx231xx_write_i2c_data(dev, VID_BLK_I2C_ADDRESS,
+				(u16)reg->reg, 2, reg->val, 1);
+		break;
+	case 3:	/* I2S block - write byte */
+		ret = cx231xx_write_i2c_data(dev, I2S_BLK_DEVICE_ADDRESS,
+				(u16)reg->reg, 1, reg->val, 1);
+		break;
+	case 4: /* AFE - write dword */
+		ret = cx231xx_write_i2c_data(dev, AFE_DEVICE_ADDRESS,
+				(u16)reg->reg, 2, reg->val, 4);
+		break;
+	case 5: /* Video Block - write dword */
+		ret = cx231xx_write_i2c_data(dev, VID_BLK_I2C_ADDRESS,
+				(u16)reg->reg, 2, reg->val, 4);
+		break;
+	case 6: /* I2S block - write dword */
+		ret = cx231xx_write_i2c_data(dev, I2S_BLK_DEVICE_ADDRESS,
+				(u16)reg->reg, 1, reg->val, 4);
+		break;
+	default:
+		return -EINVAL;
 	}
-
-	call_all(dev, core, s_register, reg);
-
-	return ret;
+	return ret < 0 ? ret : 0;
 }
 #endif
 
@@ -1836,9 +1488,6 @@ static int vidioc_streamoff(struct file *file, void *priv,
 	if (rc < 0)
 		return rc;
 
-	if ((fh->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) &&
-	    (fh->type != V4L2_BUF_TYPE_VBI_CAPTURE))
-		return -EINVAL;
 	if (type != fh->type)
 		return -EINVAL;
 
@@ -1850,9 +1499,10 @@ static int vidioc_streamoff(struct file *file, void *priv,
 	return 0;
 }
 
-static int vidioc_querycap(struct file *file, void *priv,
+int cx231xx_querycap(struct file *file, void *priv,
 			   struct v4l2_capability *cap)
 {
+	struct video_device *vdev = video_devdata(file);
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
 
@@ -1860,17 +1510,22 @@ static int vidioc_querycap(struct file *file, void *priv,
 	strlcpy(cap->card, cx231xx_boards[dev->model].name, sizeof(cap->card));
 	usb_make_path(dev->udev, cap->bus_info, sizeof(cap->bus_info));
 
-	cap->capabilities = V4L2_CAP_VBI_CAPTURE |
-#if 0
-		V4L2_CAP_SLICED_VBI_CAPTURE |
-#endif
-		V4L2_CAP_VIDEO_CAPTURE	|
-		V4L2_CAP_AUDIO		|
-		V4L2_CAP_READWRITE	|
-		V4L2_CAP_STREAMING;
-
+	if (vdev->vfl_type == VFL_TYPE_RADIO)
+		cap->device_caps = V4L2_CAP_RADIO;
+	else {
+		cap->device_caps = V4L2_CAP_READWRITE | V4L2_CAP_STREAMING;
+		if (vdev->vfl_type == VFL_TYPE_VBI)
+			cap->device_caps |= V4L2_CAP_VBI_CAPTURE;
+		else
+			cap->device_caps |= V4L2_CAP_VIDEO_CAPTURE;
+	}
 	if (dev->tuner_type != TUNER_ABSENT)
-		cap->capabilities |= V4L2_CAP_TUNER;
+		cap->device_caps |= V4L2_CAP_TUNER;
+	cap->capabilities = cap->device_caps | V4L2_CAP_READWRITE |
+		V4L2_CAP_VBI_CAPTURE | V4L2_CAP_VIDEO_CAPTURE |
+		V4L2_CAP_STREAMING | V4L2_CAP_DEVICE_CAPS;
+	if (video_is_registered(&dev->radio_dev))
+		cap->capabilities |= V4L2_CAP_RADIO;
 
 	return 0;
 }
@@ -1887,47 +1542,6 @@ static int vidioc_enum_fmt_vid_cap(struct file *file, void *priv,
 	return 0;
 }
 
-/* Sliced VBI ioctls */
-static int vidioc_g_fmt_sliced_vbi_cap(struct file *file, void *priv,
-				       struct v4l2_format *f)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-	int rc;
-
-	rc = check_dev(dev);
-	if (rc < 0)
-		return rc;
-
-	f->fmt.sliced.service_set = 0;
-
-	call_all(dev, vbi, g_sliced_fmt, &f->fmt.sliced);
-
-	if (f->fmt.sliced.service_set == 0)
-		rc = -EINVAL;
-
-	return rc;
-}
-
-static int vidioc_try_set_sliced_vbi_cap(struct file *file, void *priv,
-					 struct v4l2_format *f)
-{
-	struct cx231xx_fh *fh = priv;
-	struct cx231xx *dev = fh->dev;
-	int rc;
-
-	rc = check_dev(dev);
-	if (rc < 0)
-		return rc;
-
-	call_all(dev, vbi, g_sliced_fmt, &f->fmt.sliced);
-
-	if (f->fmt.sliced.service_set == 0)
-		return -EINVAL;
-
-	return 0;
-}
-
 /* RAW VBI ioctls */
 
 static int vidioc_g_fmt_vbi_cap(struct file *file, void *priv,
@@ -1935,6 +1549,7 @@ static int vidioc_g_fmt_vbi_cap(struct file *file, void *priv,
 {
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
+
 	f->fmt.vbi.sampling_rate = 6750000 * 4;
 	f->fmt.vbi.samples_per_line = VBI_LINE_LENGTH;
 	f->fmt.vbi.sample_format = V4L2_PIX_FMT_GREY;
@@ -1946,6 +1561,7 @@ static int vidioc_g_fmt_vbi_cap(struct file *file, void *priv,
 	f->fmt.vbi.start[1] = (dev->norm & V4L2_STD_625_50) ?
 	    PAL_VBI_START_LINE + 312 : NTSC_VBI_START_LINE + 263;
 	f->fmt.vbi.count[1] = f->fmt.vbi.count[0];
+	memset(f->fmt.vbi.reserved, 0, sizeof(f->fmt.vbi.reserved));
 
 	return 0;
 
@@ -1957,12 +1573,6 @@ static int vidioc_try_fmt_vbi_cap(struct file *file, void *priv,
 	struct cx231xx_fh *fh = priv;
 	struct cx231xx *dev = fh->dev;
 
-	if (dev->vbi_stream_on && !fh->stream_on) {
-		cx231xx_errdev("%s device in use by another fh\n", __func__);
-		return -EBUSY;
-	}
-
-	f->type = V4L2_BUF_TYPE_VBI_CAPTURE;
 	f->fmt.vbi.sampling_rate = 6750000 * 4;
 	f->fmt.vbi.samples_per_line = VBI_LINE_LENGTH;
 	f->fmt.vbi.sample_format = V4L2_PIX_FMT_GREY;
@@ -1975,9 +1585,24 @@ static int vidioc_try_fmt_vbi_cap(struct file *file, void *priv,
 	f->fmt.vbi.start[1] = (dev->norm & V4L2_STD_625_50) ?
 	    PAL_VBI_START_LINE + 312 : NTSC_VBI_START_LINE + 263;
 	f->fmt.vbi.count[1] = f->fmt.vbi.count[0];
+	memset(f->fmt.vbi.reserved, 0, sizeof(f->fmt.vbi.reserved));
 
 	return 0;
 
+}
+
+static int vidioc_s_fmt_vbi_cap(struct file *file, void *priv,
+				  struct v4l2_format *f)
+{
+	struct cx231xx_fh *fh = priv;
+	struct cx231xx *dev = fh->dev;
+
+	if (dev->vbi_stream_on && !fh->stream_on) {
+		dev_err(dev->dev,
+			"%s device in use by another fh\n", __func__);
+		return -EBUSY;
+	}
+	return vidioc_try_fmt_vbi_cap(file, priv, f);
 }
 
 static int vidioc_reqbufs(struct file *file, void *priv,
@@ -2037,92 +1662,28 @@ static int vidioc_dqbuf(struct file *file, void *priv, struct v4l2_buffer *b)
 /* RADIO ESPECIFIC IOCTLS                                      */
 /* ----------------------------------------------------------- */
 
-static int radio_querycap(struct file *file, void *priv,
-			  struct v4l2_capability *cap)
-{
-	struct cx231xx *dev = ((struct cx231xx_fh *)priv)->dev;
-
-	strlcpy(cap->driver, "cx231xx", sizeof(cap->driver));
-	strlcpy(cap->card, cx231xx_boards[dev->model].name, sizeof(cap->card));
-	usb_make_path(dev->udev, cap->bus_info, sizeof(cap->bus_info));
-
-	cap->capabilities = V4L2_CAP_TUNER;
-	return 0;
-}
-
 static int radio_g_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
 {
 	struct cx231xx *dev = ((struct cx231xx_fh *)priv)->dev;
 
-	if (unlikely(t->index > 0))
+	if (t->index)
 		return -EINVAL;
 
 	strcpy(t->name, "Radio");
-	t->type = V4L2_TUNER_RADIO;
 
-	call_all(dev, tuner, s_tuner, t);
-
-	return 0;
-}
-
-static int radio_enum_input(struct file *file, void *priv, struct v4l2_input *i)
-{
-	if (i->index != 0)
-		return -EINVAL;
-	strcpy(i->name, "Radio");
-	i->type = V4L2_INPUT_TYPE_TUNER;
+	call_all(dev, tuner, g_tuner, t);
 
 	return 0;
 }
-
-static int radio_g_audio(struct file *file, void *priv, struct v4l2_audio *a)
-{
-	if (unlikely(a->index))
-		return -EINVAL;
-
-	strcpy(a->name, "Radio");
-	return 0;
-}
-
-static int radio_s_tuner(struct file *file, void *priv, struct v4l2_tuner *t)
+static int radio_s_tuner(struct file *file, void *priv, const struct v4l2_tuner *t)
 {
 	struct cx231xx *dev = ((struct cx231xx_fh *)priv)->dev;
 
-	if (0 != t->index)
+	if (t->index)
 		return -EINVAL;
 
 	call_all(dev, tuner, s_tuner, t);
 
-	return 0;
-}
-
-static int radio_s_audio(struct file *file, void *fh, const struct v4l2_audio *a)
-{
-	return 0;
-}
-
-static int radio_s_input(struct file *file, void *fh, unsigned int i)
-{
-	return 0;
-}
-
-static int radio_queryctrl(struct file *file, void *priv,
-			   struct v4l2_queryctrl *c)
-{
-	int i;
-
-	if (c->id < V4L2_CID_BASE || c->id >= V4L2_CID_LASTP1)
-		return -EINVAL;
-	if (c->id == V4L2_CID_AUDIO_MUTE) {
-		for (i = 0; i < CX231XX_CTLS; i++) {
-			if (cx231xx_ctls[i].v.id == c->id)
-				break;
-		}
-		if (i == CX231XX_CTLS)
-			return -EINVAL;
-		*c = cx231xx_ctls[i].v;
-	} else
-		*c = no_ctl;
 	return 0;
 }
 
@@ -2132,7 +1693,7 @@ static int radio_queryctrl(struct file *file, void *priv,
  */
 static int cx231xx_v4l2_open(struct file *filp)
 {
-	int errCode = 0, radio = 0;
+	int radio = 0;
 	struct video_device *vdev = video_devdata(filp);
 	struct cx231xx *dev = video_drvdata(filp);
 	struct cx231xx_fh *fh;
@@ -2157,30 +1718,25 @@ static int cx231xx_v4l2_open(struct file *filp)
 #if 0
 	errCode = cx231xx_set_mode(dev, CX231XX_ANALOG_MODE);
 	if (errCode < 0) {
-		cx231xx_errdev
-		    ("Device locked on digital mode. Can't open analog\n");
+		dev_err(dev->dev,
+			"Device locked on digital mode. Can't open analog\n");
 		return -EBUSY;
 	}
 #endif
 
 	fh = kzalloc(sizeof(struct cx231xx_fh), GFP_KERNEL);
-	if (!fh) {
-		cx231xx_errdev("cx231xx-video.c: Out of memory?!\n");
+	if (!fh)
 		return -ENOMEM;
-	}
 	if (mutex_lock_interruptible(&dev->lock)) {
 		kfree(fh);
 		return -ERESTARTSYS;
 	}
 	fh->dev = dev;
-	fh->radio = radio;
 	fh->type = fh_type;
 	filp->private_data = fh;
+	v4l2_fh_init(&fh->fh, vdev);
 
 	if (fh->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && dev->users == 0) {
-		dev->width = norm_maxw(dev);
-		dev->height = norm_maxh(dev);
-
 		/* Power up in Analog TV mode */
 		if (dev->board.external_av)
 			cx231xx_set_power_mode(dev,
@@ -2203,7 +1759,7 @@ static int cx231xx_v4l2_open(struct file *filp)
 		dev->video_input = dev->video_input > 2 ? 2 : dev->video_input;
 
 	}
-	if (fh->radio) {
+	if (radio) {
 		cx231xx_videodbg("video_open: setting radio device\n");
 
 		/* cx231xx_start_radio(dev); */
@@ -2231,8 +1787,9 @@ static int cx231xx_v4l2_open(struct file *filp)
 					    fh, &dev->lock);
 	}
 	mutex_unlock(&dev->lock);
+	v4l2_fh_add(&fh->fh);
 
-	return errCode;
+	return 0;
 }
 
 /*
@@ -2245,35 +1802,24 @@ void cx231xx_release_analog_resources(struct cx231xx *dev)
 
 	/*FIXME: I2C IR should be disconnected */
 
-	if (dev->radio_dev) {
-		if (video_is_registered(dev->radio_dev))
-			video_unregister_device(dev->radio_dev);
-		else
-			video_device_release(dev->radio_dev);
-		dev->radio_dev = NULL;
+	if (video_is_registered(&dev->radio_dev))
+		video_unregister_device(&dev->radio_dev);
+	if (video_is_registered(&dev->vbi_dev)) {
+		dev_info(dev->dev, "V4L2 device %s deregistered\n",
+			video_device_node_name(&dev->vbi_dev));
+		video_unregister_device(&dev->vbi_dev);
 	}
-	if (dev->vbi_dev) {
-		cx231xx_info("V4L2 device %s deregistered\n",
-			     video_device_node_name(dev->vbi_dev));
-		if (video_is_registered(dev->vbi_dev))
-			video_unregister_device(dev->vbi_dev);
-		else
-			video_device_release(dev->vbi_dev);
-		dev->vbi_dev = NULL;
-	}
-	if (dev->vdev) {
-		cx231xx_info("V4L2 device %s deregistered\n",
-			     video_device_node_name(dev->vdev));
+	if (video_is_registered(&dev->vdev)) {
+		dev_info(dev->dev, "V4L2 device %s deregistered\n",
+			video_device_node_name(&dev->vdev));
 
 		if (dev->board.has_417)
 			cx231xx_417_unregister(dev);
 
-		if (video_is_registered(dev->vdev))
-			video_unregister_device(dev->vdev);
-		else
-			video_device_release(dev->vdev);
-		dev->vdev = NULL;
+		video_unregister_device(&dev->vdev);
 	}
+	v4l2_ctrl_handler_free(&dev->ctrl_handler);
+	v4l2_ctrl_handler_free(&dev->radio_ctrl_handler);
 }
 
 /*
@@ -2323,12 +1869,15 @@ static int cx231xx_close(struct file *filp)
 			else
 				cx231xx_set_alt_setting(dev, INDEX_HANC, 0);
 
+			v4l2_fh_del(&fh->fh);
+			v4l2_fh_exit(&fh->fh);
 			kfree(fh);
 			dev->users--;
 			wake_up_interruptible_nr(&dev->open, 1);
 			return 0;
 		}
 
+	v4l2_fh_del(&fh->fh);
 	dev->users--;
 	if (!dev->users) {
 		videobuf_stop(&fh->vb_vidq);
@@ -2355,6 +1904,7 @@ static int cx231xx_close(struct file *filp)
 		/* set alternate 0 */
 		cx231xx_set_alt_setting(dev, INDEX_VIDEO, 0);
 	}
+	v4l2_fh_exit(&fh->fh);
 	kfree(fh);
 	wake_up_interruptible_nr(&dev->open, 1);
 	return 0;
@@ -2411,29 +1961,37 @@ cx231xx_v4l2_read(struct file *filp, char __user *buf, size_t count,
  */
 static unsigned int cx231xx_v4l2_poll(struct file *filp, poll_table *wait)
 {
+	unsigned long req_events = poll_requested_events(wait);
 	struct cx231xx_fh *fh = filp->private_data;
 	struct cx231xx *dev = fh->dev;
+	unsigned res = 0;
 	int rc;
 
 	rc = check_dev(dev);
 	if (rc < 0)
-		return rc;
+		return POLLERR;
 
 	rc = res_get(fh);
 
 	if (unlikely(rc < 0))
 		return POLLERR;
 
+	if (v4l2_event_pending(&fh->fh))
+		res |= POLLPRI;
+	else
+		poll_wait(filp, &fh->fh.wait, wait);
+
+	if (!(req_events & (POLLIN | POLLRDNORM)))
+		return res;
+
 	if ((V4L2_BUF_TYPE_VIDEO_CAPTURE == fh->type) ||
 	    (V4L2_BUF_TYPE_VBI_CAPTURE == fh->type)) {
-		unsigned int res;
-
 		mutex_lock(&dev->lock);
-		res = videobuf_poll_stream(filp, &fh->vb_vidq, wait);
+		res |= videobuf_poll_stream(filp, &fh->vb_vidq, wait);
 		mutex_unlock(&dev->lock);
 		return res;
 	}
-	return POLLERR;
+	return res | POLLERR;
 }
 
 /*
@@ -2478,77 +2036,69 @@ static const struct v4l2_file_operations cx231xx_v4l_fops = {
 };
 
 static const struct v4l2_ioctl_ops video_ioctl_ops = {
-	.vidioc_querycap               = vidioc_querycap,
+	.vidioc_querycap               = cx231xx_querycap,
 	.vidioc_enum_fmt_vid_cap       = vidioc_enum_fmt_vid_cap,
 	.vidioc_g_fmt_vid_cap          = vidioc_g_fmt_vid_cap,
 	.vidioc_try_fmt_vid_cap        = vidioc_try_fmt_vid_cap,
 	.vidioc_s_fmt_vid_cap          = vidioc_s_fmt_vid_cap,
 	.vidioc_g_fmt_vbi_cap          = vidioc_g_fmt_vbi_cap,
 	.vidioc_try_fmt_vbi_cap        = vidioc_try_fmt_vbi_cap,
-	.vidioc_s_fmt_vbi_cap          = vidioc_try_fmt_vbi_cap,
-	.vidioc_g_audio                =  vidioc_g_audio,
-	.vidioc_s_audio                = vidioc_s_audio,
+	.vidioc_s_fmt_vbi_cap          = vidioc_s_fmt_vbi_cap,
 	.vidioc_cropcap                = vidioc_cropcap,
-	.vidioc_g_fmt_sliced_vbi_cap   = vidioc_g_fmt_sliced_vbi_cap,
-	.vidioc_try_fmt_sliced_vbi_cap = vidioc_try_set_sliced_vbi_cap,
 	.vidioc_reqbufs                = vidioc_reqbufs,
 	.vidioc_querybuf               = vidioc_querybuf,
 	.vidioc_qbuf                   = vidioc_qbuf,
 	.vidioc_dqbuf                  = vidioc_dqbuf,
 	.vidioc_s_std                  = vidioc_s_std,
 	.vidioc_g_std                  = vidioc_g_std,
-	.vidioc_enum_input             = vidioc_enum_input,
-	.vidioc_g_input                = vidioc_g_input,
-	.vidioc_s_input                = vidioc_s_input,
-	.vidioc_queryctrl              = vidioc_queryctrl,
-	.vidioc_g_ctrl                 = vidioc_g_ctrl,
-	.vidioc_s_ctrl                 = vidioc_s_ctrl,
+	.vidioc_enum_input             = cx231xx_enum_input,
+	.vidioc_g_input                = cx231xx_g_input,
+	.vidioc_s_input                = cx231xx_s_input,
 	.vidioc_streamon               = vidioc_streamon,
 	.vidioc_streamoff              = vidioc_streamoff,
-	.vidioc_g_tuner                = vidioc_g_tuner,
-	.vidioc_s_tuner                = vidioc_s_tuner,
-	.vidioc_g_frequency            = vidioc_g_frequency,
-	.vidioc_s_frequency            = vidioc_s_frequency,
+	.vidioc_g_tuner                = cx231xx_g_tuner,
+	.vidioc_s_tuner                = cx231xx_s_tuner,
+	.vidioc_g_frequency            = cx231xx_g_frequency,
+	.vidioc_s_frequency            = cx231xx_s_frequency,
 #ifdef CONFIG_VIDEO_ADV_DEBUG
-	.vidioc_g_register             = vidioc_g_register,
-	.vidioc_s_register             = vidioc_s_register,
+	.vidioc_g_chip_info            = cx231xx_g_chip_info,
+	.vidioc_g_register             = cx231xx_g_register,
+	.vidioc_s_register             = cx231xx_s_register,
 #endif
+	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
+	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
 };
 
 static struct video_device cx231xx_vbi_template;
 
 static const struct video_device cx231xx_video_template = {
 	.fops         = &cx231xx_v4l_fops,
-	.release      = video_device_release,
+	.release      = video_device_release_empty,
 	.ioctl_ops    = &video_ioctl_ops,
 	.tvnorms      = V4L2_STD_ALL,
-	.current_norm = V4L2_STD_PAL,
 };
 
 static const struct v4l2_file_operations radio_fops = {
 	.owner   = THIS_MODULE,
 	.open   = cx231xx_v4l2_open,
 	.release = cx231xx_v4l2_close,
-	.ioctl   = video_ioctl2,
+	.poll = v4l2_ctrl_poll,
+	.unlocked_ioctl = video_ioctl2,
 };
 
 static const struct v4l2_ioctl_ops radio_ioctl_ops = {
-	.vidioc_querycap    = radio_querycap,
+	.vidioc_querycap    = cx231xx_querycap,
 	.vidioc_g_tuner     = radio_g_tuner,
-	.vidioc_enum_input  = radio_enum_input,
-	.vidioc_g_audio     = radio_g_audio,
 	.vidioc_s_tuner     = radio_s_tuner,
-	.vidioc_s_audio     = radio_s_audio,
-	.vidioc_s_input     = radio_s_input,
-	.vidioc_queryctrl   = radio_queryctrl,
-	.vidioc_g_ctrl      = vidioc_g_ctrl,
-	.vidioc_s_ctrl      = vidioc_s_ctrl,
-	.vidioc_g_frequency = vidioc_g_frequency,
-	.vidioc_s_frequency = vidioc_s_frequency,
+	.vidioc_g_frequency = cx231xx_g_frequency,
+	.vidioc_s_frequency = cx231xx_s_frequency,
 #ifdef CONFIG_VIDEO_ADV_DEBUG
-	.vidioc_g_register  = vidioc_g_register,
-	.vidioc_s_register  = vidioc_s_register,
+	.vidioc_g_chip_info = cx231xx_g_chip_info,
+	.vidioc_g_register  = cx231xx_g_register,
+	.vidioc_s_register  = cx231xx_s_register,
 #endif
+	.vidioc_subscribe_event = v4l2_ctrl_subscribe_event,
+	.vidioc_unsubscribe_event = v4l2_event_unsubscribe,
 };
 
 static struct video_device cx231xx_radio_template = {
@@ -2559,37 +2109,35 @@ static struct video_device cx231xx_radio_template = {
 
 /******************************** usb interface ******************************/
 
-static struct video_device *cx231xx_vdev_init(struct cx231xx *dev,
-		const struct video_device
-		*template, const char *type_name)
+static void cx231xx_vdev_init(struct cx231xx *dev,
+		struct video_device *vfd,
+		const struct video_device *template,
+		const char *type_name)
 {
-	struct video_device *vfd;
-
-	vfd = video_device_alloc();
-	if (NULL == vfd)
-		return NULL;
-
 	*vfd = *template;
 	vfd->v4l2_dev = &dev->v4l2_dev;
-	vfd->release = video_device_release;
-	vfd->debug = video_debug;
+	vfd->release = video_device_release_empty;
 	vfd->lock = &dev->lock;
 
 	snprintf(vfd->name, sizeof(vfd->name), "%s %s", dev->name, type_name);
 
 	video_set_drvdata(vfd, dev);
-	return vfd;
+	if (dev->tuner_type == TUNER_ABSENT) {
+		v4l2_disable_ioctl(vfd, VIDIOC_G_FREQUENCY);
+		v4l2_disable_ioctl(vfd, VIDIOC_S_FREQUENCY);
+		v4l2_disable_ioctl(vfd, VIDIOC_G_TUNER);
+		v4l2_disable_ioctl(vfd, VIDIOC_S_TUNER);
+	}
 }
 
 int cx231xx_register_analog_devices(struct cx231xx *dev)
 {
 	int ret;
 
-	cx231xx_info("%s: v4l2 driver version %s\n",
-		     dev->name, CX231XX_VERSION);
+	dev_info(dev->dev, "v4l2 driver version %s\n", CX231XX_VERSION);
 
 	/* set default norm */
-	/*dev->norm = cx231xx_video_template.current_norm; */
+	dev->norm = V4L2_STD_PAL;
 	dev->width = norm_maxw(dev);
 	dev->height = norm_maxh(dev);
 	dev->interlaced = 0;
@@ -2600,71 +2148,88 @@ int cx231xx_register_analog_devices(struct cx231xx *dev)
 	/* Set the initial input */
 	video_mux(dev, dev->video_input);
 
-	/* Audio defaults */
-	dev->mute = 1;
-	dev->volume = 0x1f;
+	call_all(dev, video, s_std, dev->norm);
+
+	v4l2_ctrl_handler_init(&dev->ctrl_handler, 10);
+	v4l2_ctrl_handler_init(&dev->radio_ctrl_handler, 5);
+
+	if (dev->sd_cx25840) {
+		v4l2_ctrl_add_handler(&dev->ctrl_handler,
+				dev->sd_cx25840->ctrl_handler, NULL);
+		v4l2_ctrl_add_handler(&dev->radio_ctrl_handler,
+				dev->sd_cx25840->ctrl_handler,
+				v4l2_ctrl_radio_filter);
+	}
+
+	if (dev->ctrl_handler.error)
+		return dev->ctrl_handler.error;
+	if (dev->radio_ctrl_handler.error)
+		return dev->radio_ctrl_handler.error;
 
 	/* enable vbi capturing */
 	/* write code here...  */
 
 	/* allocate and fill video video_device struct */
-	dev->vdev = cx231xx_vdev_init(dev, &cx231xx_video_template, "video");
-	if (!dev->vdev) {
-		cx231xx_errdev("cannot allocate video_device.\n");
-		return -ENODEV;
-	}
-
+	cx231xx_vdev_init(dev, &dev->vdev, &cx231xx_video_template, "video");
+#if defined(CONFIG_MEDIA_CONTROLLER)
+	dev->video_pad.flags = MEDIA_PAD_FL_SINK;
+	ret = media_entity_init(&dev->vdev.entity, 1, &dev->video_pad, 0);
+	if (ret < 0)
+		dev_err(dev->dev, "failed to initialize video media entity!\n");
+#endif
+	dev->vdev.ctrl_handler = &dev->ctrl_handler;
 	/* register v4l2 video video_device */
-	ret = video_register_device(dev->vdev, VFL_TYPE_GRABBER,
+	ret = video_register_device(&dev->vdev, VFL_TYPE_GRABBER,
 				    video_nr[dev->devno]);
 	if (ret) {
-		cx231xx_errdev("unable to register video device (error=%i).\n",
-			       ret);
+		dev_err(dev->dev,
+			"unable to register video device (error=%i).\n",
+			ret);
 		return ret;
 	}
 
-	cx231xx_info("%s/0: registered device %s [v4l2]\n",
-		     dev->name, video_device_node_name(dev->vdev));
+	dev_info(dev->dev, "Registered video device %s [v4l2]\n",
+		video_device_node_name(&dev->vdev));
 
 	/* Initialize VBI template */
-	memcpy(&cx231xx_vbi_template, &cx231xx_video_template,
-	       sizeof(cx231xx_vbi_template));
+	cx231xx_vbi_template = cx231xx_video_template;
 	strcpy(cx231xx_vbi_template.name, "cx231xx-vbi");
 
 	/* Allocate and fill vbi video_device struct */
-	dev->vbi_dev = cx231xx_vdev_init(dev, &cx231xx_vbi_template, "vbi");
+	cx231xx_vdev_init(dev, &dev->vbi_dev, &cx231xx_vbi_template, "vbi");
 
+#if defined(CONFIG_MEDIA_CONTROLLER)
+	dev->vbi_pad.flags = MEDIA_PAD_FL_SINK;
+	ret = media_entity_init(&dev->vbi_dev.entity, 1, &dev->vbi_pad, 0);
+	if (ret < 0)
+		dev_err(dev->dev, "failed to initialize vbi media entity!\n");
+#endif
+	dev->vbi_dev.ctrl_handler = &dev->ctrl_handler;
 	/* register v4l2 vbi video_device */
-	ret = video_register_device(dev->vbi_dev, VFL_TYPE_VBI,
+	ret = video_register_device(&dev->vbi_dev, VFL_TYPE_VBI,
 				    vbi_nr[dev->devno]);
 	if (ret < 0) {
-		cx231xx_errdev("unable to register vbi device\n");
+		dev_err(dev->dev, "unable to register vbi device\n");
 		return ret;
 	}
 
-	cx231xx_info("%s/0: registered device %s\n",
-		     dev->name, video_device_node_name(dev->vbi_dev));
+	dev_info(dev->dev, "Registered VBI device %s\n",
+		video_device_node_name(&dev->vbi_dev));
 
 	if (cx231xx_boards[dev->model].radio.type == CX231XX_RADIO) {
-		dev->radio_dev = cx231xx_vdev_init(dev, &cx231xx_radio_template,
-						   "radio");
-		if (!dev->radio_dev) {
-			cx231xx_errdev("cannot allocate video_device.\n");
-			return -ENODEV;
-		}
-		ret = video_register_device(dev->radio_dev, VFL_TYPE_RADIO,
+		cx231xx_vdev_init(dev, &dev->radio_dev,
+				&cx231xx_radio_template, "radio");
+		dev->radio_dev.ctrl_handler = &dev->radio_ctrl_handler;
+		ret = video_register_device(&dev->radio_dev, VFL_TYPE_RADIO,
 					    radio_nr[dev->devno]);
 		if (ret < 0) {
-			cx231xx_errdev("can't register radio device\n");
+			dev_err(dev->dev,
+				"can't register radio device\n");
 			return ret;
 		}
-		cx231xx_info("Registered radio device as %s\n",
-			     video_device_node_name(dev->radio_dev));
+		dev_info(dev->dev, "Registered radio device as %s\n",
+			video_device_node_name(&dev->radio_dev));
 	}
-
-	cx231xx_info("V4L2 device registered as %s and %s\n",
-		     video_device_node_name(dev->vdev),
-		     video_device_node_name(dev->vbi_dev));
 
 	return 0;
 }

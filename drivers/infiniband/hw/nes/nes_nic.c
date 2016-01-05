@@ -373,11 +373,11 @@ static int nes_nic_send(struct sk_buff *skb, struct net_device *netdev)
 	wqe_fragment_length = (__le16 *)&nic_sqe->wqe_words[NES_NIC_SQ_WQE_LENGTH_0_TAG_IDX];
 
 	/* setup the VLAN tag if present */
-	if (vlan_tx_tag_present(skb)) {
+	if (skb_vlan_tag_present(skb)) {
 		nes_debug(NES_DBG_NIC_TX, "%s: VLAN packet to send... VLAN = %08X\n",
-				netdev->name, vlan_tx_tag_get(skb));
+				netdev->name, skb_vlan_tag_get(skb));
 		wqe_misc = NES_NIC_SQ_WQE_TAGVALUE_ENABLE;
-		wqe_fragment_length[0] = (__force __le16) vlan_tx_tag_get(skb);
+		wqe_fragment_length[0] = (__force __le16) skb_vlan_tag_get(skb);
 	} else
 		wqe_misc = 0;
 
@@ -576,11 +576,12 @@ tso_sq_no_longer_full:
 				wqe_fragment_length =
 						(__le16 *)&nic_sqe->wqe_words[NES_NIC_SQ_WQE_LENGTH_0_TAG_IDX];
 				/* setup the VLAN tag if present */
-				if (vlan_tx_tag_present(skb)) {
+				if (skb_vlan_tag_present(skb)) {
 					nes_debug(NES_DBG_NIC_TX, "%s: VLAN packet to send... VLAN = %08X\n",
-							netdev->name, vlan_tx_tag_get(skb) );
+							netdev->name,
+						  skb_vlan_tag_get(skb));
 					wqe_misc = NES_NIC_SQ_WQE_TAGVALUE_ENABLE;
-					wqe_fragment_length[0] = (__force __le16) vlan_tx_tag_get(skb);
+					wqe_fragment_length[0] = (__force __le16) skb_vlan_tag_get(skb);
 				} else
 					wqe_misc = 0;
 
@@ -1317,11 +1318,13 @@ static void nes_netdev_get_drvinfo(struct net_device *netdev,
 	struct nes_vnic *nesvnic = netdev_priv(netdev);
 	struct nes_adapter *nesadapter = nesvnic->nesdev->nesadapter;
 
-	strcpy(drvinfo->driver, DRV_NAME);
-	strcpy(drvinfo->bus_info, pci_name(nesvnic->nesdev->pcidev));
-	sprintf(drvinfo->fw_version, "%u.%u", nesadapter->firmware_version>>16,
-				nesadapter->firmware_version & 0x000000ff);
-	strcpy(drvinfo->version, DRV_VERSION);
+	strlcpy(drvinfo->driver, DRV_NAME, sizeof(drvinfo->driver));
+	strlcpy(drvinfo->bus_info, pci_name(nesvnic->nesdev->pcidev),
+		sizeof(drvinfo->bus_info));
+	snprintf(drvinfo->fw_version, sizeof(drvinfo->fw_version),
+		 "%u.%u", nesadapter->firmware_version >> 16,
+		 nesadapter->firmware_version & 0x000000ff);
+	strlcpy(drvinfo->version, DRV_VERSION, sizeof(drvinfo->version));
 	drvinfo->testinfo_len = 0;
 	drvinfo->eedump_len = 0;
 	drvinfo->regdump_len = 0;
@@ -1597,7 +1600,7 @@ static void nes_vlan_mode(struct net_device *netdev, struct nes_device *nesdev, 
 
 	/* Enable/Disable VLAN Stripping */
 	u32temp = nes_read_indexed(nesdev, NES_IDX_PCIX_DIAG);
-	if (features & NETIF_F_HW_VLAN_RX)
+	if (features & NETIF_F_HW_VLAN_CTAG_RX)
 		u32temp &= 0xfdffffff;
 	else
 		u32temp	|= 0x02000000;
@@ -1612,10 +1615,10 @@ static netdev_features_t nes_fix_features(struct net_device *netdev, netdev_feat
 	 * Since there is no support for separate rx/tx vlan accel
 	 * enable/disable make sure tx flag is always in same state as rx.
 	 */
-	if (features & NETIF_F_HW_VLAN_RX)
-		features |= NETIF_F_HW_VLAN_TX;
+	if (features & NETIF_F_HW_VLAN_CTAG_RX)
+		features |= NETIF_F_HW_VLAN_CTAG_TX;
 	else
-		features &= ~NETIF_F_HW_VLAN_TX;
+		features &= ~NETIF_F_HW_VLAN_CTAG_TX;
 
 	return features;
 }
@@ -1626,7 +1629,7 @@ static int nes_set_features(struct net_device *netdev, netdev_features_t feature
 	struct nes_device *nesdev = nesvnic->nesdev;
 	u32 changed = netdev->features ^ features;
 
-	if (changed & NETIF_F_HW_VLAN_RX)
+	if (changed & NETIF_F_HW_VLAN_CTAG_RX)
 		nes_vlan_mode(netdev, nesdev, features);
 
 	return 0;
@@ -1703,13 +1706,12 @@ struct net_device *nes_netdev_init(struct nes_device *nesdev,
 	netdev->dev_addr[3] = (u8)(u64temp>>16);
 	netdev->dev_addr[4] = (u8)(u64temp>>8);
 	netdev->dev_addr[5] = (u8)u64temp;
-	memcpy(netdev->perm_addr, netdev->dev_addr, 6);
 
-	netdev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_RXCSUM | NETIF_F_HW_VLAN_RX;
+	netdev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_RXCSUM | NETIF_F_HW_VLAN_CTAG_RX;
 	if ((nesvnic->logical_port < 2) || (nesdev->nesadapter->hw_rev != NE020_REV))
 		netdev->hw_features |= NETIF_F_TSO;
 
-	netdev->features = netdev->hw_features | NETIF_F_HIGHDMA | NETIF_F_HW_VLAN_TX;
+	netdev->features = netdev->hw_features | NETIF_F_HIGHDMA | NETIF_F_HW_VLAN_CTAG_TX;
 	netdev->hw_features |= NETIF_F_LRO;
 
 	nes_debug(NES_DBG_INIT, "nesvnic = %p, reported features = 0x%lX, QPid = %d,"

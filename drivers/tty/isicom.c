@@ -249,7 +249,7 @@ static int lock_card(struct isi_board *card)
 		spin_unlock_irqrestore(&card->card_lock, card->flags);
 		msleep(10);
 	}
-	pr_warning("Failed to lock Card (0x%lx)\n", card->base);
+	pr_warn("Failed to lock Card (0x%lx)\n", card->base);
 
 	return 0;	/* Failed to acquire the card! */
 }
@@ -378,13 +378,13 @@ static inline int __isicom_paranoia_check(struct isi_port const *port,
 	char *name, const char *routine)
 {
 	if (!port) {
-		pr_warning("Warning: bad isicom magic for dev %s in %s.\n",
-			   name, routine);
+		pr_warn("Warning: bad isicom magic for dev %s in %s\n",
+			name, routine);
 		return 1;
 	}
 	if (port->magic != ISICOM_MAGIC) {
-		pr_warning("Warning: NULL isicom port for dev %s in %s.\n",
-			   name, routine);
+		pr_warn("Warning: NULL isicom port for dev %s in %s\n",
+			name, routine);
 		return 1;
 	}
 
@@ -546,8 +546,8 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id)
 	byte_count = header & 0xff;
 
 	if (channel + 1 > card->port_count) {
-		pr_warning("%s(0x%lx): %d(channel) > port_count.\n",
-			   __func__, base, channel+1);
+		pr_warn("%s(0x%lx): %d(channel) > port_count\n",
+			__func__, base, channel + 1);
 		outw(0x0000, base+0x04); /* enable interrupts */
 		spin_unlock(&card->card_lock);
 		return IRQ_HANDLED;
@@ -634,10 +634,10 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id)
 			break;
 
 		case 1:	/* Received Break !!! */
-			tty_insert_flip_char(tty, 0, TTY_BREAK);
+			tty_insert_flip_char(&port->port, 0, TTY_BREAK);
 			if (port->port.flags & ASYNC_SAK)
 				do_SAK(tty);
-			tty_flip_buffer_push(tty);
+			tty_flip_buffer_push(&port->port);
 			break;
 
 		case 2:	/* Statistics		 */
@@ -650,15 +650,15 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id)
 			break;
 		}
 	} else {				/* Data   Packet */
-
-		count = tty_prepare_flip_string(tty, &rp, byte_count & ~1);
+		count = tty_prepare_flip_string(&port->port, &rp,
+				byte_count & ~1);
 		pr_debug("%s: Can rx %d of %d bytes.\n",
 			 __func__, count, byte_count);
 		word_count = count >> 1;
 		insw(base, rp, word_count);
 		byte_count -= (word_count << 1);
 		if (count & 0x0001) {
-			tty_insert_flip_char(tty,  inw(base) & 0xff,
+			tty_insert_flip_char(&port->port, inw(base) & 0xff,
 				TTY_NORMAL);
 			byte_count -= 2;
 		}
@@ -671,7 +671,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id)
 				byte_count -= 2;
 			}
 		}
-		tty_flip_buffer_push(tty);
+		tty_flip_buffer_push(&port->port);
 	}
 	outw(0x0000, base+0x04); /* enable interrupts */
 	spin_unlock(&card->card_lock);
@@ -1055,7 +1055,7 @@ static int isicom_send_break(struct tty_struct *tty, int length)
 
 	outw(0x8000 | ((port->channel) << (card->shift_count)) | 0x3, base);
 	outw((length & 0xff) << 8 | 0x00, base);
-	outw((length & 0xff00), base);
+	outw((length & 0xff00u), base);
 	InterruptTheCard(base);
 
 	unlock_card(card);

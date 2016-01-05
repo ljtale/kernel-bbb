@@ -1,23 +1,24 @@
-menu "Rpmsg drivers (EXPERIMENTAL)"
+menu "Rpmsg drivers"
 
 # RPMSG always gets selected by whoever wants it
 config RPMSG
 	tristate
 	select VIRTIO
-	depends on EXPERIMENTAL
+	select VIRTUALIZATION
 
-config RPMSG_NUM_BUFS
-	int "RPMSG number of buffers"
+config RPMSG_RPC
+	tristate "rpmsg Remote Procedure Call driver"
+	default n
 	depends on RPMSG
-	default 512
-	help
-	  Configure rpmsg number of bufs (default is 512)
+	depends on REMOTEPROC
+	depends on OMAP_REMOTEPROC
+	select DMA_SHARED_BUFFER
+	---help---
+	  An rpmsg driver that exposes the Remote Procedure Call API to
+	  user space, in order to allow applications to distribute
+	  remote calls to more power-efficient remote processors. This is
+	  currently available only on OMAP4+ systems.
 
-config RPMSG_BUF_SIZE
-	int "RPMSG size of buffers"
-	depends on RPMSG
-	default 512
-	help
-	  Configure rpmsg buffer size (default is 512)
+	  If unsure, say N.
 
 endmenu

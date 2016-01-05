@@ -16,7 +16,6 @@
  */
 
 #include <linux/i2c.h>
-#include <linux/of_i2c.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/pinctrl/pinmux.h>
@@ -27,10 +26,7 @@
 struct tfp410_module {
 	struct tilcdc_module base;
 	struct i2c_adapter *i2c;
-	enum of_gpio_flags ofgpioflags;
 	int gpio;
-	struct pinctrl *pinctrl;
-	char *selected_state_name;
 };
 #define to_tfp410_module(x) container_of(x, struct tfp410_module, base)
 
@@ -69,22 +65,17 @@ static void tfp410_encoder_destroy(struct drm_encoder *encoder)
 static void tfp410_encoder_dpms(struct drm_encoder *encoder, int mode)
 {
 	struct tfp410_encoder *tfp410_encoder = to_tfp410_encoder(encoder);
-	int state;
 
 	if (tfp410_encoder->dpms == mode)
 		return;
 
-	if (IS_ERR_VALUE(tfp410_encoder->mod->gpio))
-		return;
-
-	state = mode == DRM_MODE_DPMS_ON;
-	if (tfp410_encoder->mod->ofgpioflags & OF_GPIO_ACTIVE_LOW)
-		state = !state;
-
-	pr_debug("%s: dpms %d, gpio-state %d\n", __func__,
-			mode == DRM_MODE_DPMS_ON, state);
-
-	gpio_direction_output(tfp410_encoder->mod->gpio, state);
+	if (mode == DRM_MODE_DPMS_ON) {
+		DBG("Power on");
+		gpio_direction_output(tfp410_encoder->mod->gpio, 1);
+	} else {
+		DBG("Power off");
+		gpio_direction_output(tfp410_encoder->mod->gpio, 0);
+	}
 
 	tfp410_encoder->dpms = mode;
 }
@@ -176,6 +167,7 @@ struct tfp410_connector {
 static void tfp410_connector_destroy(struct drm_connector *connector)
 {
 	struct tfp410_connector *tfp410_connector = to_tfp410_connector(connector);
+	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	kfree(tfp410_connector);
 }
@@ -215,8 +207,7 @@ static int tfp410_connector_mode_valid(struct drm_connector *connector,
 {
 	struct tilcdc_drm_private *priv = connector->dev->dev_private;
 	/* our only constraints are what the crtc can generate: */
-	return tilcdc_crtc_mode_valid(priv->crtc, mode,
-			priv->allow_non_rblank ? 0 : 1, 0, NULL);
+	return tilcdc_crtc_mode_valid(priv->crtc, mode);
 }
 
 static struct drm_encoder *tfp410_connector_best_encoder(
@@ -271,7 +262,7 @@ static struct drm_connector *tfp410_connector_create(struct drm_device *dev,
 	if (ret)
 		goto fail;
 
-	drm_sysfs_connector_add(connector);
+	drm_connector_register(connector);
 
 	return connector;
 
@@ -305,23 +296,8 @@ static int tfp410_modeset_init(struct tilcdc_module *mod, struct drm_device *dev
 	return 0;
 }
 
-static void tfp410_destroy(struct tilcdc_module *mod)
-{
-	struct tfp410_module *tfp410_mod = to_tfp410_module(mod);
-
-	if (tfp410_mod->i2c)
-		i2c_put_adapter(tfp410_mod->i2c);
-
-	if (!IS_ERR_VALUE(tfp410_mod->gpio))
-		gpio_free(tfp410_mod->gpio);
-
-	tilcdc_module_cleanup(mod);
-	kfree(tfp410_mod);
-}
-
 static const struct tilcdc_module_ops tfp410_module_ops = {
 		.modeset_init = tfp410_modeset_init,
-		.destroy = tfp410_destroy,
 };
 
 /*
@@ -330,84 +306,14 @@ static const struct tilcdc_module_ops tfp410_module_ops = {
 
 static struct of_device_id tfp410_of_match[];
 
-static ssize_t pinmux_show_state(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct tfp410_module *tfp410_mod = platform_get_drvdata(pdev);
-	const char *name;
-
-	name = tfp410_mod->selected_state_name;
-	if (name == NULL || strlen(name) == 0)
-		name = "none";
-	return sprintf(buf, "%s\n", name);
-}
-
-static ssize_t pinmux_store_state(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct tfp410_module *tfp410_mod = platform_get_drvdata(pdev);
-	struct pinctrl_state *state;
-	char *state_name;
-	char *s;
-	int err;
-
-	/* duplicate (as a null terminated string) */
-	state_name = kmalloc(count + 1, GFP_KERNEL);
-	if (state_name == NULL)
-		return -ENOMEM;
-	memcpy(state_name, buf, count);
-	state_name[count] = '\0';
-
-	/* and chop off newline */
-	s = strchr(state_name, '\n');
-	if (s != NULL)
-		*s = '\0';
-
-	/* try to select default state at first (if it exists) */
-	state = pinctrl_lookup_state(tfp410_mod->pinctrl, state_name);
-	if (!IS_ERR(state)) {
-		err = pinctrl_select_state(tfp410_mod->pinctrl, state);
-		if (err != 0)
-			dev_err(dev, "Failed to select state %s\n",
-					state_name);
-	} else {
-		dev_err(dev, "Failed to find state %s\n", state_name);
-		err = PTR_RET(state);
-	}
-
-	if (err == 0) {
-		kfree(tfp410_mod->selected_state_name);
-		tfp410_mod->selected_state_name = state_name;
-	}
-
-	return err ? err : count;
-}
-
-static DEVICE_ATTR(pinmux_state, S_IWUSR | S_IRUGO,
-		   pinmux_show_state, pinmux_store_state);
-
-static struct attribute *pinmux_attributes[] = {
-	&dev_attr_pinmux_state.attr,
-	NULL
-};
-
-static const struct attribute_group pinmux_attr_group = {
-	.attrs = pinmux_attributes,
-};
-
 static int tfp410_probe(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
 	struct device_node *node = pdev->dev.of_node;
 	struct device_node *i2c_node;
 	struct tfp410_module *tfp410_mod;
 	struct tilcdc_module *mod;
-	struct pinctrl_state *state;
+	struct pinctrl *pinctrl;
 	uint32_t i2c_phandle;
-	unsigned long gpioflags;
-	char *state_name;
 	int ret = -EINVAL;
 
 	/* bail out early if no DT data: */
@@ -420,54 +326,21 @@ static int tfp410_probe(struct platform_device *pdev)
 	if (!tfp410_mod)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, tfp410_mod);
-
 	mod = &tfp410_mod->base;
+	pdev->dev.platform_data = mod;
 
 	tilcdc_module_init(mod, "tfp410", &tfp410_module_ops);
 
-	state_name = kmalloc(strlen(PINCTRL_STATE_DEFAULT) + 1,
-			GFP_KERNEL);
-	if (state_name == NULL) {
-		dev_err(dev, "Failed to allocate state name\n");
-		ret = -ENOMEM;
-		goto fail;
-	}
-	tfp410_mod->selected_state_name = state_name;
-	strcpy(tfp410_mod->selected_state_name, PINCTRL_STATE_DEFAULT);
-
-	tfp410_mod->pinctrl = devm_pinctrl_get(dev);
-	if (IS_ERR(tfp410_mod->pinctrl)) {
-		dev_err(dev, "Failed to get pinctrl\n");
-		ret = PTR_RET(tfp410_mod->pinctrl);
-		goto fail;
-	}
-
-	/* try to select default state at first (if it exists) */
-	state = pinctrl_lookup_state(tfp410_mod->pinctrl,
-			tfp410_mod->selected_state_name);
-	if (!IS_ERR(state)) {
-		ret = pinctrl_select_state(tfp410_mod->pinctrl, state);
-		if (ret != 0) {
-			dev_err(dev, "Failed to select default state\n");
-			goto fail;
-		}
-	} else {
-		tfp410_mod->selected_state_name = '\0';
-	}
-
-	/* Register sysfs hooks */
-	ret = sysfs_create_group(&dev->kobj, &pinmux_attr_group);
-	if (ret) {
-		dev_err(dev, "Failed to create sysfs group\n");
-		goto fail;
-	}
-
+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+	if (IS_ERR(pinctrl))
+		dev_warn(&pdev->dev, "pins are not configured\n");
 
 	if (of_property_read_u32(node, "i2c", &i2c_phandle)) {
 		dev_err(&pdev->dev, "could not get i2c bus phandle\n");
 		goto fail;
 	}
+
+	mod->preferred_bpp = dvi_info.bpp;
 
 	i2c_node = of_find_node_by_phandle(i2c_phandle);
 	if (!i2c_node) {
@@ -478,49 +351,53 @@ static int tfp410_probe(struct platform_device *pdev)
 	tfp410_mod->i2c = of_find_i2c_adapter_by_node(i2c_node);
 	if (!tfp410_mod->i2c) {
 		dev_err(&pdev->dev, "could not get i2c\n");
+		of_node_put(i2c_node);
 		goto fail;
 	}
 
 	of_node_put(i2c_node);
 
-	tfp410_mod->gpio = of_get_named_gpio_flags(pdev->dev.of_node, "ti,power-gpio",
-                       0, &tfp410_mod->ofgpioflags);
+	tfp410_mod->gpio = of_get_named_gpio_flags(node, "powerdn-gpio",
+			0, NULL);
 	if (IS_ERR_VALUE(tfp410_mod->gpio)) {
-		dev_warn(&pdev->dev, "tftp410: No power control GPIO\n");
+		dev_warn(&pdev->dev, "No power down GPIO\n");
 	} else {
-		gpioflags = GPIOF_DIR_OUT;
-		if (tfp410_mod->ofgpioflags & OF_GPIO_ACTIVE_LOW) {
-			gpioflags |= GPIOF_INIT_LOW;
-			dev_info(&pdev->dev, "Power GPIO active low, initial state set to low\n");
-		} else {
-			gpioflags |= GPIOF_INIT_HIGH;
-			dev_info(&pdev->dev, "Power GPIO active high, initial state set to high\n");
-		}
-		ret = devm_gpio_request_one(&pdev->dev, tfp410_mod->gpio,
-				gpioflags, "tfp410:PDN");
-		if (ret != 0) {
-			dev_err(&pdev->dev, "Failed to request power gpio\n");
-			goto fail;
+		ret = gpio_request(tfp410_mod->gpio, "DVI_PDn");
+		if (ret) {
+			dev_err(&pdev->dev, "could not get DVI_PDn gpio\n");
+			goto fail_adapter;
 		}
 	}
 
 	return 0;
 
+fail_adapter:
+	i2c_put_adapter(tfp410_mod->i2c);
+
 fail:
-	tfp410_destroy(mod);
+	kfree(tfp410_mod);
+	tilcdc_module_cleanup(mod);
 	return ret;
 }
 
 static int tfp410_remove(struct platform_device *pdev)
 {
+	struct tilcdc_module *mod = dev_get_platdata(&pdev->dev);
+	struct tfp410_module *tfp410_mod = to_tfp410_module(mod);
+
+	i2c_put_adapter(tfp410_mod->i2c);
+	gpio_free(tfp410_mod->gpio);
+
+	tilcdc_module_cleanup(mod);
+	kfree(tfp410_mod);
+
 	return 0;
 }
 
 static struct of_device_id tfp410_of_match[] = {
-		{ .compatible = "tilcdc,tfp410", },
+		{ .compatible = "ti,tilcdc,tfp410", },
 		{ },
 };
-MODULE_DEVICE_TABLE(of, tfp410_of_match);
 
 struct platform_driver tfp410_driver = {
 	.probe = tfp410_probe,

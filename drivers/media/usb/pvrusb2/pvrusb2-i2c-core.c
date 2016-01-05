@@ -649,8 +649,8 @@ void pvr2_i2c_core_init(struct pvr2_hdw *hdw)
 	}
 
 	// Configure the adapter and set up everything else related to it.
-	memcpy(&hdw->i2c_adap,&pvr2_i2c_adap_template,sizeof(hdw->i2c_adap));
-	memcpy(&hdw->i2c_algo,&pvr2_i2c_algo_template,sizeof(hdw->i2c_algo));
+	hdw->i2c_adap = pvr2_i2c_adap_template;
+	hdw->i2c_algo = pvr2_i2c_algo_template;
 	strlcpy(hdw->i2c_adap.name,hdw->name,sizeof(hdw->i2c_adap.name));
 	hdw->i2c_adap.dev.parent = &hdw->usb_dev->dev;
 	hdw->i2c_adap.algo = &hdw->i2c_algo;
@@ -686,13 +686,3 @@ void pvr2_i2c_core_done(struct pvr2_hdw *hdw)
 		hdw->i2c_linked = 0;
 	}
 }
-
-/*
-  Stuff for Emacs to see, in order to encourage consistent editing style:
-  *** Local Variables: ***
-  *** mode: c ***
-  *** fill-column: 75 ***
-  *** tab-width: 8 ***
-  *** c-basic-offset: 8 ***
-  *** End: ***
-  */

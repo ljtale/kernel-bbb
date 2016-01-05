@@ -17,7 +17,8 @@
  * GNU General Public License for more details.
  */
 #include <linux/module.h>
-#include <linux/opp.h>
+#include <linux/of.h>
+#include <linux/pm_opp.h>
 #include <linux/cpu.h>
 
 #include "omap_device.h"
@@ -26,6 +27,66 @@
 
 /* Temp variable to allow multiple calls */
 static u8 __initdata omap_table_init;
+
+/*
+ * opp_def_list_enable_opp() - enable opp by hwmod_name and frequency
+ * @list:	opp default list for this silicon
+ * @size:	number of opp entries for this silicon
+ * @hwmod_name: hwmod for which the provided opp_freq exists
+ * @opp_freq:	frequency for which the state should be updated
+ * @state:	new state to set for opp availability
+ */
+int __init opp_def_list_enable_opp(struct omap_opp_def *list,
+				   unsigned int size,
+				   const char *hwmod_name,
+				   unsigned long opp_freq, bool state)
+{
+	int i;
+
+	for (i = 0; i < size; i++) {
+		struct omap_opp_def *entry = &list[i];
+
+		if (entry->hwmod_name == hwmod_name &&
+		    entry->freq == opp_freq) {
+			entry->default_available = state;
+			return 0;
+		}
+	}
+	WARN(1, "Unable to find opp for %s, frequency %ld\n",
+	     hwmod_name, opp_freq);
+	return -EINVAL;
+}
+
+/**
+ * opp_def_list_update_voltage_opp() - update opp u_volt entry by hwmod_name
+ *				       and frequency
+ * @list:	opp default list for this silicon
+ * @size:	number of opp entries for this silicon
+ * @hwmod_name: hwmod for which the provided opp_freq exists
+ * @opp_freq:	frequency for which the voltage should be updated
+ * @u_volt:	new voltage value for the provided opp
+ */
+int __init opp_def_list_update_opp_voltage(struct omap_opp_def *list,
+					   unsigned int size,
+					   const char *hwmod_name,
+					   unsigned long opp_freq,
+					   unsigned long u_volt)
+{
+	int i;
+
+	for (i = 0; i < size; i++) {
+		struct omap_opp_def *entry = &list[i];
+
+		if (entry->hwmod_name == hwmod_name &&
+		    entry->freq == opp_freq) {
+			entry->u_volt = u_volt;
+			return 0;
+		}
+	}
+	WARN(1, "Unable to find opp for %s, frequency %ld\n",
+	     hwmod_name, opp_freq);
+	return -EINVAL;
+}
 
 /**
  * omap_init_opp_table() - Initialize opp table as per the CPU type
@@ -81,14 +142,14 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 			dev = &oh->od->pdev->dev;
 		}
 
-		r = opp_add(dev, opp_def->freq, opp_def->u_volt);
+		r = dev_pm_opp_add(dev, opp_def->freq, opp_def->u_volt);
 		if (r) {
 			dev_err(dev, "%s: add OPP %ld failed for %s [%d] result=%d\n",
 				__func__, opp_def->freq,
 				opp_def->hwmod_name, i, r);
 		} else {
 			if (!opp_def->default_available)
-				r = opp_disable(dev, opp_def->freq);
+				r = dev_pm_opp_disable(dev, opp_def->freq);
 			if (r)
 				dev_err(dev, "%s: disable %ld failed for %s [%d] result=%d\n",
 					__func__, opp_def->freq,

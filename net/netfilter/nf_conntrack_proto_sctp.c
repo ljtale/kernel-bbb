@@ -1,6 +1,9 @@
 /*
  * Connection tracking protocol helper module for SCTP.
  *
+ * Copyright (c) 2004 Kiran Kumar Immidi <immidi_kiran@yahoo.com>
+ * Copyright (c) 2004-2012 Patrick McHardy <kaber@trash.net>
+ *
  * SCTP is defined in RFC 2960. References to various sections in this code
  * are to this RFC.
  *
@@ -163,16 +166,16 @@ static bool sctp_invert_tuple(struct nf_conntrack_tuple *tuple,
 }
 
 /* Print out the per-protocol part of the tuple. */
-static int sctp_print_tuple(struct seq_file *s,
-			    const struct nf_conntrack_tuple *tuple)
+static void sctp_print_tuple(struct seq_file *s,
+			     const struct nf_conntrack_tuple *tuple)
 {
-	return seq_printf(s, "sport=%hu dport=%hu ",
-			  ntohs(tuple->src.u.sctp.port),
-			  ntohs(tuple->dst.u.sctp.port));
+	seq_printf(s, "sport=%hu dport=%hu ",
+		   ntohs(tuple->src.u.sctp.port),
+		   ntohs(tuple->dst.u.sctp.port));
 }
 
 /* Print out the private part of the conntrack. */
-static int sctp_print_conntrack(struct seq_file *s, struct nf_conn *ct)
+static void sctp_print_conntrack(struct seq_file *s, struct nf_conn *ct)
 {
 	enum sctp_conntrack state;
 
@@ -180,7 +183,7 @@ static int sctp_print_conntrack(struct seq_file *s, struct nf_conn *ct)
 	state = ct->proto.sctp.state;
 	spin_unlock_bh(&ct->lock);
 
-	return seq_printf(s, "%s ", sctp_conntrack_names[state]);
+	seq_printf(s, "%s ", sctp_conntrack_names[state]);
 }
 
 #define for_each_sctp_chunk(skb, sch, _sch, offset, dataoff, count)	\
@@ -853,33 +856,28 @@ static int sctp_net_init(struct net *net)
 {
 	int ret = 0;
 
-	ret = nf_conntrack_l4proto_register(net,
-					    &nf_conntrack_l4proto_sctp4);
+	ret = nf_ct_l4proto_pernet_register(net, &nf_conntrack_l4proto_sctp4);
 	if (ret < 0) {
-		pr_err("nf_conntrack_l4proto_sctp4 :protocol register failed.\n");
+		pr_err("nf_conntrack_sctp4: pernet registration failed.\n");
 		goto out;
 	}
-	ret = nf_conntrack_l4proto_register(net,
-					    &nf_conntrack_l4proto_sctp6);
+	ret = nf_ct_l4proto_pernet_register(net, &nf_conntrack_l4proto_sctp6);
 	if (ret < 0) {
-		pr_err("nf_conntrack_l4proto_sctp6 :protocol register failed.\n");
+		pr_err("nf_conntrack_sctp6: pernet registration failed.\n");
 		goto cleanup_sctp4;
 	}
 	return 0;
 
 cleanup_sctp4:
-	nf_conntrack_l4proto_unregister(net,
-					&nf_conntrack_l4proto_sctp4);
+	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_sctp4);
 out:
 	return ret;
 }
 
 static void sctp_net_exit(struct net *net)
 {
-	nf_conntrack_l4proto_unregister(net,
-					&nf_conntrack_l4proto_sctp6);
-	nf_conntrack_l4proto_unregister(net,
-					&nf_conntrack_l4proto_sctp4);
+	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_sctp6);
+	nf_ct_l4proto_pernet_unregister(net, &nf_conntrack_l4proto_sctp4);
 }
 
 static struct pernet_operations sctp_net_ops = {
@@ -891,11 +889,33 @@ static struct pernet_operations sctp_net_ops = {
 
 static int __init nf_conntrack_proto_sctp_init(void)
 {
-	return register_pernet_subsys(&sctp_net_ops);
+	int ret;
+
+	ret = register_pernet_subsys(&sctp_net_ops);
+	if (ret < 0)
+		goto out_pernet;
+
+	ret = nf_ct_l4proto_register(&nf_conntrack_l4proto_sctp4);
+	if (ret < 0)
+		goto out_sctp4;
+
+	ret = nf_ct_l4proto_register(&nf_conntrack_l4proto_sctp6);
+	if (ret < 0)
+		goto out_sctp6;
+
+	return 0;
+out_sctp6:
+	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_sctp4);
+out_sctp4:
+	unregister_pernet_subsys(&sctp_net_ops);
+out_pernet:
+	return ret;
 }
 
 static void __exit nf_conntrack_proto_sctp_fini(void)
 {
+	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_sctp6);
+	nf_ct_l4proto_unregister(&nf_conntrack_l4proto_sctp4);
 	unregister_pernet_subsys(&sctp_net_ops);
 }
 

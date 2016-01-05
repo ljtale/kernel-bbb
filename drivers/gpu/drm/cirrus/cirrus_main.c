@@ -23,16 +23,8 @@ static void cirrus_user_framebuffer_destroy(struct drm_framebuffer *fb)
 	kfree(fb);
 }
 
-static int cirrus_user_framebuffer_create_handle(struct drm_framebuffer *fb,
-						 struct drm_file *file_priv,
-						 unsigned int *handle)
-{
-	return 0;
-}
-
 static const struct drm_framebuffer_funcs cirrus_fb_funcs = {
 	.destroy = cirrus_user_framebuffer_destroy,
-	.create_handle = cirrus_user_framebuffer_create_handle,
 };
 
 int cirrus_framebuffer_init(struct drm_device *dev,
@@ -42,13 +34,13 @@ int cirrus_framebuffer_init(struct drm_device *dev,
 {
 	int ret;
 
+	drm_helper_mode_fill_fb_struct(&gfb->base, mode_cmd);
+	gfb->obj = obj;
 	ret = drm_framebuffer_init(dev, &gfb->base, &cirrus_fb_funcs);
 	if (ret) {
 		DRM_ERROR("drm_framebuffer_init failed: %d\n", ret);
 		return ret;
 	}
-	drm_helper_mode_fill_fb_struct(&gfb->base, mode_cmd);
-	gfb->obj = obj;
 	return 0;
 }
 
@@ -57,14 +49,16 @@ cirrus_user_framebuffer_create(struct drm_device *dev,
 			       struct drm_file *filp,
 			       struct drm_mode_fb_cmd2 *mode_cmd)
 {
+	struct cirrus_device *cdev = dev->dev_private;
 	struct drm_gem_object *obj;
 	struct cirrus_framebuffer *cirrus_fb;
 	int ret;
 	u32 bpp, depth;
 
 	drm_fb_get_bpp_depth(mode_cmd->pixel_format, &depth, &bpp);
-	/* cirrus can't handle > 24bpp framebuffers at all */
-	if (bpp > 24)
+
+	if (!cirrus_check_framebuffer(cdev, mode_cmd->width, mode_cmd->height,
+				      bpp, mode_cmd->pitches[0]))
 		return ERR_PTR(-EINVAL);
 
 	obj = drm_gem_object_lookup(dev, filp, mode_cmd->handles[0]);
@@ -104,8 +98,7 @@ static int cirrus_vram_init(struct cirrus_device *cdev)
 {
 	/* BAR 0 is VRAM */
 	cdev->mc.vram_base = pci_resource_start(cdev->dev->pdev, 0);
-	/* We have 4MB of VRAM */
-	cdev->mc.vram_size = 4 * 1024 * 1024;
+	cdev->mc.vram_size = pci_resource_len(cdev->dev->pdev, 0);
 
 	if (!request_mem_region(cdev->mc.vram_base, cdev->mc.vram_size,
 				"cirrusdrmfb_vram")) {
@@ -187,17 +180,22 @@ int cirrus_driver_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	r = cirrus_mm_init(cdev);
-	if (r)
+	if (r) {
 		dev_err(&dev->pdev->dev, "fatal err on mm init\n");
+		goto out;
+	}
 
 	r = cirrus_modeset_init(cdev);
-	if (r)
+	if (r) {
 		dev_err(&dev->pdev->dev, "Fatal error during modeset init: %d\n", r);
+		goto out;
+	}
 
 	dev->mode_config.funcs = (void *)&cirrus_mode_funcs;
+
+	return 0;
 out:
-	if (r)
-		cirrus_driver_unload(dev);
+	cirrus_driver_unload(dev);
 	return r;
 }
 
@@ -263,20 +261,7 @@ int cirrus_dumb_create(struct drm_file *file,
 	return 0;
 }
 
-int cirrus_dumb_destroy(struct drm_file *file,
-		     struct drm_device *dev,
-		     uint32_t handle)
-{
-	return drm_gem_handle_delete(file, handle);
-}
-
-int cirrus_gem_init_object(struct drm_gem_object *obj)
-{
-	BUG();
-	return 0;
-}
-
-void cirrus_bo_unref(struct cirrus_bo **bo)
+static void cirrus_bo_unref(struct cirrus_bo **bo)
 {
 	struct ttm_buffer_object *tbo;
 
@@ -285,24 +270,20 @@ void cirrus_bo_unref(struct cirrus_bo **bo)
 
 	tbo = &((*bo)->bo);
 	ttm_bo_unref(&tbo);
-	if (tbo == NULL)
-		*bo = NULL;
-
+	*bo = NULL;
 }
 
 void cirrus_gem_free_object(struct drm_gem_object *obj)
 {
 	struct cirrus_bo *cirrus_bo = gem_to_cirrus_bo(obj);
 
-	if (!cirrus_bo)
-		return;
 	cirrus_bo_unref(&cirrus_bo);
 }
 
 
 static inline u64 cirrus_bo_mmap_offset(struct cirrus_bo *bo)
 {
-	return bo->bo.addr_space_offset;
+	return drm_vma_node_offset_addr(&bo->bo.vma_node);
 }
 
 int
@@ -331,4 +312,24 @@ out_unlock:
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 
+}
+
+bool cirrus_check_framebuffer(struct cirrus_device *cdev, int width, int height,
+			      int bpp, int pitch)
+{
+	const int max_pitch = 0x1FF << 3; /* (4096 - 1) & ~111b bytes */
+	const int max_size = cdev->mc.vram_size;
+
+	if (bpp > cirrus_bpp)
+		return false;
+	if (bpp > 32)
+		return false;
+
+	if (pitch > max_pitch)
+		return false;
+
+	if (pitch * height > max_size)
+		return false;
+
+	return true;
 }
