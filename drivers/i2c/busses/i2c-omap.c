@@ -40,6 +40,9 @@
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
 
+/* ljtale */
+#include "../drivers/ljtale/central-pm.h"
+
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
 
@@ -182,6 +185,8 @@ enum {
 #define I2C_OMAP_ERRATA_I207		(1 << 0)
 #define I2C_OMAP_ERRATA_I462		(1 << 1)
 
+/* ljtale: for v2 I2C device, only bits [14:13] and [11:0] are valid
+ * interrupt enable bits */
 #define OMAP_I2C_IP_V2_INTERRUPTS_MASK	0x6FFF
 
 struct omap_i2c_dev {
@@ -200,6 +205,9 @@ struct omap_i2c_dev {
 	u16			scheme;
 	u16			cmd_err;
 	u8			*buf;
+    /* ljtale: regs are assigned in the probe function, the regs array is
+     * hardcoded in reg_map_ip_v2,
+     * and the offset mapping matches with Sitara TRM */
 	u8			*regs;
 	size_t			buf_len;
 	struct i2c_adapter	adapter;
@@ -208,12 +216,15 @@ struct omap_i2c_dev {
 						 * fifo_size==0 implies no fifo
 						 * if set, should be trsh+1
 						 */
+    /* ljtale: i2c revision number */
 	u32			rev;
 	unsigned		b_hw:1;		/* bad h/w fixes */
 	unsigned		bb_valid:1;	/* true when BB-bit reflects
 						 * the I2C bus state
 						 */
 	unsigned		receiver:1;	/* true when we're in receiver mode */
+    /* ljtale: the following four values, iestate, pscstate, scll/hstate
+     * are written in i2c_init function */
 	u16			iestate;	/* Saved interrupt register */
 	u16			pscstate;
 	u16			scllstate;
@@ -286,6 +297,7 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
 static void __omap_i2c_init(struct omap_i2c_dev *dev)
 {
 
+    /* ljtale: reset everything, disable the i2c module */
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 
 	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
@@ -311,6 +323,10 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
 	 * cause deadlock.
 	 */
 	if (dev->iestate)
+        /* ljtale: from the offset mapping in the TRM, OMAP_I2C_IE_REG
+         * is I2C_IRQENABLE_SET register, writing 1 to a bit will enable
+         * the field of triggering an interrupt request, writing 0 to
+         * a bit has no effect */
 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
 }
 
@@ -378,6 +394,7 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 		 * always returns 12MHz for the functional clock, we can
 		 * do this bit unconditionally.
 		 */
+        /* ljtale: why to get a clock named "fck"? */
 		fclk = clk_get(dev->dev, "fck");
 		fclk_rate = clk_get_rate(fclk);
 		clk_put(fclk);
@@ -1172,6 +1189,8 @@ static struct omap_i2c_bus_platform_data omap3_pdata = {
 	.flags = OMAP_I2C_FLAG_BUS_SHIFT_2,
 };
 
+/* ljtale: on BBB, omap4_pdata is used, platform data does not initialize
+ * flags, it has a different register layout from VERSION_1 */
 static struct omap_i2c_bus_platform_data omap4_pdata = {
 	.rev = OMAP_I2C_IP_VERSION_2,
 };
@@ -1215,6 +1234,8 @@ static int omap_i2c_get_scl(struct i2c_adapter *adap)
 
 	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
 
+    /* ljtale: mask out all the bits except SCL_I_FUNC, read-only one-bit
+     * status, 0 - read 0 from SCL line, 1 - read 1 from SCL line */
 	return reg & OMAP_I2C_SYSTEST_SCL_I_FUNC;
 }
 
@@ -1225,6 +1246,7 @@ static int omap_i2c_get_sda(struct i2c_adapter *adap)
 
 	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
 
+    /* ljtale: the similar to the omap_i2c_get_scl above */
 	return reg & OMAP_I2C_SYSTEST_SDA_I_FUNC;
 }
 
@@ -1284,6 +1306,9 @@ static struct i2c_bus_recovery_info omap_i2c_bus_recovery_info = {
 static int
 omap_i2c_probe(struct platform_device *pdev)
 {
+    /* ljtale: the platform device instance should be allocated and
+     * populated during platform device matching, the platform driver
+     * matches the compatible string of the device tree */
 	struct omap_i2c_dev	*dev;
 	struct i2c_adapter	*adap;
 	struct resource		*mem;
@@ -1335,8 +1360,17 @@ omap_i2c_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dev);
 	init_completion(&dev->cmd_complete);
 
+    /* ljtale: why does it need a reg_shift for register address? 
+     * For REVISION_2, the register layout is different from REVISION_1,
+     * OMAP_I2C_FLAG_BUS_SHIFT__SHIFT is 7, which means the 8-th and
+     * 9-th bits in dev->flags determine the reg_shift value. These two
+     * bits are OMAP_I2C_BUS_SHIFT_1 and OMAP_I2C_BUS_SHIFT_2 respectively */
 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
 
+    /* ljtale starts */
+    /* until here, all the values should be passed to the per-device data */
+    central_pm_omap_i2c_ctx(dev->dev);
+    /* ljtale ends */
 	pm_runtime_enable(dev->dev);
 	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
 	pm_runtime_use_autosuspend(dev->dev);
@@ -1353,6 +1387,8 @@ omap_i2c_probe(struct platform_device *pdev)
 	 */
 	rev = readw_relaxed(dev->base + 0x04);
 
+    /* ljtale: the following line takes the [15:14] bits from rev
+     * and assign them to scheme */
 	dev->scheme = OMAP_I2C_SCHEME(rev);
 	switch (dev->scheme) {
 	case OMAP_I2C_SCHEME_0:
@@ -1407,6 +1443,16 @@ omap_i2c_probe(struct platform_device *pdev)
 
 	/* reset ASAP, clearing any IRQs */
 	omap_i2c_init(dev);
+
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale-i2c: base: 0x%lx, shift: 0x%x\n",
+            (unsigned long)dev->base, dev->reg_shift);
+    printk(KERN_INFO "ljtale-i2c: rev: 0x%x, scheme: 0x%x\n",
+            dev->rev, dev->scheme); 
+    printk(KERN_INFO "ljtale-i2c: psc: 0x%x, scll: 0x%x, sclh: 0x%x\n",
+            dev->pscstate, dev->scllstate, dev->sclhstate); 
+    printk(KERN_INFO "ljtale-i2c: westate: 0x%x\n", dev->westate); 
+    /* ljtale ends */
 
 	if (dev->rev < OMAP_I2C_OMAP1_REV_2)
 		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_omap1_isr,
@@ -1484,12 +1530,15 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 	if (_dev->scheme == OMAP_I2C_SCHEME_0)
 		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
 	else
+        /* ljtale: clear all the bits in IRQENABLE */
 		omap_i2c_write_reg(_dev, OMAP_I2C_IP_V2_IRQENABLE_CLR,
 				   OMAP_I2C_IP_V2_INTERRUPTS_MASK);
 
 	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
 		omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
 	} else {
+        /* ljtale: reset all the active and enabled events, write 1 to
+         * a bit in OMAP_I2C_STAT_REG will set it to 0 */
 		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
 
 		/* Flush posted write */
