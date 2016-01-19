@@ -1,5 +1,14 @@
-#ifndef DRIVERS_LJTALE_CENTRAL_PM_
-#define DRIVERS_LJTALE_CENTRAL_PM_
+#ifndef CENTRAL_PM_
+#define CENTRAL_PM_
+
+#include <linux/kernel.h>
+
+/* some helper macros */
+#define LJTALE_MSG(LEVEL, stmt)             \
+do {                                        \
+    printk(LEVEL "ljtale: " #stmt "\n");     \
+}                                           \
+while(0)
 
 /* values that need to be written to I2C register when resuming */
 struct i2c_resume_values {
@@ -10,6 +19,9 @@ struct i2c_resume_values {
     u16 omap_i2c_con_we;
     u16 omap_i2c_con_en;
     u16 omap_i2c_ie_val;
+    /* bottom half of the resume function that needs to be done in the driver */
+    int (*bottom_resume)(struct device *dev);
+
 };
 
 /* values that need to be written or read when suspending */
@@ -38,6 +50,19 @@ central_pm_omap_i2c_ctx(struct device *dev);
 int
 central_pm_omap_i2c_resume(struct device *dev);
 
+/* global linked list to hold all the devices' rpm context */
+extern struct list_head dev_rpm_ctx;
 
+
+/* ioremap record table entry */
+struct ioremap_tb_entry {
+    char *name;
+    void *phys;
+    void __iomem *virt;
+    struct list_head list;
+};
+
+/* global linked list to hold all the io mapping */
+extern struct list_head ioremap_tbl;
 
 #endif

@@ -3,4 +3,3 @@
 #
 
 obj-y			+= central-pm.o
-

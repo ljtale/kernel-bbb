@@ -4,6 +4,9 @@
 #include <linux/gfp.h>
 #include <linux/export.h>
 
+/* ljtale */
+#include <linux/central-pm.h>
+
 void devm_ioremap_release(struct device *dev, void *res)
 {
 	iounmap(*(void __iomem **)res);
@@ -26,7 +29,7 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
 			   resource_size_t size)
 {
 	void __iomem **ptr, *addr;
-
+    struct ioremap_tb_entry *iomap;
 	ptr = devres_alloc(devm_ioremap_release, sizeof(*ptr), GFP_KERNEL);
 	if (!ptr)
 		return NULL;
@@ -38,6 +41,16 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
 	} else
 		devres_free(ptr);
 
+    /* ljtale starts */
+    /* record the current mapping if the ioremap call succeeds*/
+    iomap = kmalloc(sizeof(struct ioremap_tb_entry), GFP_KERNEL);
+    if (!iomap) {
+        LJTALE_MSG(KERN_ERR, ioremap entry allocation failed);
+        return addr;
+    }
+
+
+    /* ljtale ends */
 	return addr;
 }
 EXPORT_SYMBOL(devm_ioremap);

@@ -41,7 +41,7 @@
 #include <linux/pinctrl/consumer.h>
 
 /* ljtale */
-#include "../drivers/ljtale/central-pm.h"
+#include <linux/central-pm.h>
 
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20

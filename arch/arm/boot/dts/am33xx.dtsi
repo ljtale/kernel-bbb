@@ -305,13 +305,6 @@
 			reg = <0x4802a000 0x1000>;
 			interrupts = <71>;
 			status = "disabled";
-            reset_all = <0>;
-            psc = <0xb>;
-            scll = <0xd>;
-            sclh = <0xf>;
-            westate = <0x636f>;
-            mod_en = <0x8000>;
-
 		};
 
 		i2c2: i2c@4819c000 {
@@ -322,6 +315,12 @@
 			reg = <0x4819c000 0x1000>;
 			interrupts = <30>;
 			status = "disabled";
+            reset_all = <0>;
+            psc = <0xb>;
+            scll = <0xd>;
+            sclh = <0xf>;
+            westate = <0x636f>;
+            mod_en = <0x8000>;
 		};
 
 		mmc1: mmc@48060000 {

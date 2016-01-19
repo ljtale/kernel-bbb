@@ -740,6 +740,10 @@ struct device {
 					   core doesn't touch it */
 	void		*driver_data;	/* Driver data, set and get with
 					   dev_set/get_drvdata */
+    /* ljtale starts */
+    void        *rpm_data;      /* runtime PM data 
+                   FIXME: temporarily accessed directly, add accessors later */
+    /* ljtale ends */
 	struct dev_pm_info	power;
 	struct dev_pm_domain	*pm_domain;
 
