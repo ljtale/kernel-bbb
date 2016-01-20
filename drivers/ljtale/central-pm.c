@@ -29,6 +29,8 @@ int
 central_pm_omap_i2c_ctx(struct device *dev) {
     struct i2c_runtime_context *i2c_ctx;
     struct device_node *node;
+    struct ioremap_tb_entry *entry;
+    phys_addr_t phys_addr;
     if (!dev) {
         return -EFAULT;
     }
@@ -55,7 +57,7 @@ central_pm_omap_i2c_ctx(struct device *dev) {
 
     of_property_read_u32_array(node, "scll", 
             (u32 *)&i2c_ctx->resume.omap_i2c_scll_val, 1);
-    printk(KERN_INFO "ljtale: central-pm scll: ox%x\n",
+    printk(KERN_INFO "ljtale: central-pm scll: 0x%x\n",
             i2c_ctx->resume.omap_i2c_scll_val);
 
     of_property_read_u32_array(node, "sclh", 
@@ -64,6 +66,15 @@ central_pm_omap_i2c_ctx(struct device *dev) {
     of_property_read_u32_array(node, "westate", 
             (u32 *)&i2c_ctx->resume.omap_i2c_con_we, 1);
     dev->rpm_data = i2c_ctx;
+    of_property_read_u32_array(node, "reg", (u32 *)&phys_addr, 1);
+
+    /* test to print ioremap table */
+    list_for_each_entry (entry, &ioremap_tbl, list) {
+        if (phys_addr == entry->phys) {
+            LJTALE_PRINT(KERN_INFO, "phsy: 0x%x, virt: 0x%x\n",
+                    (unsigned int)entry->phys, (unsigned int)entry->virt);
+        }
+    }
     return 0;
 }
 EXPORT_SYMBOL(central_pm_omap_i2c_ctx);
@@ -77,6 +88,14 @@ central_pm_omap_i2c_resume(struct device *dev) {
 }
 EXPORT_SYMBOL(central_pm_omap_i2c_resume);
 
+/*
+ * universal_probe should take a representation of the device data
+ * and do the actual initialization for the device accordingly.
+ * */
+int
+universal_probe(struct platform_device *pdev) {
+    return 0;
+}
 
 
 static int __init init_universal_driver(void) {

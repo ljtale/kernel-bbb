@@ -5,22 +5,22 @@
 #include <linux/platform_device.h>
 
 /* some helper macros */
-#define LJTALE_MSG(LEVEL, stmt)             \
+#define LJTALE_MSG(LEVEL, args...)             \
     do {                                        \
-        printk(LEVEL "ljtale: " #stmt "\n");     \
+        printk(LEVEL "ljtale: " args);                   \
     }                                           \
     while(0)
 
 #define LJTALE_DEBUG_ENABLE
 
 #ifdef LJTALE_DEBUG_ENABLE
-#define LJTALE_PRINT(LEVEL, stmt)           \
+#define LJTALE_PRINT(LEVEL, args...)           \
     do {                                        \
-        printk(LEVEL "ljtale: " #stmt "\n");    \
+        printk(LEVEL "ljtale: " args);    \
     }                                       \
-while(0)
+    while(0)
 #else
-#define LJTALE_PRINT(LEVEL, stmt)
+#define LJTALE_PRINT(LEVEL, args...)
 #endif
 
 /* values that need to be written to I2C register when resuming */

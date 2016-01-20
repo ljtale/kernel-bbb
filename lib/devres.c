@@ -17,6 +17,22 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
 	return *(void **)res == match_data;
 }
 
+/* ljtale starts */
+static void add_ioremap_entry_to_table(struct device *dev,
+        resource_size_t offset, void __iomem *addr) {
+    struct ioremap_tb_entry *iomap;
+    iomap = kmalloc(sizeof(struct ioremap_tb_entry), GFP_KERNEL);
+    if (!iomap) {
+        LJTALE_MSG(KERN_ERR, "ioremap entry allocation failed\n");
+        return;
+    }
+    iomap->name = dev->init_name;    /* FIXME: init_name could be null */
+    iomap->phys = offset;
+    iomap->virt = addr;
+    list_add(&(iomap->list), &ioremap_tbl);
+}
+/* ljtale ends */
+
 /**
  * devm_ioremap - Managed ioremap()
  * @dev: Generic device to remap IO address for
@@ -29,7 +45,6 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
 			   resource_size_t size)
 {
 	void __iomem **ptr, *addr;
-    struct ioremap_tb_entry *iomap;
 	ptr = devres_alloc(devm_ioremap_release, sizeof(*ptr), GFP_KERNEL);
 	if (!ptr)
 		return NULL;
@@ -40,19 +55,10 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
 		devres_add(dev, ptr);
 	} else
 		devres_free(ptr);
-
     /* ljtale starts */
-    /* record the current mapping if the ioremap call succeeds*/
-    iomap = kmalloc(sizeof(struct ioremap_tb_entry), GFP_KERNEL);
-    if (!iomap) {
-        LJTALE_MSG(KERN_ERR, ioremap entry allocation failed);
-        return addr;
-    }
-    iomap->name = dev->init_name;    /* FIXME: init_name could be null */
-    iomap->phys = offset;
-    iomap->virt = addr;
-    list_add(&(iomap->list), &ioremap_tbl);
+    add_ioremap_entry_to_table(dev, offset, addr);
     /* ljtale ends */
+
 	return addr;
 }
 EXPORT_SYMBOL(devm_ioremap);
@@ -81,7 +87,9 @@ void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
 		devres_add(dev, ptr);
 	} else
 		devres_free(ptr);
-
+    /* ljtale starts */
+    add_ioremap_entry_to_table(dev, offset, addr);
+    /* ljtale ends */
 	return addr;
 }
 EXPORT_SYMBOL(devm_ioremap_nocache);
