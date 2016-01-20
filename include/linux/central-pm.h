@@ -2,13 +2,26 @@
 #define CENTRAL_PM_
 
 #include <linux/kernel.h>
+#include <linux/platform_device.h>
 
 /* some helper macros */
 #define LJTALE_MSG(LEVEL, stmt)             \
-do {                                        \
-    printk(LEVEL "ljtale: " #stmt "\n");     \
-}                                           \
+    do {                                        \
+        printk(LEVEL "ljtale: " #stmt "\n");     \
+    }                                           \
+    while(0)
+
+#define LJTALE_DEBUG_ENABLE
+
+#ifdef LJTALE_DEBUG_ENABLE
+#define LJTALE_PRINT(LEVEL, stmt)           \
+    do {                                        \
+        printk(LEVEL "ljtale: " #stmt "\n");    \
+    }                                       \
 while(0)
+#else
+#define LJTALE_PRINT(LEVEL, stmt)
+#endif
 
 /* values that need to be written to I2C register when resuming */
 struct i2c_resume_values {
@@ -32,11 +45,13 @@ struct i2c_suspend_values {
     u16 omap_i2c_stat_val_r;    /* this value needs to be read */
 };
 
-/* this context should be on a per-device manner. In a driver that supports
+/* 
+ * this context should be on a per-device manner. In a driver that supports
  * multiple devices, this is not able to describe static context for a
  * certain device. Thus the values of the context should come in through
  * something like device tree. Device tree would be a good candidate to
- * process such values */
+ * process such values
+ * */
 struct i2c_runtime_context {
     void __iomem *base;
     int reg_shift;
@@ -44,11 +59,13 @@ struct i2c_runtime_context {
     struct i2c_suspend_values suspend;
 };
 
-int
-central_pm_omap_i2c_ctx(struct device *dev);
+int central_pm_omap_i2c_ctx(struct device *dev);
 
-int
-central_pm_omap_i2c_resume(struct device *dev);
+int central_pm_omap_i2c_resume(struct device *dev);
+
+
+/* universal init function for a device driver */
+int universal_probe(struct platform_device *pdev);
 
 /* global linked list to hold all the devices' rpm context */
 extern struct list_head dev_rpm_ctx;
@@ -56,8 +73,8 @@ extern struct list_head dev_rpm_ctx;
 
 /* ioremap record table entry */
 struct ioremap_tb_entry {
-    char *name;
-    void *phys;
+    const char *name;
+    phys_addr_t phys;
     void __iomem *virt;
     struct list_head list;
 };

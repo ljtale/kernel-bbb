@@ -48,8 +48,10 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
         LJTALE_MSG(KERN_ERR, ioremap entry allocation failed);
         return addr;
     }
-
-
+    iomap->name = dev->init_name;    /* FIXME: init_name could be null */
+    iomap->phys = offset;
+    iomap->virt = addr;
+    list_add(&(iomap->list), &ioremap_tbl);
     /* ljtale ends */
 	return addr;
 }
