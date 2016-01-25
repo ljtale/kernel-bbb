@@ -28,6 +28,18 @@ struct list_head dev_rpm_ctx;
 /* global linked list to hold all the io mapping */
 struct list_head ioremap_tbl;
 
+void spin_lock_init_wrapper(spinlock_t *lock) {
+    spin_lock_init(lock);
+}
+
+u16 readw_relaxed_wrapper(void __iomem *addr) {
+    return readw_relaxed(addr);
+}
+
+void writew_relaxed_wrapper(u16 val, void __iomem *addr) {
+    writew_relaxed(val, addr);
+}
+
 
 /* driver functionality operations */
 struct atomic_ops all_ops = {
@@ -36,7 +48,7 @@ struct atomic_ops all_ops = {
     .platform_get_resource = platform_get_resource,
     .devm_ioremap_resource = devm_ioremap_resource,
     .of_match_device = of_match_device,
-    .spin_lock_init = NULL, // spin_lock_init,
+    .spin_lock_init = spin_lock_init_wrapper, // spin_lock_init,
     .platform_set_drvdata = platform_set_drvdata,
 
     .pm_runtime_enable = pm_runtime_enable,
@@ -51,8 +63,8 @@ struct atomic_ops all_ops = {
     .clk_set_rate = clk_set_rate,
     .clk_put = clk_put,
 
-    .readw_relaxed = NULL, // readw_relaxed,
-    .writew_relaxed = NULL, // writew_relaxed,
+    .readw_relaxed = readw_relaxed_wrapper, // readw_relaxed,
+    .writew_relaxed = writew_relaxed_wrapper, // writew_relaxed,
 };
 
 int
