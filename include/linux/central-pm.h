@@ -82,4 +82,60 @@ struct ioremap_tb_entry {
 /* global linked list to hold all the io mapping */
 extern struct list_head ioremap_tbl;
 
+/* for all the function calls, the size of the function pointer should
+ * be fixed. Thus we use an index to retrieve each function */
+enum {
+    PLATFORM_GET_IRQ = 0,
+    DEVM_KZALLOC,
+    PLATFORM_GET_RESOURCE,
+    DEVM_IOREMAP_RESOURCE,
+    OF_MATCH_DEVICE,
+    SPIN_LOCK_INIT,
+    PLATFORM_SET_DRVDATA,
+    PM_RUNTIME_ENABLE,
+    PM_RUNTIME_DISABLE,
+    /* pm runtime put/get methods could be replaced by central pm manager */
+    PM_RUNTIME_GET,
+    PM_RUNTIME_PUT,
+    PM_RUNTIME_GET_SYNC,
+    PM_RUNTIME_PUT_SYNC,
+    CLK_GET,
+    CLK_PUT,
+    CLK_GET_RATE,
+    CLK_SET_RATE,
+    READW_RELAXED,
+    WRITEW_RELAXED,
+};
+
+struct atomic_ops {
+    int (*platform_get_irq)(struct platform_device *dev, unsigned int num);
+    void *(*devm_kzalloc)(struct device *dev, size_t size, gfp_t gfp);
+    struct resource *(*platform_get_resource)(struct platform_device *dev,
+            unsigned int type, unsigned int num);
+    void __iomem *(*devm_ioremap_resource)(struct device *dev,
+                                           struct resource *res);
+    const struct of_device_id *(*of_match_device)(
+            const struct of_device_id *matches, const struct device *dev);
+    /* FIXME: this is a macro defined in include/linux/spinlock.h */
+    void (*spin_lock_init)(spinlock_t *lock);
+    void (*platform_set_drvdata)(struct platform_device *dev, void *data);
+    /* pm related ops */
+    void (*pm_runtime_enable)(struct device *dev);
+    void (*pm_runtime_disable)(struct device *dev);
+    int (*pm_runtime_get)(struct device *dev);
+    int (*pm_runtime_put)(struct device *dev);
+    int (*pm_runtime_get_sync)(struct device *dev);
+    int (*pm_runtime_put_sync)(struct device *dev);
+
+    /* clk related ops */
+    struct clk *(*clk_get)(struct device *dev, const char *id);
+    unsigned long (*clk_get_rate)(struct clk *clk);
+    int (*clk_set_rate)(struct clk *clk, unsigned long rate);
+    void (*clk_put)(struct clk *clk);
+    
+    /* register access ops */
+    u16 (*readw_relaxed)(void __iomem *addr);
+    void (*writew_relaxed)(u16 val, void __iomem *addr);
+};
+
 #endif

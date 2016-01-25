@@ -15,6 +15,9 @@
 #include <asm/uaccess.h>
 #include <linux/err.h>
 
+#include <linux/clk.h>
+#include <linux/io.h>
+#include <linux/spinlock.h>
 #include <linux/platform_device.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/central-pm.h>
@@ -24,6 +27,33 @@ struct list_head dev_rpm_ctx;
 
 /* global linked list to hold all the io mapping */
 struct list_head ioremap_tbl;
+
+
+/* driver functionality operations */
+struct atomic_ops all_ops = {
+    .platform_get_irq = platform_get_irq,
+    .devm_kzalloc = devm_kzalloc,
+    .platform_get_resource = platform_get_resource,
+    .devm_ioremap_resource = devm_ioremap_resource,
+    .of_match_device = of_match_device,
+    .spin_lock_init = NULL, // spin_lock_init,
+    .platform_set_drvdata = platform_set_drvdata,
+
+    .pm_runtime_enable = pm_runtime_enable,
+    .pm_runtime_disable = pm_runtime_disable,
+    .pm_runtime_put = pm_runtime_put,
+    .pm_runtime_get = pm_runtime_get,
+    .pm_runtime_put_sync = pm_runtime_put_sync,
+    .pm_runtime_get_sync = pm_runtime_get_sync,
+
+    .clk_get = clk_get,
+    .clk_get_rate = clk_get_rate,
+    .clk_set_rate = clk_set_rate,
+    .clk_put = clk_put,
+
+    .readw_relaxed = NULL, // readw_relaxed,
+    .writew_relaxed = NULL, // writew_relaxed,
+};
 
 int
 central_pm_omap_i2c_ctx(struct device *dev) {
