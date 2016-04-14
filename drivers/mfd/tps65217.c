@@ -212,6 +212,7 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 	tps->pwr_but->evbit[0] = BIT_MASK(EV_KEY);
 	tps->pwr_but->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
 	tps->pwr_but->name = "tps65217_pwr_but";
+    /* ljtale: register the input device to the input subsystem */
 	ret = input_register_device(tps->pwr_but);
 	if (ret) {
 		/* NOTE: devm managed device */
@@ -232,6 +233,7 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 		dev_err(tps->dev, "Failed to read INT reg\n");
 		return ret;
 	}
+    /* ljtale: power button monitor bit in the interrupt register */
 	int_reg &= ~TPS65217_INT_PBM;
 	tps65217_reg_write(tps, TPS65217_REG_INT, int_reg, TPS65217_PROTECT_NONE);
 	return 0;
@@ -240,6 +242,9 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale: tps65217 probe get called\n");
+    /* ljtale ends */
 	struct tps65217 *tps;
 	unsigned int version;
 	unsigned long chip_id = ids->driver_data;
@@ -310,6 +315,7 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->irq_gpio = irq_gpio;
 
 	/* we got an irq, request it */
+    /* ljtale: also enable the power button interrupt */
 	if (tps->irq >= 0) {
 		ret = tps65217_probe_pwr_but(tps);
 		if (ret < 0) {
@@ -341,6 +347,7 @@ static int tps65217_probe(struct i2c_client *client,
 			dev_warn(tps->dev, "unable to set the status OFF\n");
 	}
 
+    /* ljtale: dev_info defined in include/linux/device.h */
 	dev_info(tps->dev, "TPS65217 ID %#x version 1.%d\n",
 			(version & TPS65217_CHIPID_CHIP_MASK) >> 4,
 			version & TPS65217_CHIPID_REV_MASK);

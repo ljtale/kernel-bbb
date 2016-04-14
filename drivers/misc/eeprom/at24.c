@@ -567,6 +567,9 @@ static struct regmap_bus regmap_at24_bus = {
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
+    /* ljtale ends */
 	struct at24_platform_data chip;
 	bool writable;
 	int use_smbus = 0;
@@ -580,7 +583,9 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
 
+    /* ljtale: who sets up the platform data for the device? */
 	if (client->dev.platform_data) {
+        /* ljtale: struct direct assignment? not type safe */
 		chip = *(struct at24_platform_data *)client->dev.platform_data;
 	} else {
 		if (!id->driver_data)
@@ -704,6 +709,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err_out;
 	}
 
+    /* ljtale: num_addresses * sizeof(struct i2c_client *) is the
+     * i2c_client pointer for all the eeprom devices */
 	at24 = devm_kzalloc(&client->dev, sizeof(struct at24_data) +
 		num_addresses * sizeof(struct i2c_client *), GFP_KERNEL);
 	if (!at24) {
@@ -719,6 +726,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	mutex_init(&at24->lock);
 	at24->use_smbus = use_smbus;
 	at24->use_smbus_write = use_smbus_write;
+    /* ljtale: another chip copy... */
 	at24->chip = chip;
 	at24->num_addresses = num_addresses;
 
@@ -765,6 +773,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		}
 	}
 
+    /* ljtale: this is just a wrapper for the generic driver data set
+     * function: dev_set_drvdata()  */
 	i2c_set_clientdata(client, at24);
 
 	dev_info(&client->dev, "%zu byte %s EEPROM, %s, %u bytes/write\n",

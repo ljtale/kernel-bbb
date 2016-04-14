@@ -23,6 +23,7 @@ static int regmap_smbus_byte_reg_read(void *context, unsigned int reg,
 	struct i2c_client *i2c = to_i2c_client(dev);
 	int ret;
 
+    /* ljtale: i2c only support 16-bit for now */
 	if (reg > 0xff)
 		return -EINVAL;
 

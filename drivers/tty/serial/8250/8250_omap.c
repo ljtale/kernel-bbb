@@ -1088,6 +1088,9 @@ MODULE_DEVICE_TABLE(of, omap8250_dt_ids);
 
 static int omap8250_probe(struct platform_device *pdev)
 {
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale: omap8250 probe get called %s\n", __FUNCTION__);
+    /* ljtale ends */
 	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	struct omap8250_priv *priv;
