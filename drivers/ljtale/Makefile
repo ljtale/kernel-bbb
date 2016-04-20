@@ -1,5 +1,6 @@
-# ljtale: Makefile for central pm module
+# ljtale: Makefile for universal driver
 # #
 #
 
 obj-y			+= central-pm.o
+obj-y			+= universal-drv.o

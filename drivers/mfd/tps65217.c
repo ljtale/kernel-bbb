@@ -34,6 +34,10 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65217.h>
 
+/* ljtale starts */
+#include <linux/universal-drv.h>
+/* ljtale ends */
+
 static const struct mfd_cell tps65217s[] = {
 	{
 		.name = "tps65217-pmic",
@@ -156,6 +160,16 @@ static const struct regmap_config tps65217_regmap_config = {
 	.max_register = TPS65217_REG_MAX,
 };
 
+/* ljtale starts */
+static struct universal_drv tps65217_universal_driver = {
+    .name = "tps65217",
+    .config = {
+        .name = "tps65217-config",
+        .regmap_config = &tps65217_regmap_config,
+    }
+};
+/* ljtale ends */
+
 static const struct of_device_id tps65217_of_match[] = {
 	{ .compatible = "ti,tps65217", .data = (void *)TPS65217 },
 	{ /* sentinel */ },
@@ -242,9 +256,6 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {
-    /* ljtale starts */
-    printk(KERN_INFO "ljtale: tps65217 probe get called\n");
-    /* ljtale ends */
 	struct tps65217 *tps;
 	unsigned int version;
 	unsigned long chip_id = ids->driver_data;
@@ -253,6 +264,10 @@ static int tps65217_probe(struct i2c_client *client,
 	bool status_off = false;
 	int irq = -1, irq_gpio = -1;
 	int ret;
+
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale: tps65217 probe get called\n");
+    /* ljtale ends */
 
 	node = client->dev.of_node;
 	if (node) {
@@ -304,8 +319,11 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->id = chip_id;
 
     /* ljtale starts */
+    tps65217_universal_driver.client = client; 
+    BUG_ON(universal_drv_register(&tps65217_universal_driver) < 0);
+    universal_drv_init(client);
     /* FIXME: there should be no direct assignment in the future */
-    tps->regmap = tps->tps65217_universal_driver.config.regmap;
+    tps->regmap = tps65217_universal_driver.config.regmap;
     /* instead of calling devm_regmap_init, call universal driver init */
 /*	tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
 	if (IS_ERR(tps->regmap)) {
@@ -376,15 +394,6 @@ static const struct i2c_device_id tps65217_id_table[] = {
 };
 MODULE_DEVICE_TABLE(i2c, tps65217_id_table);
 
-/* ljtale starts */
-static struct universal_drv tps65217_universal_driver = {
-    .name = "tps65217",
-    .config = {
-        .regmap_config = &tps65217_regmap_config,
-    },
-};
-/* ljtale ends */
-
 static struct i2c_driver tps65217_driver = {
 	.driver		= {
 		.name	= "tps65217",
@@ -398,9 +407,6 @@ static struct i2c_driver tps65217_driver = {
 
 static int __init tps65217_init(void)
 {
-    /* ljtale starts */
-    BUG_ON(!universal_drv_register(tps65217_universal_drv));
-    /* ljtale ends */
 	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);

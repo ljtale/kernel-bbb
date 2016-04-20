@@ -567,9 +567,6 @@ static struct regmap_bus regmap_at24_bus = {
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-    /* ljtale starts */
-    printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
-    /* ljtale ends */
 	struct at24_platform_data chip;
 	bool writable;
 	int use_smbus = 0;
@@ -582,6 +579,10 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct regmap *regmap;
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
+
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
+    /* ljtale ends */
 
     /* ljtale: who sets up the platform data for the device? */
 	if (client->dev.platform_data) {
