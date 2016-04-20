@@ -303,13 +303,19 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->dev = &client->dev;
 	tps->id = chip_id;
 
-	tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
+    /* ljtale starts */
+    /* FIXME: there should be no direct assignment in the future */
+    tps->regmap = tps->tps65217_universal_driver.config.regmap;
+    /* instead of calling devm_regmap_init, call universal driver init */
+/*	tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
 	if (IS_ERR(tps->regmap)) {
 		ret = PTR_ERR(tps->regmap);
 		dev_err(tps->dev, "Failed to allocate register map: %d\n",
 			ret);
 		return ret;
 	}
+*/
+    /* ljtale ends */
 
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;
@@ -370,6 +376,15 @@ static const struct i2c_device_id tps65217_id_table[] = {
 };
 MODULE_DEVICE_TABLE(i2c, tps65217_id_table);
 
+/* ljtale starts */
+static struct universal_drv tps65217_universal_driver = {
+    .name = "tps65217",
+    .config = {
+        .regmap_config = &tps65217_regmap_config,
+    },
+};
+/* ljtale ends */
+
 static struct i2c_driver tps65217_driver = {
 	.driver		= {
 		.name	= "tps65217",
@@ -383,6 +398,9 @@ static struct i2c_driver tps65217_driver = {
 
 static int __init tps65217_init(void)
 {
+    /* ljtale starts */
+    BUG_ON(!universal_drv_register(tps65217_universal_drv));
+    /* ljtale ends */
 	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);
