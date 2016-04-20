@@ -162,9 +162,8 @@ static const struct regmap_config tps65217_regmap_config = {
 
 /* ljtale starts */
 static struct universal_drv tps65217_universal_driver = {
-    .name = "tps65217",
+    .name = "tps65217-universal",
     .config = {
-        .name = "tps65217-config",
         .regmap_config = &tps65217_regmap_config,
     }
 };
@@ -320,7 +319,11 @@ static int tps65217_probe(struct i2c_client *client,
 
     /* ljtale starts */
     tps65217_universal_driver.client = client; 
-    BUG_ON(universal_drv_register(&tps65217_universal_driver) < 0);
+    ret = universal_drv_register(&tps65217_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
+        return ret;
+    }
     universal_drv_init(&tps65217_universal_driver);
     /* FIXME: there should be no direct assignment in the future */
     tps->regmap = tps65217_universal_driver.config.regmap;

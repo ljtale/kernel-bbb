@@ -36,7 +36,7 @@ struct universal_drv {
 
 extern int __universal_drv_register(struct universal_drv *drv);
 #define universal_drv_register(drv) \
-    __universal_drv_register
+    __universal_drv_register(drv)
 
 extern int __universal_drv_probe(struct universal_drv *drv);
 #define universal_drv_init(drv) \

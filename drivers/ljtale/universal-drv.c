@@ -24,7 +24,10 @@
 static struct list_head universal_drivers;
 
 int __universal_drv_register(struct universal_drv *drv) {
-    BUG_ON(!drv);
+    if (!drv) {
+        LJTALE_MSG(KERN_ERR, "universal driver pointer null\n");
+        return -ENODEV;
+    }
     list_add_tail(&drv->list, &universal_drivers);
     LJTALE_MSG(KERN_INFO, "universal driver register: %s\n", drv->name);
     return 0;
@@ -35,7 +38,9 @@ int __universal_drv_probe(struct universal_drv *drv) {
     int ret;
     struct universal_drv_config *config;
 
-    BUG_ON(!drv);
+    if (!drv) {
+        return -ENODEV;
+    }
     LJTALE_MSG(KERN_INFO, "universal driver initialization: %s\n", drv->name);
     config = &drv->config;
     /* FIXME: this only works for i2c devices */
