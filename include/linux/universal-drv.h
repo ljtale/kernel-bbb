@@ -38,9 +38,9 @@ extern int __universal_drv_register(struct universal_drv *drv);
 #define universal_drv_register(drv) \
     __universal_drv_register
 
-extern int __universal_drv_probe(struct i2c_client *client);
-#define universal_drv_init(client) \
-    __universal_drv_probe(client)
+extern int __universal_drv_probe(struct universal_drv *drv);
+#define universal_drv_init(drv) \
+    __universal_drv_probe(drv)
 
 #endif
 

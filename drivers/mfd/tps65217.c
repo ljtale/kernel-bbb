@@ -321,7 +321,7 @@ static int tps65217_probe(struct i2c_client *client,
     /* ljtale starts */
     tps65217_universal_driver.client = client; 
     BUG_ON(universal_drv_register(&tps65217_universal_driver) < 0);
-    universal_drv_init(client);
+    universal_drv_init(&tps65217_universal_driver);
     /* FIXME: there should be no direct assignment in the future */
     tps->regmap = tps65217_universal_driver.config.regmap;
     /* instead of calling devm_regmap_init, call universal driver init */
