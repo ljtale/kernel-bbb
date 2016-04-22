@@ -28,6 +28,10 @@
 #include <linux/nvmem-provider.h>
 #include <linux/io.h>
 
+/* ljtale starts */
+#include <linux/universal-drv.h>
+/* ljtale ends */
+
 /*
  * I2C EEPROMs from most vendors are inexpensive and mostly interchangeable.
  * Differences between different vendor product lines (like Atmel AT24C or
@@ -565,6 +569,15 @@ static struct regmap_bus regmap_at24_bus = {
 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 };
 
+/* ljtale starts */
+static struct universal_drv at24_universal_driver = {
+    .name = "at24-universal",
+    .config = {
+        .regmap_bus = &regmap_at24_bus,
+    },
+}; 
+/* ljtale ends */
+
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct at24_platform_data chip;
@@ -579,6 +592,10 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct regmap *regmap;
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
+
+    /* ljtale starts */
+    int ret;
+    /* ljtale ends */
 
     /* ljtale starts */
     printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
@@ -673,6 +690,23 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
 
+    /* ljtale starts */
+    /* populate the universal driver fields for at24 */
+    at24_universal_driver.dev = &client->dev;
+    at24_universal_driver.config.regmap_bus_context = client;
+    at24_universal_driver.config.regmap_config = regmap_config;
+    ret = universal_drv_register(&at24_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
+        return ret;
+    }
+    universal_drv_init(&at24_universal_driver);
+    /* FIXME: the regmap pointer for this driver should be put into a data 
+     * structure for the driver's use, but the data structure format 
+     * needs more thinking 
+     */
+    regmap = at24_universal_driver.config.regmap;
+#if 0
 	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
 	regmap = devm_regmap_init(&client->dev, &regmap_at24_bus,
 			client, regmap_config);
@@ -682,6 +716,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			__func__, err);
 		return err;
 	}
+#endif
+    /* ljtale ends */
 
 	nvmem_config = devm_kzalloc(&client->dev, sizeof(*nvmem_config),
 			GFP_KERNEL);

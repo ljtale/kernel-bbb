@@ -265,6 +265,10 @@ static int tps65217_probe(struct i2c_client *client,
 	int ret;
 
     /* ljtale starts */
+    struct regmap_bus *regmap_bus;
+    /* ljtale ends */
+
+    /* ljtale starts */
     printk(KERN_INFO "ljtale: tps65217 probe get called\n");
     /* ljtale ends */
 
@@ -318,7 +322,15 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->id = chip_id;
 
     /* ljtale starts */
-    tps65217_universal_driver.client = client; 
+    /* the universal driver fields needs to be populated, either
+     * statically or dynamically */
+    tps65217_universal_driver.dev = &client->dev; 
+    tps65217_universal_driver.config.regmap_bus_context = &client->dev; 
+    regmap_bus = regmap_get_i2c_bus_pub(client, &tps65217_regmap_config);
+    if (IS_ERR(regmap_bus)) {
+        return PTR_ERR(regmap_bus);
+    }
+    tps65217_universal_driver.config.regmap_bus = regmap_bus;
     ret = universal_drv_register(&tps65217_universal_driver);
     if (ret < 0) {
         LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
@@ -328,14 +340,15 @@ static int tps65217_probe(struct i2c_client *client,
     /* FIXME: there should be no direct assignment in the future */
     tps->regmap = tps65217_universal_driver.config.regmap;
     /* instead of calling devm_regmap_init, call universal driver init */
-/*	tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
+#if 0
+    tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
 	if (IS_ERR(tps->regmap)) {
 		ret = PTR_ERR(tps->regmap);
 		dev_err(tps->dev, "Failed to allocate register map: %d\n",
 			ret);
 		return ret;
 	}
-*/
+#endif
     /* ljtale ends */
 
 	tps->irq = irq;

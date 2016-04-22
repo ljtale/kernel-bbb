@@ -43,12 +43,15 @@ int __universal_drv_probe(struct universal_drv *drv) {
     }
     LJTALE_MSG(KERN_INFO, "universal driver initialization: %s\n", drv->name);
     config = &drv->config;
-    /* FIXME: this only works for i2c devices */
-    config->regmap = devm_regmap_init_i2c(drv->client, 
-                        config->regmap_config);
+    /* use the devm_regmap_init API provided by the regmap framework, this
+     * should work for any regmap buses. 
+     * The regmap_bus_context should be populated outside universal driver
+     */
+    config->regmap = devm_regmap_init(drv->dev, config->regmap_bus, 
+                        config->regmap_bus_context, config->regmap_config);
     if (IS_ERR(config->regmap)) {
         ret = PTR_ERR(config->regmap);
-        dev_err(&drv->client->dev, 
+        dev_err(drv->dev, 
                 "Failed to allocate register map: %d\n", ret);
         return ret;
     }
@@ -60,4 +63,4 @@ static int __init init_universal_driver(void) {
     INIT_LIST_HEAD(&universal_drivers);
     return 0;
 }
-core_initcall(init_universal_driver);
+pure_initcall(init_universal_driver);

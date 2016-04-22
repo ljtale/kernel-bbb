@@ -350,6 +350,10 @@ struct regmap *devm_regmap_init(struct device *dev,
 				const struct regmap_config *config);
 struct regmap *devm_regmap_init_i2c(struct i2c_client *i2c,
 				    const struct regmap_config *config);
+/* ljtale starts */
+struct regmap_bus *regmap_get_i2c_bus_pub(struct i2c_client *i2c,
+                    const struct regmap_config *config);
+/* ljtale ends */
 struct regmap *devm_regmap_init_spi(struct spi_device *dev,
 				    const struct regmap_config *config);
 struct regmap *devm_regmap_init_spmi_base(struct spmi_device *dev,

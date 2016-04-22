@@ -234,6 +234,36 @@ static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
 	return ERR_PTR(-ENOTSUPP);
 }
 
+/** 
+ * regmap_get_i2c_bus_pub(): A copy of the above function to get a i2c
+ *                           regmap bus
+ * @i2c: device that will be interacted with
+ * @config: configuration for the register map
+ */
+struct regmap_bus *regmap_get_i2c_bus_pub(struct i2c_client *i2c,
+                    const struct regmap_config *config) {
+	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
+		return &regmap_i2c;
+	else if (config->val_bits == 16 && config->reg_bits == 8 &&
+		 i2c_check_functionality(i2c->adapter,
+					 I2C_FUNC_SMBUS_WORD_DATA))
+		switch (regmap_get_val_endian(&i2c->dev, NULL, config)) {
+		case REGMAP_ENDIAN_LITTLE:
+			return &regmap_smbus_word;
+		case REGMAP_ENDIAN_BIG:
+			return &regmap_smbus_word_swapped;
+		default:		/* everything else is not supported */
+			break;
+		}
+	else if (config->val_bits == 8 && config->reg_bits == 8 &&
+		 i2c_check_functionality(i2c->adapter,
+					 I2C_FUNC_SMBUS_BYTE_DATA))
+		return &regmap_smbus_byte;
+
+	return ERR_PTR(-ENOTSUPP);
+}
+EXPORT_SYMBOL_GPL(regmap_get_i2c_bus_pub);
+
 /**
  * regmap_init_i2c(): Initialise register map
  *
