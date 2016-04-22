@@ -34,8 +34,7 @@ struct universal_drv {
     struct list_head list;
 };
 
-
-
+ /* The registration function should be called from init calls */
 extern int __universal_drv_register(struct universal_drv *drv);
 #define universal_drv_register(drv) \
     __universal_drv_register(drv)

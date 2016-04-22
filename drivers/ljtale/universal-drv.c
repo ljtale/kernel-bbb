@@ -28,6 +28,7 @@ int __universal_drv_register(struct universal_drv *drv) {
         LJTALE_MSG(KERN_ERR, "universal driver pointer null\n");
         return -ENODEV;
     }
+    /* each driver should only have one instance of universal driver */
     list_add_tail(&drv->list, &universal_drivers);
     LJTALE_MSG(KERN_INFO, "universal driver register: %s\n", drv->name);
     return 0;

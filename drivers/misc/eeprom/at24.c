@@ -594,10 +594,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct nvmem_device *nvmem_dev;
 
     /* ljtale starts */
-    int ret;
-    /* ljtale ends */
-
-    /* ljtale starts */
     printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
     /* ljtale ends */
 
@@ -695,11 +691,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
     at24_universal_driver.dev = &client->dev;
     at24_universal_driver.config.regmap_bus_context = client;
     at24_universal_driver.config.regmap_config = regmap_config;
-    ret = universal_drv_register(&at24_universal_driver);
-    if (ret < 0) {
-        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
-        return ret;
-    }
     universal_drv_init(&at24_universal_driver);
     /* FIXME: the regmap pointer for this driver should be put into a data 
      * structure for the driver's use, but the data structure format 
@@ -871,12 +862,20 @@ static struct i2c_driver at24_driver = {
 
 static int __init at24_init(void)
 {
+    int ret;
 	if (!io_limit) {
 		pr_err("at24: io_limit must not be 0!\n");
 		return -EINVAL;
 	}
 
 	io_limit = rounddown_pow_of_two(io_limit);
+    /* ljtale starts */
+    ret = universal_drv_register(&at24_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
+        return ret;
+    }
+    /* ljtale ends */
 	return i2c_add_driver(&at24_driver);
 }
 module_init(at24_init);

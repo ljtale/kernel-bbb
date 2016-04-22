@@ -331,11 +331,6 @@ static int tps65217_probe(struct i2c_client *client,
         return PTR_ERR(regmap_bus);
     }
     tps65217_universal_driver.config.regmap_bus = regmap_bus;
-    ret = universal_drv_register(&tps65217_universal_driver);
-    if (ret < 0) {
-        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
-        return ret;
-    }
     universal_drv_init(&tps65217_universal_driver);
     /* FIXME: there should be no direct assignment in the future */
     tps->regmap = tps65217_universal_driver.config.regmap;
@@ -423,6 +418,14 @@ static struct i2c_driver tps65217_driver = {
 
 static int __init tps65217_init(void)
 {
+    /* ljtale starts */
+    int ret;
+    ret = universal_drv_register(&tps65217_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
+        return ret;
+    }
+    /* ljtale ends */
 	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);
