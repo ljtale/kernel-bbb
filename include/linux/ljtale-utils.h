@@ -15,8 +15,15 @@
         printk(LEVEL "ljtale: " args);    \
     }                                       \
     while(0)
+
+#define LJTALE_WARN(args...)           \
+    do {                                        \
+        printk(KERN_WARNING "ljtale-warning: " args);    \
+    }                                       \
+    while(0)
 #else
 #define LJTALE_PRINT(LEVEL, args...)
+#define LJTALE_WARN(args...)
 #endif
 
-#endif
+#endif /* LINUX_LJTALE_UTILS_H */

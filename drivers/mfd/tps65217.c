@@ -160,19 +160,41 @@ static const struct regmap_config tps65217_regmap_config = {
 	.max_register = TPS65217_REG_MAX,
 };
 
-/* ljtale starts */
-static struct universal_drv tps65217_universal_driver = {
-    .name = "tps65217-universal",
-    .config = {
-        .regmap_config = &tps65217_regmap_config,
-    }
-};
-/* ljtale ends */
-
 static const struct of_device_id tps65217_of_match[] = {
 	{ .compatible = "ti,tps65217", .data = (void *)TPS65217 },
 	{ /* sentinel */ },
 };
+
+
+/* ljtale starts */
+static struct universal_regmap_type tps65217_universal_regmap = {
+    .regmap_config = &tps65217_regmap_config,
+};
+
+static struct universal_devm_alloc_type tps65217_universal_devm_alloc = {
+};
+
+static struct universal_of_node_match_type tps65217_universal_of_node_match = {
+    .matches = tps65217_of_match,
+};
+
+static struct universal_request tps65217_universal_requests[] = {
+    {
+        .type = REGMAP_INIT,
+        .data = &tps65217_universal_regmap,
+    },
+    {
+        .type = DEVM_ALLOCATE,
+        .data = &tps65217_universal_devm_alloc,
+    },
+    {
+        .type = OF_NODE_MATCH,
+        .data = &tps65217_universal_of_node_match,
+    },
+};
+
+static const char *tps65217_universal_driver_name = "tps65217-universal";
+/* ljtale ends */
 
 static irqreturn_t tps65217_irq(int irq, void *irq_data)
 {
@@ -265,11 +287,29 @@ static int tps65217_probe(struct i2c_client *client,
 	int ret;
 
     /* ljtale starts */
+    struct universal_drv *tps65217_universal_driver;
     struct regmap_bus *regmap_bus;
     /* ljtale ends */
 
     /* ljtale starts */
     printk(KERN_INFO "ljtale: tps65217 probe get called\n");
+    /* We assume each device should have a universal driver */
+    tps65217_universal_driver = 
+        devm_kzalloc(&client->dev, sizeof(struct universal_drv), GFP_KERNEL);
+    if (IS_ERR(tps65217_universal_driver)) {
+        ret = PTR_ERR(tps65217_universal_driver);
+        LJTALE_MSG(KERN_ERR, "universal driver allocation failed\n");
+        return ret;
+    }
+    tps65217_universal_driver->dev = &client->dev;
+    tps65217_universal_driver->requests = tps65217_universal_requests;
+    tps65217_universal_driver->request_size =
+        ARRAY_SIZE(tps65217_universal_requests);
+    ret = universal_drv_register(tps65217_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
+        return ret;
+    }
     /* ljtale ends */
 
 	node = client->dev.of_node;
@@ -324,16 +364,20 @@ static int tps65217_probe(struct i2c_client *client,
     /* ljtale starts */
     /* the universal driver fields needs to be populated, either
      * statically or dynamically */
-    tps65217_universal_driver.dev = &client->dev; 
-    tps65217_universal_driver.config.regmap_bus_context = &client->dev; 
+    tps65217_universal_regmap.regmap_bus_context = &client->dev; 
     regmap_bus = regmap_get_i2c_bus_pub(client, &tps65217_regmap_config);
     if (IS_ERR(regmap_bus)) {
         return PTR_ERR(regmap_bus);
     }
-    tps65217_universal_driver.config.regmap_bus = regmap_bus;
-    universal_drv_init(&tps65217_universal_driver);
+    tps65217_universal_regmap.regmap_bus = regmap_bus;
+    /* 
+     * FIXME: call universal driver init only after all the request fields 
+     * are populated. Refer to the google doc for conerns and explanation
+     */
+    universal_drv_init(tps65217_universal_driver);
+
     /* FIXME: there should be no direct assignment in the future */
-    tps->regmap = tps65217_universal_driver.config.regmap;
+    tps->regmap = tps65217_universal_regmap.regmap;
     /* instead of calling devm_regmap_init, call universal driver init */
 #if 0
     tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
@@ -418,14 +462,6 @@ static struct i2c_driver tps65217_driver = {
 
 static int __init tps65217_init(void)
 {
-    /* ljtale starts */
-    int ret;
-    ret = universal_drv_register(&tps65217_universal_driver);
-    if (ret < 0) {
-        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
-        return ret;
-    }
-    /* ljtale ends */
 	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);
