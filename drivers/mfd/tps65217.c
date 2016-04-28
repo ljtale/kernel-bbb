@@ -312,6 +312,9 @@ static int tps65217_probe(struct i2c_client *client,
     }
     /* ljtale ends */
 
+    /* ljtale starts */
+    tps65217_universal_of_node_match.dev = &client->dev;
+    /* ljtale ends */
 	node = client->dev.of_node;
 	if (node) {
 		match = of_match_device(tps65217_of_match, &client->dev);
@@ -352,6 +355,12 @@ static int tps65217_probe(struct i2c_client *client,
 		dev_err(&client->dev, "id is null.\n");
 		return -ENODEV;
 	}
+
+    /* ljtale starts */
+    tps65217_universal_devm_alloc.dev = &client->dev;
+    tps65217_universal_devm_alloc.size = sizeof(struct tps65217);
+    tps65217_universal_devm_alloc.gfp = GFP_KERNEL;
+    /* ljtale ends */
 
 	tps = devm_kzalloc(&client->dev, sizeof(*tps), GFP_KERNEL);
 	if (!tps)

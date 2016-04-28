@@ -13,7 +13,6 @@
 #include <linux/of_irq.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
-#include <asm/uaccess.h>
 #include <linux/err.h>
 
 #include <linux/universal-drv.h>
@@ -79,10 +78,26 @@ int __universal_drv_probe(struct universal_drv *drv) {
             case DEVM_ALLOCATE:
                 devm_alloc_ptr = 
                     (struct universal_devm_alloc_type *)request->data; 
+                devm_alloc_ptr->ret_addr = 
+                    devm_kzalloc(devm_alloc_ptr->dev, devm_alloc_ptr->size,
+                            devm_alloc_ptr->gfp);
+                if (!devm_alloc_ptr->ret_addr) {
+                    ret = -ENOMEM;
+                    goto err;
+                }
                 break;
             case OF_NODE_MATCH:
                 of_node_match_ptr = 
                     (struct universal_of_node_match_type *)request->data; 
+                of_node_match_ptr->ret_match = 
+                    of_match_device(of_node_match_ptr->matches,
+                            of_node_match_ptr->dev);
+                if (!of_node_match_ptr->ret_match) {
+                    dev_err(of_node_match_ptr->dev, 
+                            "Failed to find matching dt id\n");
+                    ret = -EINVAL;
+                    goto err;
+                }
                 break;
             default:
                 goto err;
