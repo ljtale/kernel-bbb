@@ -32,6 +32,14 @@ struct universal_devm_alloc_type {
     size_t size;
     gfp_t gfp;
     void *ret_addr;
+    /* Usually the allocated memory needs to be populated, we provide a 
+     * function pointer to point back to the conventional driver to do
+     * the population.
+     * FIXME: this is a temporary approach of proof-of-concept, later we
+     * need to think about separating the conventional drivers and the
+     * universal driver, providing a clean interface between them instead of
+     * using C pointers. A similar problem is also exposed to other types. */
+    int (*populate)(struct universal_devm_alloc_type *ptr);
 };
 
 struct universal_of_node_match_type {
