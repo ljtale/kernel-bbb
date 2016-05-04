@@ -85,6 +85,9 @@ int __universal_drv_probe(struct universal_drv *drv) {
                     ret = -ENOMEM;
                     goto err;
                 }
+                /* set the driver data, this should be generic for all
+                 * the drivers */
+                dev_set_drvdata(devm_alloc_ptr->dev, devm_alloc_ptr->ret_addr);
                 break;
             case OF_NODE_MATCH:
                 of_node_match_ptr = 

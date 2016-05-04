@@ -89,6 +89,8 @@ struct universal_drv {
      */
     struct universal_request *requests;
     int request_size;
+    /* Local data for the conventional driver */
+    void *local_data;
     /* Currently we assume each device will have a universal driver attached */
     struct list_head list;
 };
