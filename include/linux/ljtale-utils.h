@@ -26,4 +26,11 @@
 #define LJTALE_WARN(args...)
 #endif
 
+#define LJTALE_DEBUG_PRINT(args...) \
+    do {                            \
+        printk(KERN_INFO "ljtale-debug: %s: line: %d" args, \
+                __FILE__, __LINE__);                \
+    }                               \
+    while(0)
+
 #endif /* LINUX_LJTALE_UTILS_H */

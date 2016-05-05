@@ -47,8 +47,7 @@ static struct universal_devm_alloc_type *devm_alloc_ptr = NULL ;
 static struct universal_of_node_match_type *of_node_match_ptr = NULL;
 
 int __universal_drv_probe(struct universal_drv *drv) {
-    int ret;
-    struct universal_drv_config *config;
+    int ret = -EINVAL;
     struct universal_request *request;
     int count = 0;
     
@@ -106,20 +105,6 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 goto err;
                 break;
         }
-    }
-
-    config = &drv->config;
-    /* use the devm_regmap_init API provided by the regmap framework, this
-     * should work for any regmap buses. 
-     * The regmap_bus_context should be populated outside universal driver
-     */
-    config->regmap = devm_regmap_init(drv->dev, config->regmap_bus, 
-                        config->regmap_bus_context, config->regmap_config);
-    if (IS_ERR(config->regmap)) {
-        ret = PTR_ERR(config->regmap);
-        dev_err(drv->dev, 
-                "Failed to allocate register map: %d\n", ret);
-        return ret;
     }
     return 0;
 err:

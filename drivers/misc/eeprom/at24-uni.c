@@ -569,7 +569,6 @@ static struct regmap_bus regmap_at24_bus = {
 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 };
 
-#if 0
 /* ljtale starts */
 static struct universal_drv at24_universal_driver = {
     .name = "at24-universal",
@@ -578,7 +577,6 @@ static struct universal_drv at24_universal_driver = {
     },
 }; 
 /* ljtale ends */
-#endif
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -594,6 +592,10 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct regmap *regmap;
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
+
+    /* ljtale starts */
+    printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
+    /* ljtale ends */
 
     /* ljtale: who sets up the platform data for the device? */
 	if (client->dev.platform_data) {
@@ -683,7 +685,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	else
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
-#if 0
+
     /* ljtale starts */
     /* populate the universal driver fields for at24 */
     at24_universal_driver.dev = &client->dev;
@@ -695,7 +697,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
      * needs more thinking 
      */
     regmap = at24_universal_driver.config.regmap;
-#endif
+#if 0
 	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
 	regmap = devm_regmap_init(&client->dev, &regmap_at24_bus,
 			client, regmap_config);
@@ -705,6 +707,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			__func__, err);
 		return err;
 	}
+#endif
+    /* ljtale ends */
 
 	nvmem_config = devm_kzalloc(&client->dev, sizeof(*nvmem_config),
 			GFP_KERNEL);
@@ -858,14 +862,13 @@ static struct i2c_driver at24_driver = {
 
 static int __init at24_init(void)
 {
-//     int ret;
+    int ret;
 	if (!io_limit) {
 		pr_err("at24: io_limit must not be 0!\n");
 		return -EINVAL;
 	}
 
 	io_limit = rounddown_pow_of_two(io_limit);
-#if 0
     /* ljtale starts */
     ret = universal_drv_register(&at24_universal_driver);
     if (ret < 0) {
@@ -873,7 +876,6 @@ static int __init at24_init(void)
         return ret;
     }
     /* ljtale ends */
-#endif
 	return i2c_add_driver(&at24_driver);
 }
 module_init(at24_init);

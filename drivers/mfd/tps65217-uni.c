@@ -196,6 +196,7 @@ static struct universal_request tps65217_universal_requests[] = {
 static const char *tps65217_universal_driver_name = "tps65217-universal";
 
 struct tps65217_universal_local {
+    struct tps65217 *tps;
     unsigned long chip_id;
     int irq;
     int irq_gpio;
@@ -299,7 +300,9 @@ static int tps65217_devm_alloc_populate(
     struct tps65217 *tps;
     local = 
         (struct tps65217_universal_local *)tps65217_universal_driver.local_data;
-    tps = (struct tps65217 *)(ptr->ret_addr);
+    local->tps = (struct tps65217 *)(ptr->ret_addr);
+    tps = local->tps;
+    tps->regmap = tps65217_universal_regmap.regmap;
     tps->dev = ptr->dev; 
     tps->irq = local->irq;
     tps->irq_gpio = local->irq_gpio;
@@ -409,47 +412,32 @@ static int tps65217_probe(struct i2c_client *client,
     tps65217_universal_devm_alloc.populate = tps65217_devm_alloc_populate;
     /* ljtale ends */
 
-	tps->dev = &client->dev;
-    /* ljtale: FIXME as I see from the whole driver source code, this line
-     * of the id is not actually used anywhere, so I just remove it, if
-     * there are bugs later on, return to this fixme
-     */
-	// tps->id = chip_id;
+    /* ljtale starts */
+    /* populate local data structure, the values are likely to be computed
+     * in the probe function or locally in this file */
+    tps65217_local.chip_id = chip_id;
+    tps65217_local.irq = irq;
+    tps65217_local.irq_gpio = irq_gpio;
+    /* ljtale ends */
 
     /* ljtale starts */
-   /* 
+    /*
      * FIXME: call universal driver init only after all the request fields 
      * are populated. Refer to the google doc for conerns and explanation
      */
     universal_drv_init(&tps65217_universal_driver);
-
-    /* FIXME: there should be no direct assignment in the future */
-    tps->regmap = tps65217_universal_regmap.regmap;
-    /* instead of calling devm_regmap_init, call universal driver init */
-#if 0
-    tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
-	if (IS_ERR(tps->regmap)) {
-		ret = PTR_ERR(tps->regmap);
-		dev_err(tps->dev, "Failed to allocate register map: %d\n",
-			ret);
-		return ret;
-	}
-#endif
+    if (!tps65217_local.tps) {
+        LJTALE_MSG(KERN_ERR, "universal driver allocation failed\n");
+        return -EINVAL;
+    }
+    tps = tps65217_local.tps;
+    LJTALE_DEBUG_PRINT();
     /* ljtale ends */
-    tps65217_local.chip_id = chip_id;
-    tps65217_local.irq = irq;
-    tps65217_local.irq_gpio = irq_gpio;
 
-	/* we got an irq, request it */
-    /* ljtale: also enable the power button interrupt */
-	if (tps->irq >= 0) {
-		ret = tps65217_probe_pwr_but(tps);
-		if (ret < 0) {
-			dev_err(tps->dev, "Failed to probe pwr_but\n");
-			return ret;
-		}
-	}
-
+    /* ljtale: the following code are essentially using the tps data structure,
+     * TODO: we should think about creating other data structures to abstract
+     * them out into universal driver 
+     */
 	ret = mfd_add_devices(tps->dev, -1, tps65217s,
 			      ARRAY_SIZE(tps65217s), NULL, 0, NULL);
 	if (ret < 0) {
