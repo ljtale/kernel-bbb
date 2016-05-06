@@ -336,6 +336,7 @@ static int tps65217_probe(struct i2c_client *client,
     /* ljtale ends */
 
     /* ljtale starts */
+    tps65217_universal_driver.name = tps65217_universal_driver_name;
     tps65217_universal_driver.dev = &client->dev;
     tps65217_universal_driver.requests = tps65217_universal_requests;
     tps65217_universal_driver.request_size =
@@ -350,7 +351,7 @@ static int tps65217_probe(struct i2c_client *client,
 
     /* ljtale starts */
     /* TODO: I leave the of node match untounched at this moment */
-    // tps65217_universal_of_node_match.dev = &client->dev;
+    tps65217_universal_of_node_match.dev = &client->dev;
     /* ljtale ends */
 	node = client->dev.of_node;
 	if (node) {
@@ -431,7 +432,6 @@ static int tps65217_probe(struct i2c_client *client,
         return -EINVAL;
     }
     tps = tps65217_local.tps;
-    LJTALE_DEBUG_PRINT();
     /* ljtale ends */
 
     /* ljtale: the following code are essentially using the tps data structure,

@@ -165,37 +165,6 @@ static const struct of_device_id tps65217_of_match[] = {
 	{ /* sentinel */ },
 };
 
-
-/* ljtale starts */
-static struct universal_regmap_type tps65217_universal_regmap = {
-    .regmap_config = &tps65217_regmap_config,
-};
-
-static struct universal_devm_alloc_type tps65217_universal_devm_alloc = {
-};
-
-static struct universal_of_node_match_type tps65217_universal_of_node_match = {
-    .matches = tps65217_of_match,
-};
-
-static struct universal_request tps65217_universal_requests[] = {
-    {
-        .type = REGMAP_INIT,
-        .data = &tps65217_universal_regmap,
-    },
-    {
-        .type = DEVM_ALLOCATE,
-        .data = &tps65217_universal_devm_alloc,
-    },
-    {
-        .type = OF_NODE_MATCH,
-        .data = &tps65217_universal_of_node_match,
-    },
-};
-
-static const char *tps65217_universal_driver_name = "tps65217-universal";
-/* ljtale ends */
-
 static irqreturn_t tps65217_irq(int irq, void *irq_data)
 {
 	struct tps65217 *tps = irq_data;
@@ -287,34 +256,9 @@ static int tps65217_probe(struct i2c_client *client,
 	int ret;
 
     /* ljtale starts */
-    struct universal_drv *tps65217_universal_driver;
-    struct regmap_bus *regmap_bus;
-    /* ljtale ends */
-
-    /* ljtale starts */
     printk(KERN_INFO "ljtale: tps65217 probe get called\n");
-    /* We assume each device should have a universal driver */
-    tps65217_universal_driver = 
-        devm_kzalloc(&client->dev, sizeof(struct universal_drv), GFP_KERNEL);
-    if (IS_ERR(tps65217_universal_driver)) {
-        ret = PTR_ERR(tps65217_universal_driver);
-        LJTALE_MSG(KERN_ERR, "universal driver allocation failed\n");
-        return ret;
-    }
-    tps65217_universal_driver->dev = &client->dev;
-    tps65217_universal_driver->requests = tps65217_universal_requests;
-    tps65217_universal_driver->request_size =
-        ARRAY_SIZE(tps65217_universal_requests);
-    ret = universal_drv_register(tps65217_universal_driver);
-    if (ret < 0) {
-        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
-        return ret;
-    }
     /* ljtale ends */
 
-    /* ljtale starts */
-    tps65217_universal_of_node_match.dev = &client->dev;
-    /* ljtale ends */
 	node = client->dev.of_node;
 	if (node) {
 		match = of_match_device(tps65217_of_match, &client->dev);
@@ -356,12 +300,6 @@ static int tps65217_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-    /* ljtale starts */
-    tps65217_universal_devm_alloc.dev = &client->dev;
-    tps65217_universal_devm_alloc.size = sizeof(struct tps65217);
-    tps65217_universal_devm_alloc.gfp = GFP_KERNEL;
-    /* ljtale ends */
-
 	tps = devm_kzalloc(&client->dev, sizeof(*tps), GFP_KERNEL);
 	if (!tps)
 		return -ENOMEM;
@@ -370,25 +308,6 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->dev = &client->dev;
 	tps->id = chip_id;
 
-    /* ljtale starts */
-    /* the universal driver fields needs to be populated, either
-     * statically or dynamically */
-    tps65217_universal_regmap.regmap_bus_context = &client->dev; 
-    regmap_bus = regmap_get_i2c_bus_pub(client, &tps65217_regmap_config);
-    if (IS_ERR(regmap_bus)) {
-        return PTR_ERR(regmap_bus);
-    }
-    tps65217_universal_regmap.regmap_bus = regmap_bus;
-    /* 
-     * FIXME: call universal driver init only after all the request fields 
-     * are populated. Refer to the google doc for conerns and explanation
-     */
-    universal_drv_init(tps65217_universal_driver);
-
-    /* FIXME: there should be no direct assignment in the future */
-    tps->regmap = tps65217_universal_regmap.regmap;
-    /* instead of calling devm_regmap_init, call universal driver init */
-#if 0
     tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
 	if (IS_ERR(tps->regmap)) {
 		ret = PTR_ERR(tps->regmap);
@@ -396,8 +315,6 @@ static int tps65217_probe(struct i2c_client *client,
 			ret);
 		return ret;
 	}
-#endif
-    /* ljtale ends */
 
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;

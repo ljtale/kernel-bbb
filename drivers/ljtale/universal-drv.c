@@ -47,7 +47,7 @@ static struct universal_devm_alloc_type *devm_alloc_ptr = NULL ;
 static struct universal_of_node_match_type *of_node_match_ptr = NULL;
 
 int __universal_drv_probe(struct universal_drv *drv) {
-    int ret = -EINVAL;
+    int ret = 0;
     struct universal_request *request;
     int count = 0;
     
@@ -57,8 +57,12 @@ int __universal_drv_probe(struct universal_drv *drv) {
     LJTALE_MSG(KERN_INFO, "universal driver initialization: %s\n", drv->name);
     BUG_ON(drv->request_size < 0);
 
-    while (count < drv->request_size) {
+    for (count = 0; count < drv->request_size; count++) {
         request = &drv->requests[count];
+        if (!request) {
+            /* end of the request array */
+            break;
+        }
         /* FIXME: for each of the request type, it may require separate
          * well-defined functions to handle them */
         switch (request->type) {
@@ -87,6 +91,11 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 /* set the driver data, this should be generic for all
                  * the drivers */
                 dev_set_drvdata(devm_alloc_ptr->dev, devm_alloc_ptr->ret_addr);
+                if (devm_alloc_ptr->populate) {
+                    ret = devm_alloc_ptr->populate(devm_alloc_ptr);
+                } else {
+                    LJTALE_DEBUG_PRINT("memory populate unavailable\n");
+                }
                 break;
             case OF_NODE_MATCH:
                 of_node_match_ptr = 
@@ -106,7 +115,7 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 break;
         }
     }
-    return 0;
+    return ret;
 err:
     /* FIXME: revoke what has been done */
     LJTALE_MSG(KERN_INFO "universal driver initializaiton failed\n");
