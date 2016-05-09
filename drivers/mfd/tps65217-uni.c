@@ -435,12 +435,13 @@ static int tps65217_probe(struct i2c_client *client,
     /* initialize the universal driver data according to the request order, */
     /* either statically or dynamically */
     /* regmap init */
-    tps65217_universal_regmap.regmap_bus_context = &client->dev; 
+    tps65217_universal_regmap.dev = &client->dev;
     regmap_bus = regmap_get_i2c_bus_pub(client, &tps65217_regmap_config);
     if (IS_ERR(regmap_bus)) {
         return PTR_ERR(regmap_bus);
     }
     tps65217_universal_regmap.regmap_bus = regmap_bus;
+    tps65217_universal_regmap.regmap_bus_context = &client->dev; 
     /* devm allocation */
     tps65217_universal_devm_alloc.dev = &client->dev;
     tps65217_universal_devm_alloc.size = sizeof(struct tps65217);

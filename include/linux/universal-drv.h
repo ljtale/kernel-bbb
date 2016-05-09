@@ -22,9 +22,10 @@ enum universal_req_type {
  * Corresponding to different request types, there should be a data structure
  * associate with the data pointer */
 struct universal_regmap_type {
+    struct device *dev;
     struct regmap_bus *regmap_bus;
-    struct regmap_config *regmap_config;
     void *regmap_bus_context;
+    struct regmap_config *regmap_config;
     struct regmap *regmap;
 };
 
@@ -69,18 +70,6 @@ struct universal_request {
     void *data;
 };
 
-/*
- * universal driver configuration struct 
- */
-
-struct universal_drv_config {
-    const char *name;
-    struct regmap_bus *regmap_bus;
-    void *regmap_bus_context;
-    struct regmap_config *regmap_config;
-    struct regmap *regmap;
-};
-
 #define UNIDRV_TYPE(activity) \
     struct universal_##activity_type
 
@@ -96,8 +85,9 @@ struct universal_drv {
      * universal driver could potentially maintain device states, this pointer
      * is used to uniquely identify universal drivers
      */
+    /* FIXME: since the universal driver is for a specific device, this pointer
+     * should replace any one that is used in specific activity type */
     struct device *dev;
-    struct universal_drv_config config;
     /* 
      * The universal driver probe function could take a list of requests
      * from conventional drivers and do them according to the order specified

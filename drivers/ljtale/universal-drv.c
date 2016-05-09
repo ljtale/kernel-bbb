@@ -68,18 +68,20 @@ int __universal_drv_probe(struct universal_drv *drv) {
          * well-defined functions to handle them */
         switch (request->type) {
             case REGMAP_INIT:
+                LJTALE_MSG(KERN_INFO,"regmap init activity\n");
                 regmap_ptr = (struct universal_regmap_type *)request->data; 
-                regmap_ptr->regmap = devm_regmap_init(drv->dev, 
+                regmap_ptr->regmap = devm_regmap_init(regmap_ptr->dev, 
                         regmap_ptr->regmap_bus, regmap_ptr->regmap_bus_context,
                         regmap_ptr->regmap_config);
                 if (IS_ERR(regmap_ptr->regmap)) {
                     ret = PTR_ERR(regmap_ptr->regmap);
-                    dev_err(drv->dev, 
+                    dev_err(regmap_ptr->dev, 
                             "Failed to allocate register map: %d\n", ret);
                     goto err;
                 }
                 break;
             case DEVM_ALLOCATE:
+                LJTALE_MSG(KERN_INFO, "devm alloc activity\n");
                 devm_alloc_ptr = 
                     (struct universal_devm_alloc_type *)request->data; 
                 devm_alloc_ptr->ret_addr = 
@@ -99,6 +101,7 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 }
                 break;
             case OF_NODE_MATCH:
+                LJTALE_MSG(KERN_INFO, "of node match activity\n");
                 of_node_match_ptr = 
                     (struct universal_of_node_match_type *)request->data; 
                 of_node_match_ptr->ret_match = 
@@ -112,6 +115,7 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 }
                 break;
             case REQUEST_IRQ:
+                LJTALE_MSG(KERN_INFO, "request irq activity\n");
                 request_irq_ptr = 
                     (struct universal_request_ir_type *)request->data;
                 request_irq_ptr->ret_irq = devm_request_threaded_irq(
