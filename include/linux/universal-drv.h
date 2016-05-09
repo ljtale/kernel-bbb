@@ -5,6 +5,7 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/of_device.h>
+#include <linux/interrupt.h>
 
 #include <linux/ljtale-utils.h>
 
@@ -14,6 +15,7 @@ enum universal_req_type {
     REGMAP_INIT,
     DEVM_ALLOCATE,
     OF_NODE_MATCH,
+    REQUEST_IRQ,
 };
 
 /*
@@ -46,6 +48,19 @@ struct universal_of_node_match_type {
     struct of_device_id *matches;
     struct device *dev;
     struct of_device_id *ret_match;
+};
+
+/* TODO: distinguish threaded and non-threaded irq request */
+struct universal_request_irq_type {
+    struct device *dev;
+    unsigned int irq;
+    irq_handler_t handler;
+    irq_handler_t thread_fn;
+    unsigned long irqflags;
+    const char *devname;
+    void *dev_id;
+    int ret_irq;
+    int (*post_process)(struct universal_request_irq_type *ptr);
 };
 
 struct universal_request {

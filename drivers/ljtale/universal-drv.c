@@ -45,6 +45,7 @@ EXPORT_SYMBOL_GPL(__universal_drv_register);
 static struct universal_regmap_type *regmap_ptr = NULL;
 static struct universal_devm_alloc_type *devm_alloc_ptr = NULL ;
 static struct universal_of_node_match_type *of_node_match_ptr = NULL;
+static struct universal_request_irq_type *request_irq_ptr = NULL;
 
 int __universal_drv_probe(struct universal_drv *drv) {
     int ret = 0;
@@ -108,6 +109,25 @@ int __universal_drv_probe(struct universal_drv *drv) {
                             "Failed to find matching dt id\n");
                     ret = -EINVAL;
                     goto err;
+                }
+                break;
+            case REQUEST_IRQ:
+                request_irq_ptr = 
+                    (struct universal_request_ir_type *)request->data;
+                request_irq_ptr->ret_irq = devm_request_threaded_irq(
+                        request_irq_ptr->dev, request_irq_ptr->irq,
+                        request_irq_ptr->handler, request_irq_ptr->thread_fn,
+                        request_irq_ptr->irqflags, request_irq_ptr->devname,
+                        request_irq_ptr->dev_id);
+                if (request_irq_ptr->ret_irq < 0) {
+                    dev_err(request_irq_ptr->dev, "Failed to request IRQ %d\n",
+                            request_irq_ptr->irq);
+                    goto err;
+                }
+                if (!request_irq_ptr->post_process) {
+                    ret = request_irq_ptr->post_process(request_irq_ptr);
+                } else {
+                    /* TODO: */
                 }
                 break;
             default:

@@ -165,52 +165,6 @@ static const struct of_device_id tps65217_of_match[] = {
 	{ /* sentinel */ },
 };
 
-
-/* ljtale starts */
-static struct universal_regmap_type tps65217_universal_regmap = {
-    .regmap_config = &tps65217_regmap_config,
-};
-
-static struct universal_devm_alloc_type tps65217_universal_devm_alloc = {
-};
-
-static struct universal_of_node_match_type tps65217_universal_of_node_match = {
-    .matches = tps65217_of_match,
-};
-
-static struct universal_request tps65217_universal_requests[] = {
-    {
-        .type = REGMAP_INIT,
-        .data = &tps65217_universal_regmap,
-    },
-    {
-        .type = DEVM_ALLOCATE,
-        .data = &tps65217_universal_devm_alloc,
-    },
-    {
-        .type = OF_NODE_MATCH,
-        .data = &tps65217_universal_of_node_match,
-    },
-};
-
-static const char *tps65217_universal_driver_name = "tps65217-universal";
-
-struct tps65217_universal_local {
-    struct tps65217 *tps;
-    unsigned long chip_id;
-    int irq;
-    int irq_gpio;
-};
-
-static struct tps65217_universal_local tps65217_local = {
-    .irq = -1,
-    .irq_gpio = -1,
-};
-
-static struct universal_drv tps65217_universal_driver;
-
-/* ljtale ends */
-
 static irqreturn_t tps65217_irq(int irq, void *irq_data)
 {
 	struct tps65217 *tps = irq_data;
@@ -247,10 +201,62 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 	return IRQ_HANDLED;
 }
 
+/* ljtale starts */
+static struct universal_regmap_type tps65217_universal_regmap = {
+    .regmap_config = &tps65217_regmap_config,
+};
+
+static struct universal_devm_alloc_type tps65217_universal_devm_alloc = {
+};
+
+static struct universal_of_node_match_type tps65217_universal_of_node_match = {
+    .matches = tps65217_of_match, 
+};
+
+static struct universal_request_irq_type tps65217_universal_request_irq = {
+    .thread_fn = tps65217_irq,
+    .irqflags = IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+    .devname = "tps65217",
+};
+
+static struct universal_request tps65217_universal_requests[] = {
+    {
+        .type = REGMAP_INIT,
+        .data = &tps65217_universal_regmap,
+    },
+    {
+        .type = DEVM_ALLOCATE,
+        .data = &tps65217_universal_devm_alloc,
+    },
+    {
+        .type = REQUEST_IRQ,
+        .data = &tps65217_universal_request_irq,
+    },
+};
+
+static const char *tps65217_universal_driver_name = "tps65217-universal";
+
+struct tps65217_universal_local {
+    struct tps65217 *tps;
+    unsigned long chip_id;
+    int irq;
+    int irq_gpio;
+};
+
+static struct tps65217_universal_local tps65217_local = {
+    .irq = -1,
+    .irq_gpio = -1,
+};
+
+static struct universal_drv tps65217_universal_driver;
+/* ljtale ends */
+
 static int tps65217_probe_pwr_but(struct tps65217 *tps)
 {
 	int ret;
-	unsigned int int_reg;
+    /* ljtale starts */
+	// unsigned int int_reg;
+    /* ljtale ends */
 
 	tps->pwr_but = devm_input_allocate_device(tps->dev);
 	if (!tps->pwr_but) {
@@ -269,6 +275,8 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 		dev_err(tps->dev, "Failed to register button device\n");
 		return ret;
 	}
+    /* ljtale starts */
+#if 0
 	ret = devm_request_threaded_irq(tps->dev,
 		tps->irq, NULL, tps65217_irq, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 		"tps65217", tps);
@@ -286,6 +294,8 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
     /* ljtale: power button monitor bit in the interrupt register */
 	int_reg &= ~TPS65217_INT_PBM;
 	tps65217_reg_write(tps, TPS65217_REG_INT, int_reg, TPS65217_PROTECT_NONE);
+#endif
+    /* ljtale ends */
 	return 0;
 }
 
@@ -306,8 +316,10 @@ static int tps65217_devm_alloc_populate(
     tps->dev = ptr->dev; 
     tps->irq = local->irq;
     tps->irq_gpio = local->irq_gpio;
+    /* hand coded dependencies between various activities */
+    tps65217_universal_request_irq.irq = tps->irq;
+    tps65217_universal_request_irq.dev_id = tps;
     /* we got an irq, request it */
-    /* TODO: irq request should be extracted out as well */
     if (tps->irq >= 0) {
         ret = tps65217_probe_pwr_but(tps);
         if (ret < 0) {
@@ -315,6 +327,29 @@ static int tps65217_devm_alloc_populate(
             return ret;
         }
     }
+    return 0;
+}
+
+static int tps65217_request_irq_post_process(
+        struct universal_request_irq_type *ptr) {
+    /* according to the power button probe, after getting an irq, the
+     * driver should enable the the interrupt for the power button*/
+    int ret;
+    unsigned int int_reg;
+    struct tps65217_universal_local *local;
+    struct tps65217 *tps;
+    local = 
+        (struct tps65217_universal_local *)tps65217_universal_driver.local_data;
+    tps = local->tps;
+    /* TODO: register read and write should be extracted */
+    ret = tps65217_reg_read(tps, TPS65217_REG_INT, &int_reg);
+    if (ret < 0) {
+        dev_err(ptr->dev, "Failed to read INT reg\n");
+        return ret;
+    }
+    /* power button monitor bit in the interrupt register */
+    int_reg &= ~TPS65217_INT_PBM;
+    tps65217_reg_write(tps, TPS65217_REG_INT, int_reg, TPS65217_PROTECT_NONE);
     return 0;
 }
 /* ljtale ends */
@@ -411,6 +446,11 @@ static int tps65217_probe(struct i2c_client *client,
     tps65217_universal_devm_alloc.size = sizeof(struct tps65217);
     tps65217_universal_devm_alloc.gfp = GFP_KERNEL;
     tps65217_universal_devm_alloc.populate = tps65217_devm_alloc_populate;
+    /* request irq */
+    tps65217_universal_request_irq.dev = &client->dev;
+    tps65217_universal_request_irq.handler = NULL;
+    tps65217_universal_request_irq.post_process = 
+                                tps65217_request_irq_post_process;
     /* ljtale ends */
 
     /* ljtale starts */
