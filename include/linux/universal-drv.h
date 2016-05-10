@@ -22,6 +22,7 @@ enum universal_req_type {
  * Corresponding to different request types, there should be a data structure
  * associate with the data pointer */
 struct universal_regmap_type {
+    char *name;
     struct device *dev;
     struct regmap_bus *regmap_bus;
     void *regmap_bus_context;
@@ -30,11 +31,14 @@ struct universal_regmap_type {
 };
 
 struct universal_devm_alloc_type {
+    char *name;
     /* the device pointer for the allocated memory to be attached to*/
     struct device *dev;
     size_t size;
     gfp_t gfp;
     void *ret_addr;
+    /* indicate if this data needs to be added to the driver data */
+    bool drv_data_flag :1;
     /* Usually the allocated memory needs to be populated, we provide a 
      * function pointer to point back to the conventional driver to do
      * the population.
@@ -46,6 +50,7 @@ struct universal_devm_alloc_type {
 };
 
 struct universal_of_node_match_type {
+    char *name;
     struct of_device_id *matches;
     struct device *dev;
     struct of_device_id *ret_match;
@@ -53,6 +58,7 @@ struct universal_of_node_match_type {
 
 /* TODO: distinguish threaded and non-threaded irq request */
 struct universal_request_irq_type {
+    char *name;
     struct device *dev;
     unsigned int irq;
     irq_handler_t handler;

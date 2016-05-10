@@ -203,10 +203,13 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 
 /* ljtale starts */
 static struct universal_regmap_type tps65217_universal_regmap = {
+    .name = "tps65217-regmap-init",
     .regmap_config = &tps65217_regmap_config,
 };
 
 static struct universal_devm_alloc_type tps65217_universal_devm_alloc = {
+    .name = "tps65217-tps-alloc",
+    .drv_data_flag = 1,
 };
 
 static struct universal_of_node_match_type tps65217_universal_of_node_match = {
@@ -214,6 +217,7 @@ static struct universal_of_node_match_type tps65217_universal_of_node_match = {
 };
 
 static struct universal_request_irq_type tps65217_universal_request_irq = {
+    .name = "tps65217-pwr-irq",
     .thread_fn = tps65217_irq,
     .irqflags = IRQF_TRIGGER_LOW | IRQF_ONESHOT,
     .devname = "tps65217",
@@ -234,8 +238,6 @@ static struct universal_request tps65217_universal_requests[] = {
     },
 };
 
-static const char *tps65217_universal_driver_name = "tps65217-universal";
-
 struct tps65217_universal_local {
     struct tps65217 *tps;
     unsigned long chip_id;
@@ -248,7 +250,9 @@ static struct tps65217_universal_local tps65217_local = {
     .irq_gpio = -1,
 };
 
-static struct universal_drv tps65217_universal_driver;
+static struct universal_drv tps65217_universal_driver = {
+    .name = "tps65217-universal",
+};
 /* ljtale ends */
 
 static int tps65217_probe_pwr_but(struct tps65217 *tps)
@@ -371,7 +375,6 @@ static int tps65217_probe(struct i2c_client *client,
     /* ljtale ends */
 
     /* ljtale starts */
-    tps65217_universal_driver.name = tps65217_universal_driver_name;
     tps65217_universal_driver.dev = &client->dev;
     tps65217_universal_driver.requests = tps65217_universal_requests;
     tps65217_universal_driver.request_size =

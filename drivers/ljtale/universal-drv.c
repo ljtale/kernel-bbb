@@ -68,8 +68,9 @@ int __universal_drv_probe(struct universal_drv *drv) {
          * well-defined functions to handle them */
         switch (request->type) {
             case REGMAP_INIT:
-                LJTALE_MSG(KERN_INFO,"regmap init activity\n");
                 regmap_ptr = (struct universal_regmap_type *)request->data; 
+                LJTALE_MSG(KERN_INFO,"regmap init activity: %s\n",
+                        regmap_ptr->name);
                 regmap_ptr->regmap = devm_regmap_init(regmap_ptr->dev, 
                         regmap_ptr->regmap_bus, regmap_ptr->regmap_bus_context,
                         regmap_ptr->regmap_config);
@@ -81,9 +82,10 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 }
                 break;
             case DEVM_ALLOCATE:
-                LJTALE_MSG(KERN_INFO, "devm alloc activity\n");
                 devm_alloc_ptr = 
                     (struct universal_devm_alloc_type *)request->data; 
+                LJTALE_MSG(KERN_INFO, "devm alloc activity: %s\n", 
+                        devm_alloc_ptr->name);
                 devm_alloc_ptr->ret_addr = 
                     devm_kzalloc(devm_alloc_ptr->dev, devm_alloc_ptr->size,
                             devm_alloc_ptr->gfp);
@@ -93,7 +95,10 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 }
                 /* set the driver data, this should be generic for all
                  * the drivers */
-                dev_set_drvdata(devm_alloc_ptr->dev, devm_alloc_ptr->ret_addr);
+                if (devm_alloc_ptr->drv_data_flag) {
+                    dev_set_drvdata(devm_alloc_ptr->dev, 
+                            devm_alloc_ptr->ret_addr);
+                }
                 if (devm_alloc_ptr->populate) {
                     ret = devm_alloc_ptr->populate(devm_alloc_ptr);
                 } else {
@@ -101,9 +106,10 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 }
                 break;
             case OF_NODE_MATCH:
-                LJTALE_MSG(KERN_INFO, "of node match activity\n");
                 of_node_match_ptr = 
                     (struct universal_of_node_match_type *)request->data; 
+                LJTALE_MSG(KERN_INFO, "of node match activity: %s\n",
+                        of_node_match_ptr->name);
                 of_node_match_ptr->ret_match = 
                     of_match_device(of_node_match_ptr->matches,
                             of_node_match_ptr->dev);
@@ -115,9 +121,10 @@ int __universal_drv_probe(struct universal_drv *drv) {
                 }
                 break;
             case REQUEST_IRQ:
-                LJTALE_MSG(KERN_INFO, "request irq activity\n");
                 request_irq_ptr = 
-                    (struct universal_request_ir_type *)request->data;
+                    (struct universal_request_irq_type *)request->data;
+                LJTALE_MSG(KERN_INFO, "request irq activity: %s\n",
+                        request_irq_ptr->name);
                 request_irq_ptr->ret_irq = devm_request_threaded_irq(
                         request_irq_ptr->dev, request_irq_ptr->irq,
                         request_irq_ptr->handler, request_irq_ptr->thread_fn,

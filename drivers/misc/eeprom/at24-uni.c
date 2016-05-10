@@ -572,10 +572,63 @@ static struct regmap_bus regmap_at24_bus = {
 /* ljtale starts */
 static struct universal_drv at24_universal_driver = {
     .name = "at24-universal",
-    .config = {
-        .regmap_bus = &regmap_at24_bus,
-    },
 }; 
+
+static struct universal_devm_alloc_type at24_regmap_config_alloc = {
+    .name = "at24-regmap-config-alloc",
+    .drv_data_flag = 0,
+};
+
+static struct universal_regmap_type at24_universal_regmap = {
+    .name = "at24-regmap-config",
+
+};
+
+static struct universal_devm_alloc_type at24_nvmem_config_alloc = {
+    .name = "at24-nvmem-config-alloc",
+    .drv_data_flag = 0,
+};
+
+static struct universal_devm_alloc_type at24_universal_devm_alloc = {
+    .name = "at24-at24-alloc",
+    .drv_data_flag = 1,
+};
+
+static struct universal_request at24_universal_requests[] = {
+    {
+        .type = DEVM_ALLOCATE,
+        .data = &at24_regmap_config_alloc,
+    },
+    {
+        .type = REGMAP_INIT,
+        .data = &at24_universal_regmap,
+    },
+    {
+        .type = DEVM_ALLOCATE,
+        .data = &at24_nvmem_config_alloc,
+    },
+    {
+        .type = DEVM_ALLOCATE,
+        .data = &at24_universal_devm_alloc,
+    },
+};
+/* ljtale ends */
+
+/* ljtale starts */
+static int at24_regmap_config_alloc_populate(
+        struct universal_devm_alloc_type *ptr) {
+    return 0;
+}
+
+static int at24_nvmem_config_alloc_populate(
+        struct universal_devm_alloc_type *ptr) {
+    return 0;
+}
+
+static int at24_universal_devm_alloc_populate(
+        struct universal_devm_alloc_type *ptr) {
+    return 0;
+}
 /* ljtale ends */
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -594,7 +647,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct nvmem_device *nvmem_dev;
 
     /* ljtale starts */
-    printk(KERN_INFO "ljtale: at24 probe get called %s\n", __FUNCTION__);
+    LJTALE_DEBUG_PRINT("ljtale: at24 probe get called\n");
     /* ljtale ends */
 
     /* ljtale: who sets up the platform data for the device? */
@@ -689,15 +742,12 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
     /* ljtale starts */
     /* populate the universal driver fields for at24 */
     at24_universal_driver.dev = &client->dev;
-    at24_universal_driver.config.regmap_bus_context = client;
-    at24_universal_driver.config.regmap_config = regmap_config;
-    universal_drv_init(&at24_universal_driver);
+    // universal_drv_init(&at24_universal_driver);
     /* FIXME: the regmap pointer for this driver should be put into a data 
      * structure for the driver's use, but the data structure format 
      * needs more thinking 
      */
-    regmap = at24_universal_driver.config.regmap;
-#if 0
+    // regmap = at24_universal_driver.config.regmap;
 	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
 	regmap = devm_regmap_init(&client->dev, &regmap_at24_bus,
 			client, regmap_config);
@@ -707,7 +757,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			__func__, err);
 		return err;
 	}
-#endif
     /* ljtale ends */
 
 	nvmem_config = devm_kzalloc(&client->dev, sizeof(*nvmem_config),
