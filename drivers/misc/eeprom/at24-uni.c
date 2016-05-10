@@ -570,9 +570,6 @@ static struct regmap_bus regmap_at24_bus = {
 };
 
 /* ljtale starts */
-static struct universal_drv at24_universal_driver = {
-    .name = "at24-universal",
-}; 
 
 static struct universal_devm_alloc_type at24_regmap_config_alloc = {
     .name = "at24-regmap-config-alloc",
@@ -581,6 +578,7 @@ static struct universal_devm_alloc_type at24_regmap_config_alloc = {
 
 static struct universal_regmap_type at24_universal_regmap = {
     .name = "at24-regmap-config",
+    .regmap_bus = &regmap_at24_bus,
 
 };
 
@@ -612,41 +610,172 @@ static struct universal_request at24_universal_requests[] = {
         .data = &at24_universal_devm_alloc,
     },
 };
+
+struct at24_universal_local {
+    struct i2c_client *client;
+    struct at24_platform_data chip;
+    int use_smbus;
+    int use_smbus_write;
+    unsigned num_addresses;
+    struct nvmem_device *nvmem_dev;
+};
+static struct at24_universal_local at24_local = {
+    .use_smbus = 0,
+    .use_smbus_write = 0,
+};
+
+static struct universal_drv at24_universal_driver = {
+    .name = "at24-universal",
+    .requests = at24_universal_requests,
+    .local_data = &at24_local,
+}; 
+
+
 /* ljtale ends */
 
 /* ljtale starts */
 static int at24_regmap_config_alloc_populate(
         struct universal_devm_alloc_type *ptr) {
+    /* Assume the memory allocation is successful */
+    struct at24_universal_local *local;
+    struct regmap_config *config;
+    local = (struct at24_universal_local *)(at24_universal_driver.local_data);
+    config = (struct regmap_config *)(ptr->ret_addr);
+    config->reg_bits = 32;
+    config->val_bits = 8;
+    config->cache_type = REGCACHE_NONE;
+    /* hand code the dependency between regmap config alloc and regmap init */
+    at24_universal_regmap.regmap_config = config;
+    config->max_register = local->chip.byte_len;
     return 0;
 }
 
 static int at24_nvmem_config_alloc_populate(
         struct universal_devm_alloc_type *ptr) {
+    int err;
+    struct at24_universal_local *local;
+    struct nvmem_config *config;
+    local = (struct at24_universal_local *)(at24_universal_driver.local_data);
+    config = (struct nvmem_config *)(ptr->ret_addr);
+    config->dev = ptr->dev;
+    config->name = "at24-";
+    /* FIXME: at24_ida is a local data structure, possibly put it into the
+     * local structure for this driver */
+    config->id = ida_simple_get(&at24_ida, 0, 0, GFP_KERNEL);
+    config->owner = THIS_MODULE; 
+    if (config->id < 0) {
+        err = config->id;
+        dev_err(ptr->dev, "%s: eeprom id allocation failed (%d)\n",
+                __func__, err);
+        return err;
+    }
+    local->nvmem_dev = nvmem_register(config);
+    if (IS_ERR(local->nvmem_dev)) {
+        err = PTR_ERR(local->nvmem_dev);
+        dev_err(ptr->dev, "%s: nvmem_register failed (%d)\n",
+                __func__, err);
+        ida_simple_remove(&at24_ida, config->id);
+        return err;
+    }
     return 0;
 }
 
 static int at24_universal_devm_alloc_populate(
         struct universal_devm_alloc_type *ptr) {
-    return 0;
+    bool writable;
+    int i;
+    struct at24_universal_local *local;
+    struct at24_data *at24;
+    local = (struct at24_universal_local *)(at24_universal_driver.local_data);
+    at24 = (struct at24_data *)(ptr->ret_addr);
+    /* hand code the dependencies between devm alloc and regmap/nvmem */
+    at24->regmap = at24_universal_regmap.regmap;
+    at24->regmap_config = 
+        (struct regmap_config *)(at24_regmap_config_alloc.ret_addr);
+    at24->nvmem_config = 
+        (struct nvmem_config *)(at24_nvmem_config_alloc.ret_addr);
+    at24->nvmem_dev = local->nvmem_dev;
+    mutex_init(&at24->lock);
+    at24->use_smbus = local->use_smbus;
+    at24->use_smbus_write = local->use_smbus_write;
+    at24->chip = local->chip;
+    at24->num_addresses = local->num_addresses;
+    
+    at24->macc.read = at24_macc_read;
+	writable = !(local->chip.flags & AT24_FLAG_READONLY);
+	if (writable) {
+		if (!local->use_smbus || local->use_smbus_write) {
+
+			unsigned write_max = local->chip.page_size;
+
+			at24->macc.write = at24_macc_write;
+
+			if (write_max > io_limit)
+				write_max = io_limit;
+			if (local->use_smbus && write_max > I2C_SMBUS_BLOCK_MAX)
+				write_max = I2C_SMBUS_BLOCK_MAX;
+			at24->write_max = write_max;
+
+			/* buffer (data + address at the beginning) */
+            /* FIXME: another devm allocation, should be absracted */
+			at24->writebuf = devm_kzalloc(ptr->dev,
+				write_max + 2, GFP_KERNEL);
+			if (!at24->writebuf) {
+				return -ENOMEM;
+			}
+		} else {
+			dev_warn(ptr->dev,
+				"cannot write due to controller restrictions.");
+		}
+	}
+
+	at24->client[0] = local->client;
+
+	/* use dummy devices for multiple-address chips */
+	for (i = 1; i < local->num_addresses; i++) {
+		at24->client[i] = i2c_new_dummy(local->client->adapter,
+					local->client->addr + i);
+		if (!at24->client[i]) {
+			dev_err(ptr->dev, "address 0x%02x unavailable\n",
+					local->client->addr + i);
+            for (i = 1; i < local->num_addresses; i++) {
+                if (at24->client[i])
+                    i2c_unregister_device(at24->client[i]);
+            }
+			return -EADDRINUSE;
+		}
+	}
+
+	dev_info(ptr->dev, "%zu byte %s EEPROM, %s, %u bytes/write\n",
+		at24->chip.byte_len, at24->client[0]->name,
+		writable ? "writable" : "read-only", at24->write_max);
+	if (local->use_smbus == I2C_SMBUS_WORD_DATA ||
+	    local->use_smbus == I2C_SMBUS_BYTE_DATA) {
+		dev_notice(ptr->dev, "Falling back to %s reads, "
+			   "performance will suffer\n", local->use_smbus ==
+			   I2C_SMBUS_WORD_DATA ? "word" : "byte");
+	}
+
+	/* export data to kernel code */
+	if (local->chip.setup)
+		local->chip.setup(&at24->macc, local->chip.context);
+	return 0;
 }
 /* ljtale ends */
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct at24_platform_data chip;
-	bool writable;
 	int use_smbus = 0;
 	int use_smbus_write = 0;
-	struct at24_data *at24;
-	int err;
-	unsigned i, num_addresses;
+	// struct at24_data *at24;
+	// int err;
+	// unsigned i;
+    unsigned num_addresses;
 	kernel_ulong_t magic;
-	struct regmap_config *regmap_config;
-	struct regmap *regmap;
-	struct nvmem_config *nvmem_config;
-	struct nvmem_device *nvmem_dev;
 
     /* ljtale starts */
+    int ret;
     LJTALE_DEBUG_PRINT("ljtale: at24 probe get called\n");
     /* ljtale ends */
 
@@ -717,159 +846,60 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			chip.page_size = 1;
 		}
 	}
-
-	regmap_config = devm_kzalloc(&client->dev, sizeof(*regmap_config),
-			GFP_KERNEL);
-	if (IS_ERR(regmap_config)) {
-		err = PTR_ERR(regmap_config);
-		dev_err(&client->dev, "%s: regmap_config allocation failed (%d)\n",
-			__func__, err);
-		return err;
-	}
-
-	/* use 32 bits as registers, they don't appear on the wire anyway */
-	regmap_config->reg_bits = 32;
-	regmap_config->val_bits = 8;
-	regmap_config->cache_type = REGCACHE_NONE;
-	regmap_config->max_register = chip.byte_len;
-
+    /* ljtale starts */
+    /* get local data 
+     * FIXME: the local data could be assigned directly to the 
+     * static local data structure*/
+    at24_local.client = client;
+    at24_local.chip = chip;
+    at24_local.use_smbus = use_smbus;
+    at24_local.use_smbus_write = use_smbus_write;
 	if (chip.flags & AT24_FLAG_TAKE8ADDR)
 		num_addresses = 8;
 	else
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
-
-    /* ljtale starts */
-    /* populate the universal driver fields for at24 */
-    at24_universal_driver.dev = &client->dev;
-    // universal_drv_init(&at24_universal_driver);
-    /* FIXME: the regmap pointer for this driver should be put into a data 
-     * structure for the driver's use, but the data structure format 
-     * needs more thinking 
-     */
-    // regmap = at24_universal_driver.config.regmap;
-	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
-	regmap = devm_regmap_init(&client->dev, &regmap_at24_bus,
-			client, regmap_config);
-	if (IS_ERR(regmap)) {
-		err = PTR_ERR(regmap);
-		dev_err(&client->dev, "%s: regmap allocation failed (%d)\n",
-			__func__, err);
-		return err;
-	}
+    at24_local.num_addresses = num_addresses;
     /* ljtale ends */
 
-	nvmem_config = devm_kzalloc(&client->dev, sizeof(*nvmem_config),
-			GFP_KERNEL);
-	if (IS_ERR(nvmem_config)) {
-		err = PTR_ERR(nvmem_config);
-		dev_err(&client->dev, "%s: nvmem_config allocation failed (%d)\n",
-			__func__, err);
-		return err;
-	}
-	nvmem_config->dev = &client->dev;
-	nvmem_config->name = "at24-";
-	nvmem_config->id = ida_simple_get(&at24_ida, 0, 0, GFP_KERNEL);
-	nvmem_config->owner = THIS_MODULE;
-	if (nvmem_config->id < 0) {
-		err = nvmem_config->id;
-		dev_err(&client->dev, "%s: eeprom id allocation failed (%d)\n",
-			__func__, err);
-		return err;
-	}
+    /* ljtale starts */
+    /* populate the universal driver structure */
+    at24_universal_driver.request_size = ARRAY_SIZE(at24_universal_requests);
+    /* populate the request structure according to the request order */
+    /* regmap config allocate */
+    at24_regmap_config_alloc.dev = &client->dev;
+    at24_regmap_config_alloc.size = sizeof(struct regmap_config);
+    at24_regmap_config_alloc.gfp = GFP_KERNEL;
+    at24_regmap_config_alloc.populate = at24_regmap_config_alloc_populate;
+    /* regmap init */
+    at24_universal_regmap.dev = &client->dev;
+    at24_universal_regmap.regmap_bus_context = client;
+    /* nvmem config */
+    at24_nvmem_config_alloc.dev = &client->dev;
+    at24_nvmem_config_alloc.size = sizeof(struct nvmem_config);
+    at24_nvmem_config_alloc.gfp = GFP_KERNEL;
+    at24_nvmem_config_alloc.populate = at24_nvmem_config_alloc_populate;
+    /* at24 alloc */
+    at24_universal_devm_alloc.dev = &client->dev;
+    /* TODO: this kind of complex memory allocation needs more accurate
+     * description */
+    at24_universal_devm_alloc.size = sizeof(struct at24_data) + 
+        num_addresses * sizeof(struct i2c_client *);
+    at24_universal_devm_alloc.gfp = GFP_KERNEL;
+    at24_universal_devm_alloc.populate = at24_universal_devm_alloc_populate;
+    /* ljtale ends */
 
-	nvmem_dev = nvmem_register(nvmem_config);
-	if (IS_ERR(nvmem_dev)) {
-		err = PTR_ERR(nvmem_dev);
-		dev_err(&client->dev, "%s: nvmem_register failed (%d)\n",
-			__func__, err);
-		goto err_out;
-	}
 
-    /* ljtale: num_addresses * sizeof(struct i2c_client *) is the
-     * i2c_client pointer for all the eeprom devices */
-	at24 = devm_kzalloc(&client->dev, sizeof(struct at24_data) +
-		num_addresses * sizeof(struct i2c_client *), GFP_KERNEL);
-	if (!at24) {
-		err = -ENOMEM;
-		goto err_out;
-	}
-
-	at24->regmap = regmap;
-	at24->regmap_config = regmap_config;
-	at24->nvmem_config = nvmem_config;
-	at24->nvmem_dev = nvmem_dev;
-
-	mutex_init(&at24->lock);
-	at24->use_smbus = use_smbus;
-	at24->use_smbus_write = use_smbus_write;
-    /* ljtale: another chip copy... */
-	at24->chip = chip;
-	at24->num_addresses = num_addresses;
-
-	at24->macc.read = at24_macc_read;
-
-	writable = !(chip.flags & AT24_FLAG_READONLY);
-	if (writable) {
-		if (!use_smbus || use_smbus_write) {
-
-			unsigned write_max = chip.page_size;
-
-			at24->macc.write = at24_macc_write;
-
-			if (write_max > io_limit)
-				write_max = io_limit;
-			if (use_smbus && write_max > I2C_SMBUS_BLOCK_MAX)
-				write_max = I2C_SMBUS_BLOCK_MAX;
-			at24->write_max = write_max;
-
-			/* buffer (data + address at the beginning) */
-			at24->writebuf = devm_kzalloc(&client->dev,
-				write_max + 2, GFP_KERNEL);
-			if (!at24->writebuf) {
-				err = -ENOMEM;
-				goto err_out;
-			}
-		} else {
-			dev_warn(&client->dev,
-				"cannot write due to controller restrictions.");
-		}
-	}
-
-	at24->client[0] = client;
-
-	/* use dummy devices for multiple-address chips */
-	for (i = 1; i < num_addresses; i++) {
-		at24->client[i] = i2c_new_dummy(client->adapter,
-					client->addr + i);
-		if (!at24->client[i]) {
-			dev_err(&client->dev, "address 0x%02x unavailable\n",
-					client->addr + i);
-			err = -EADDRINUSE;
-			goto err_clients;
-		}
-	}
-
-    /* ljtale: this is just a wrapper for the generic driver data set
-     * function: dev_set_drvdata()  */
-	i2c_set_clientdata(client, at24);
-
-	dev_info(&client->dev, "%zu byte %s EEPROM, %s, %u bytes/write\n",
-		at24->chip.byte_len, client->name,
-		writable ? "writable" : "read-only", at24->write_max);
-	if (use_smbus == I2C_SMBUS_WORD_DATA ||
-	    use_smbus == I2C_SMBUS_BYTE_DATA) {
-		dev_notice(&client->dev, "Falling back to %s reads, "
-			   "performance will suffer\n", use_smbus ==
-			   I2C_SMBUS_WORD_DATA ? "word" : "byte");
-	}
-
-	/* export data to kernel code */
-	if (chip.setup)
-		chip.setup(&at24->macc, chip.context);
-
+    /* ljtale starts */
+    ret = universal_drv_init(&at24_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver allocation failed\n");
+        return ret;
+    }
 	return 0;
 
+    /* FIXME: error handling is not addressed here yet */
+#if 0
 err_clients:
 
 	for (i = 1; i < num_addresses; i++)
@@ -880,6 +910,8 @@ err_out:
 	ida_simple_remove(&at24_ida, nvmem_config->id);
 
 	return err;
+#endif
+    /* ljtale ends */
 }
 
 static int at24_remove(struct i2c_client *client)

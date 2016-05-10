@@ -93,7 +93,7 @@ struct universal_drv {
      */
     /* FIXME: since the universal driver is for a specific device, this pointer
      * should replace any one that is used in specific activity type */
-    struct device *dev;
+    // struct device *dev;
     /* 
      * The universal driver probe function could take a list of requests
      * from conventional drivers and do them according to the order specified

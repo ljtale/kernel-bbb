@@ -93,16 +93,16 @@ int __universal_drv_probe(struct universal_drv *drv) {
                     ret = -ENOMEM;
                     goto err;
                 }
+                if (devm_alloc_ptr->populate) {
+                    ret = devm_alloc_ptr->populate(devm_alloc_ptr);
+                } else {
+                    LJTALE_DEBUG_PRINT("memory populate unavailable\n");
+                }
                 /* set the driver data, this should be generic for all
                  * the drivers */
                 if (devm_alloc_ptr->drv_data_flag) {
                     dev_set_drvdata(devm_alloc_ptr->dev, 
                             devm_alloc_ptr->ret_addr);
-                }
-                if (devm_alloc_ptr->populate) {
-                    ret = devm_alloc_ptr->populate(devm_alloc_ptr);
-                } else {
-                    LJTALE_DEBUG_PRINT("memory populate unavailable\n");
                 }
                 break;
             case OF_NODE_MATCH:

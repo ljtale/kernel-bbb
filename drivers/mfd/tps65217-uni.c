@@ -316,11 +316,11 @@ static int tps65217_devm_alloc_populate(
         (struct tps65217_universal_local *)tps65217_universal_driver.local_data;
     local->tps = (struct tps65217 *)(ptr->ret_addr);
     tps = local->tps;
-    tps->regmap = tps65217_universal_regmap.regmap;
     tps->dev = ptr->dev; 
     tps->irq = local->irq;
     tps->irq_gpio = local->irq_gpio;
     /* hand coded dependencies between various activities */
+    tps->regmap = tps65217_universal_regmap.regmap;
     tps65217_universal_request_irq.irq = tps->irq;
     tps65217_universal_request_irq.dev_id = tps;
     /* we got an irq, request it */
@@ -375,11 +375,15 @@ static int tps65217_probe(struct i2c_client *client,
     /* ljtale ends */
 
     /* ljtale starts */
-    tps65217_universal_driver.dev = &client->dev;
+    // tps65217_universal_driver.dev = &client->dev;
     tps65217_universal_driver.requests = tps65217_universal_requests;
     tps65217_universal_driver.request_size =
         ARRAY_SIZE(tps65217_universal_requests);
     tps65217_universal_driver.local_data = &tps65217_local;
+    /* FIXME: As for each device there will be a universal driver instance,
+     * this call should be put in the driver init function or universal
+     * driver should be dynamically allocated for each device upon calling
+     * probe  */
     ret = universal_drv_register(&tps65217_universal_driver);
     if (ret < 0) {
         LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
@@ -470,10 +474,10 @@ static int tps65217_probe(struct i2c_client *client,
      * FIXME: call universal driver init only after all the request fields 
      * are populated. Refer to the google doc for conerns and explanation
      */
-    universal_drv_init(&tps65217_universal_driver);
-    if (!tps65217_local.tps) {
+    ret = universal_drv_init(&tps65217_universal_driver);
+    if (ret < 0) {
         LJTALE_MSG(KERN_ERR, "universal driver allocation failed\n");
-        return -EINVAL;
+        return ret;
     }
     tps = tps65217_local.tps;
     /* ljtale ends */
