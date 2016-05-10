@@ -28,7 +28,7 @@
 
 #define LJTALE_DEBUG_PRINT(args...) \
     do {                            \
-        printk(KERN_INFO "ljtale-debug: %s: line: %d" args, \
+        printk(KERN_INFO "ljtale-debug: %s: line: %d " args, \
                 __FILE__, __LINE__);                \
     }                               \
     while(0)

@@ -776,7 +776,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
     /* ljtale starts */
     int ret;
-    LJTALE_DEBUG_PRINT("ljtale: at24 probe get called\n");
+    LJTALE_DEBUG_PRINT("at24 probe get called\n");
     /* ljtale ends */
 
     /* ljtale: who sets up the platform data for the device? */
