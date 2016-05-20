@@ -454,6 +454,11 @@ static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
 	return NULL;
 }
 
+/* ljtale: the match function is called either iteratively over the list of 
+ * drivers on the bus when a device is detected or iteratively over the list of
+ * devices on the bus when a driver is registered. The driver should
+ * have something like an id table or of device id table
+ */
 static int i2c_device_match(struct device *dev, struct device_driver *drv)
 {
 	struct i2c_client	*client = i2c_verify_client(dev);
@@ -625,6 +630,11 @@ int i2c_recover_bus(struct i2c_adapter *adap)
 }
 EXPORT_SYMBOL_GPL(i2c_recover_bus);
 
+/* ljtale: i2c_device_probe uses the standard struct device interface, but
+ * all the i2c device probe in an i2c device driver is defined using interface
+ * struct i2c_client and i2c_device_id table, which is not a good thing
+ * to build a universal driver that works for all kinds of devices
+ */
 static int i2c_device_probe(struct device *dev)
 {
 	struct i2c_client	*client = i2c_verify_client(dev);
@@ -1733,6 +1743,8 @@ int i2c_register_driver(struct module *owner, struct i2c_driver *driver)
 
 	/* add the driver to the list of i2c drivers in the driver core */
 	driver->driver.owner = owner;
+    /* ljtale: This is the start point where an i2c driver has something to
+     * wo with the i2c bus */
 	driver->driver.bus = &i2c_bus_type;
 
 	/* When registration returns, the driver core

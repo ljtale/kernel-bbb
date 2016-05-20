@@ -202,6 +202,21 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 }
 
 /* ljtale starts */
+
+struct tps65217-uni {
+    struct device *dev;
+    struct regmap *regmap;
+    int irq_gpio;
+    int irq;
+};
+
+struct tps65217-local {
+    struct tps65217_board *pdata;
+    unsigned long id;
+    struct regulator_desc desc[TPS65217_NUM_REGULATOR];
+    struct input_dev *pwr_but;
+};
+
 static struct universal_regmap_type tps65217_universal_regmap = {
     .name = "tps65217-regmap-init",
     .regmap_config = &tps65217_regmap_config,

@@ -102,6 +102,13 @@ struct universal_drv {
     int request_size;
     /* Local data for the conventional driver */
     void *local_data;
+    
+    /* the universal driver provides a universal probe function for the 
+     * device driver to call upon a device-driver binding, but there
+     * are certain parts of the work that has to be done in the conventional
+     * driver TODO: define a proper argument list */
+    int (*local_probe)(struct universal_drv *drv);
+
     /* Currently we assume each device will have a universal driver attached */
     struct list_head list;
 };

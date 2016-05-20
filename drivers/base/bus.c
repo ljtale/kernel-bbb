@@ -681,6 +681,7 @@ int bus_add_driver(struct device_driver *drv)
 		goto out_put_bus;
 	}
 	klist_init(&priv->klist_devices, NULL, NULL);
+    /* ljtale: this kind of not-nice pointer relationships */
 	priv->driver = drv;
 	drv->p = priv;
 	priv->kobj.kset = bus->p->drivers_kset;
