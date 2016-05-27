@@ -7,6 +7,10 @@
 #include <linux/of_device.h>
 #include <linux/interrupt.h>
 
+#include <linux/i2c.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
+
 #include <linux/ljtale-utils.h>
 
 enum universal_req_type {
@@ -79,6 +83,13 @@ struct universal_request {
 #define UNIDRV_TYPE(activity) \
     struct universal_##activity_type
 
+
+struct data_type {
+    unsigned offset;
+    unsigned size;
+    unsigned count;
+};
+
 /*
  * universal driver struct 
  */
@@ -98,10 +109,10 @@ struct universal_drv {
      * The universal driver probe function could take a list of requests
      * from conventional drivers and do them according to the order specified
      */
-    struct universal_request *requests;
-    int request_size;
+     struct universal_request *requests;
+     int request_size;
     /* Local data for the conventional driver */
-    void *local_data;
+     void *local_data;
     
     /* the universal driver provides a universal probe function for the 
      * device driver to call upon a device-driver binding, but there
@@ -111,6 +122,13 @@ struct universal_drv {
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head list;
+
+
+    /* an array of integers to represent what memory fields the conventional
+     * driver needs
+     */
+    struct data_type *mem_represent;
+
 };
 
  /* The registration function should be called from init calls */
@@ -125,6 +143,32 @@ extern int __universal_drv_probe(struct universal_drv *drv);
 /* TODO: debugfs support for universal driver debugging */
 
 char *universal_req_type_str (enum universal_req_type type);
+
+
+#if 0
+
+0 struct device *dev;
+1 struct tps65217_board *pdata;
+2 unsigned long id;
+3 struct regulator_desc desc[TPS65217_NUM_REGULATOR];
+4 struct regmap *regmap;
+5 int irq_gpio;
+6 int irq;
+7 struct input_dev *pwr_but;
+#endif
+
+#define SIZE_0 sizeof(struct device *)
+#define SIZE_1 sizeof(struct tps65217_board)
+#define SIZE_2 sizeof(unsigned long)
+#define SIZE_3 sizeof(struct regulator_desc)
+#define SIZE_4 sizeof(struct regmap *)
+#define SIZE_5 sizeof(int)
+#define SIZE_6 sizeof(struct input_dev *)
+
+/* FIXME: the pointer should be one single primitive, thus SIZE_0/4/6 
+ * actually can be merged */
+
+void *uni_devm_alloc(struct device *, struct data_type *);
 
 #endif
 

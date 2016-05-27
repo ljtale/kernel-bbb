@@ -22,6 +22,29 @@
  */
 static struct list_head universal_drivers;
 
+void *uni_devm_alloc(struct device *dev, struct data_type *type) {
+    unsigned data_size;
+    int i;
+    void *ret;
+
+    if (!type) {
+        LJTALE_MSG(KERN_ERR, "data type empty\n");
+        return NULL;
+    }
+    type[0].offset = 0;
+    i = 1;
+    while(type[i].offset) {
+        type[i].offset = type[i-1].offset + type[i-1].size * type[i-1].count;
+        i++;
+    }
+    data_size = type[i - 1].offset + type[i - 1].size * type[i - 1].count;
+    ret = devm_kzalloc(dev, data_size, GFP_KERNEL);
+    if (!ret) {
+        LJTALE_MSG(KERN_ERR, "memory allocation failed\n");
+    }
+    return ret;
+}
+
 int __universal_drv_register(struct universal_drv *drv) {
     if (!drv) {
         LJTALE_MSG(KERN_ERR, "universal driver pointer null\n");
