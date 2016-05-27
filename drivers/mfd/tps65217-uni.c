@@ -243,57 +243,6 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 	return 0;
 }
 
-#if 0
-/* data types could be useful later, because memory allocation is infered
- * from other abstracted activities 
- * */
-
-static struct data_type tps65217_mem_represent[] = {
-    {
-        .offset = 0,
-        .size = SIZE_0,
-        .count = 1,
-    },
-    {
-        .offset = 1,
-        .size = SIZE_1,
-        .count = 1,
-    },
-    {
-        .offset = 2,
-        .size = SIZE_2,
-        .count = 1,
-    },
-    {
-        .offset = 3,
-        .size = SIZE_3,
-        .count = TPS65217_NUM_REGULATOR,
-    },
-    {
-        .offset = 4,
-        .size = SIZE_4,
-        .count = 1,
-    },
-    {
-        .offset = 5,
-        .size = SIZE_5,
-        .count = 1,
-    },
-    {
-        .offset = 6,
-        .size = SIZE_5,
-        .count = 1,
-    },
-    {
-        .offset = 7,
-        .size = SIZE_6,
-        .count = 1,
-    },
-    {},
-};
-
-#endif
-
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {

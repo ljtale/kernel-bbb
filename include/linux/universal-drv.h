@@ -80,15 +80,53 @@ struct universal_request {
     void *data;
 };
 
+/*
+ * register accessor data structures and auxiliary types
+ */
+
+typedef void (*regacc_lock)(void *);
+typedef void (*regacc_unlock)(void *);
+
+struct register_accessor {
+    struct device *dev;
+    const char *bus_name;   /* the busto which the device is connected */
+    int reg_add_bits;
+    int reg_val_bits;
+
+    /* synchronization primitives */
+    struct mutex mutex;    /* could use spinlocks for fast I/O */
+    regacc_lock lock;
+    regacc_unlock unlock;
+    void *lock_arg;
+
+    /* TODO: possible a way to describe regsiter layout, one-dimentional or
+     * two dimentional */
+    // struct reg_layout layout;
+    
+    /* register accessing APIs, i.e., read/write etc.
+     * We will assume generic read/write APIs */
+    /* 
+     * regacc_read: read from register reg and put the value in val
+     * return 0 on success, return error code on failure */
+    int (*regacc_read)(struct device *dev, unsigned int reg, unsigned int *val);
+    /* 
+     * regacc_write: write value in val to register reg
+     * return 0 on success, return error code on failure */
+    int (*regacc_write)(struct device *dev, unsigned int reg, unsigned int val); 
+    /* TODO: more accessors, like set bits */
+
+    /* ad-hoc fields */
+    bool regmap_support;
+    struct regmap *regmap;
+};
+
+
+/*
+ *
+ */
+
 #define UNIDRV_TYPE(activity) \
     struct universal_##activity_type
-
-
-struct data_type {
-    unsigned offset;
-    unsigned size;
-    unsigned count;
-};
 
 /*
  * universal driver struct 
@@ -143,32 +181,6 @@ extern int __universal_drv_probe(struct universal_drv *drv);
 /* TODO: debugfs support for universal driver debugging */
 
 char *universal_req_type_str (enum universal_req_type type);
-
-
-#if 0
-
-0 struct device *dev;
-1 struct tps65217_board *pdata;
-2 unsigned long id;
-3 struct regulator_desc desc[TPS65217_NUM_REGULATOR];
-4 struct regmap *regmap;
-5 int irq_gpio;
-6 int irq;
-7 struct input_dev *pwr_but;
-#endif
-
-#define SIZE_0 sizeof(struct device *)
-#define SIZE_1 sizeof(struct tps65217_board)
-#define SIZE_2 sizeof(unsigned long)
-#define SIZE_3 sizeof(struct regulator_desc)
-#define SIZE_4 sizeof(struct regmap *)
-#define SIZE_5 sizeof(int)
-#define SIZE_6 sizeof(struct input_dev *)
-
-/* FIXME: the pointer should be one single primitive, thus SIZE_0/4/6 
- * actually can be merged */
-
-void *uni_devm_alloc(struct device *, struct data_type *);
 
 #endif
 
