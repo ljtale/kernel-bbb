@@ -52,6 +52,10 @@
 #include <asm/uaccess.h>
 #include <linux/err.h>
 
+/* ljtale starts */
+#include <linux/universal-drv.h>
+/* ljtale ends */
+
 #include "i2c-core.h"
 
 #define CREATE_TRACE_POINTS
@@ -640,6 +644,9 @@ static int i2c_device_probe(struct device *dev)
 	struct i2c_client	*client = i2c_verify_client(dev);
 	struct i2c_driver	*driver;
 	int status;
+    /* ljtale starts */
+    struct universal_device *universal_dev;
+    /* ljtale ends */
 
 	if (!client)
 		return 0;
@@ -670,8 +677,20 @@ static int i2c_device_probe(struct device *dev)
 
 	status = dev_pm_domain_attach(&client->dev, true);
 	if (status != -EPROBE_DEFER) {
+        /* ljtale: this is where to insert code to call universal probe */
+        /* ljtale starts */
+        universal_dev = check_universal_driver(dev);
+        if (universal_dev) {
+            status = universal_driver_probe(universal_dev);
+        } else {
+           status = driver->probe(client, i2c_match_id(driver->id_table,
+                       client)); 
+        }
+#if 0
 		status = driver->probe(client, i2c_match_id(driver->id_table,
 					client));
+#endif
+        /* ljtale ends */
 		if (status)
 			dev_pm_domain_detach(&client->dev, true);
 	}

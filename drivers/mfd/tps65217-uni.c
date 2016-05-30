@@ -243,6 +243,23 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 	return 0;
 }
 
+/* ljtale starts */
+static struct register_accessor tps65217_regacc = {
+    /* device specific information */
+    .bus_name = "i2c0",
+    .reg_addr_bits = 8,
+    .reg_val_bits = 8,
+
+    /* driver-specific (ad-hoc) information */
+    .regmap_support = true,
+};
+
+struct universal_driver tps65217_universal_driver = {
+    .name = "tps65217-universal-driver",
+    .regacc = &tps65217_regacc,
+};
+/* ljtale ends */
+
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {
@@ -388,12 +405,21 @@ static struct i2c_driver tps65217_driver = {
 
 static int __init tps65217_init(void)
 {
+    /* ljtale starts */
+    int ret;
+    ret = universal_driver_register(&tps65217_universal_driver);
+    if (ret < 0) {
+        LJTALE_MSG(KERN_ERR, "universal driver registration faile: %d\n", ret);
+        return ret;
+    }
+    /* ljtale ends */
 	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);
 
 static void __exit tps65217_exit(void)
 {
+    /* TODO: a unviersal driver exit function is needed */
 	i2c_del_driver(&tps65217_driver);
 }
 module_exit(tps65217_exit);

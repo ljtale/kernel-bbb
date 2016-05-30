@@ -23,74 +23,17 @@ enum universal_req_type {
 };
 
 /*
- * Corresponding to different request types, there should be a data structure
- * associate with the data pointer */
-struct universal_regmap_type {
-    char *name;
-    struct device *dev;
-    struct regmap_bus *regmap_bus;
-    void *regmap_bus_context;
-    struct regmap_config *regmap_config;
-    struct regmap *regmap;
-};
-
-struct universal_devm_alloc_type {
-    char *name;
-    /* the device pointer for the allocated memory to be attached to*/
-    struct device *dev;
-    size_t size;
-    gfp_t gfp;
-    void *ret_addr;
-    /* indicate if this data needs to be added to the driver data */
-    bool drv_data_flag :1;
-    /* Usually the allocated memory needs to be populated, we provide a 
-     * function pointer to point back to the conventional driver to do
-     * the population.
-     * FIXME: this is a temporary approach of proof-of-concept, later we
-     * need to think about separating the conventional drivers and the
-     * universal driver, providing a clean interface between them instead of
-     * using C pointers. A similar problem is also exposed to other types. */
-    int (*populate)(struct universal_devm_alloc_type *ptr);
-};
-
-struct universal_of_node_match_type {
-    char *name;
-    struct of_device_id *matches;
-    struct device *dev;
-    struct of_device_id *ret_match;
-};
-
-/* TODO: distinguish threaded and non-threaded irq request */
-struct universal_request_irq_type {
-    char *name;
-    struct device *dev;
-    unsigned int irq;
-    irq_handler_t handler;
-    irq_handler_t thread_fn;
-    unsigned long irqflags;
-    const char *devname;
-    void *dev_id;
-    int ret_irq;
-    int (*post_process)(struct universal_request_irq_type *ptr);
-};
-
-struct universal_request {
-    enum universal_req_type type;
-    /* FIXME: potentially type unsafe */
-    void *data;
-};
-
-/*
  * register accessor data structures and auxiliary types
  */
 
 typedef void (*regacc_lock)(void *);
 typedef void (*regacc_unlock)(void *);
+void regacc_lock_mutex(void *__regacc);
+void regacc_unlock_mutex(void *__regacc);
 
 struct register_accessor {
-    struct device *dev;
     const char *bus_name;   /* the busto which the device is connected */
-    int reg_add_bits;
+    int reg_addr_bits;
     int reg_val_bits;
 
     /* synchronization primitives */
@@ -122,8 +65,53 @@ struct register_accessor {
 
 
 /*
- *
+ * irq configuration data structure and auxiliary types
  */
+
+struct irq_config {
+    irqreturn_t (*handler)(int irq, void *data);
+    irqreturn_t (*thread_fn)(int irq, void *data);
+    /* irq could come from static platform information, or from device tree,
+     * which we can get at runtime */
+};
+
+
+/*
+ * iomap configuration data structure and auxiliary types
+ */
+
+struct iomap_config {
+    /* legacy support for port IO or memory-mapped IO, default is MMIO */
+    bool pio;
+    /* depending on pio or mmio, the memory range could be got from platform
+     * data or device tree, which we can get at runtime */
+    /* if succeeds, iomap should return a virtual address
+     * FIXME: the returned address should be used somehow within the unviersal
+     * driver by the same data structure set for that device */
+    void *virt_addr;
+};
+
+/*
+ * DMA configuration data structure and auxiliary types
+ * */
+
+struct dma_config {
+    /* TODO: what is needed for DMA configuration? */
+};
+
+
+/*
+ * communication interfaces between the driver and the kernel
+ * NOTE: this part probably is the most driver-dependent, which means this
+ * part contains information that is pretty different accross drivers
+ * e.g., tps has its interfaces to talk to the regulator driver and backlight
+ * driver, eeprom has a nvmem framework on top the the register accessors
+ * TODO: a generic way to manage this, like standarlized interfaces definition ?
+ * */
+struct drv_kernel_interface {
+    /* ... */
+}; 
+
 
 #define UNIDRV_TYPE(activity) \
     struct universal_##activity_type
@@ -132,51 +120,51 @@ struct register_accessor {
  * universal driver struct 
  */
 
-struct universal_drv {
+struct universal_driver {
     const char *name;
-    /*
-     * As a generic interface for all the devices, the universal driver should
-     * use a device reference that is generic for all the devices. Since the
-     * universal driver could potentially maintain device states, this pointer
-     * is used to uniquely identify universal drivers
-     */
-    /* FIXME: since the universal driver is for a specific device, this pointer
-     * should replace any one that is used in specific activity type */
-    // struct device *dev;
-    /* 
-     * The universal driver probe function could take a list of requests
-     * from conventional drivers and do them according to the order specified
-     */
-     struct universal_request *requests;
-     int request_size;
-    /* Local data for the conventional driver */
-     void *local_data;
-    
+    struct device_driver *driver;
+
+    /* universal data structures */
+    struct register_accessor *regacc;
+
+    /* local data structrue that is only known to the conventional drivers */
+    void *local_data;
     /* the universal driver provides a universal probe function for the 
      * device driver to call upon a device-driver binding, but there
      * are certain parts of the work that has to be done in the conventional
      * driver TODO: define a proper argument list */
-    int (*local_probe)(struct universal_drv *drv);
+    int (*local_probe)(struct universal_driver *drv);
 
     /* Currently we assume each device will have a universal driver attached */
-    struct list_head list;
+    struct list_head drv_list;
+};
 
+/* 
+ * upon calling the probe function of universal driver, we will assume there is
+ * a struct device instance already created, and this universal_device will need
+ * to be created on a per-device base.
+ * */
+struct universal_device {
+    const char *name;
+    
+    struct device *dev;
+    
+    struct univeral_driver *drv;
 
-    /* an array of integers to represent what memory fields the conventional
-     * driver needs
-     */
-    struct data_type *mem_represent;
-
+    /* Add the device to a global list for further reference */
+    struct list_head dev_list;
 };
 
  /* The registration function should be called from init calls */
-extern int __universal_drv_register(struct universal_drv *drv);
-#define universal_drv_register(drv) \
+extern int __universal_drv_register(struct universal_driver *drv);
+#define universal_driver_register(drv) \
     __universal_drv_register(drv)
 
-extern int __universal_drv_probe(struct universal_drv *drv);
-#define universal_drv_init(drv) \
-    __universal_drv_probe(drv)
+extern int __universal_drv_probe(struct universal_device *dev);
+#define universal_driver_probe(dev) \
+    __universal_drv_probe(dev)
+
+struct universal_device *check_universal_driver(struct device *dev);
 
 /* TODO: debugfs support for universal driver debugging */
 
