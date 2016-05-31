@@ -13,6 +13,9 @@
 
 #include <linux/ljtale-utils.h>
 
+struct universal_driver;
+struct universal_device;
+
 enum universal_req_type {
     /* potential usage as array index */
     /* REGMAP_INIT = 0, */
@@ -133,7 +136,7 @@ struct universal_driver {
      * device driver to call upon a device-driver binding, but there
      * are certain parts of the work that has to be done in the conventional
      * driver TODO: define a proper argument list */
-    int (*local_probe)(struct universal_driver *drv);
+    int (*local_probe)(struct universal_device *dev);
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;
@@ -151,6 +154,8 @@ struct universal_device {
     
     struct univeral_driver *drv;
 
+    void *private_data;
+
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
 };
@@ -160,11 +165,20 @@ extern int __universal_drv_register(struct universal_driver *drv);
 #define universal_driver_register(drv) \
     __universal_drv_register(drv)
 
+extern int __universal_dev_register(struct universal_device *dev);
+#define universal_device_register(dev) \
+    __universal_dev_register(dev)
+
 extern int __universal_drv_probe(struct universal_device *dev);
 #define universal_driver_probe(dev) \
     __universal_drv_probe(dev)
 
+/* check if there is a universal driver for the device, if so
+ * return the universal device handle, otherwise return NULL */
 struct universal_device *check_universal_driver(struct device *dev);
+/* Create a universal device based on the existing device structure
+ * This creation is bus-agnostic */
+struct universal_device *new_universal_device(struct device *dev);
 
 /* TODO: debugfs support for universal driver debugging */
 

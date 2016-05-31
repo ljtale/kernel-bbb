@@ -2320,8 +2320,22 @@ static int i2c_detect_address(struct i2c_client *temp_client,
 		dev_dbg(&adapter->dev, "Creating %s at 0x%02x\n",
 			info.type, info.addr);
 		client = i2c_new_device(adapter, &info);
+        /* ljtale: create an i2c client for the adapter */
+        /* ljtale starts */
+#if 0
 		if (client)
 			list_add_tail(&client->detected, &driver->clients);
+#endif
+        if (client) {
+            list_add_tail(&client->detected, &driver->clients);
+            struct universal_device *uni_dev;
+            uni_dev = new_universal_device(&client->dev);
+            if (uni_dev)
+                universal_device_register(uni_dev);
+            else
+                LJTALE_MSG(KERN_ERR, "universal device creation failed\n");
+        }
+        /* ljtale ends */
 		else
 			dev_err(&adapter->dev, "Failed creating %s at 0x%02x\n",
 				info.type, info.addr);

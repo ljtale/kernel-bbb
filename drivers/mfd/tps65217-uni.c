@@ -243,22 +243,6 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 	return 0;
 }
 
-/* ljtale starts */
-static struct register_accessor tps65217_regacc = {
-    /* device specific information */
-    .bus_name = "i2c0",
-    .reg_addr_bits = 8,
-    .reg_val_bits = 8,
-
-    /* driver-specific (ad-hoc) information */
-    .regmap_support = true,
-};
-
-struct universal_driver tps65217_universal_driver = {
-    .name = "tps65217-universal-driver",
-    .regacc = &tps65217_regacc,
-};
-/* ljtale ends */
 
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
@@ -402,6 +386,34 @@ static struct i2c_driver tps65217_driver = {
 	.probe		= tps65217_probe,
 	.remove		= tps65217_remove,
 };
+
+/* ljtale starts */
+static int tps65217_universal_local_probe(struct universal_device *uni_dev) {
+    struct device *dev;
+    struct i2c_client *client;
+    dev = uni_dev->dev;
+    client = to_i2c_client(dev);
+    return tps65217_probe(client, tps65217_id_table); 
+}
+
+static struct register_accessor tps65217_regacc = {
+    /* device specific information */
+    .bus_name = "i2c0",
+    .reg_addr_bits = 8,
+    .reg_val_bits = 8,
+
+    /* driver-specific (ad-hoc) information */
+    .regmap_support = true,
+};
+
+struct universal_driver tps65217_universal_driver = {
+    .name = "tps65217-universal-driver",
+    .regacc = &tps65217_regacc,
+    .local_probe = tps65217_universal_local_probe,
+};
+
+/* ljtale ends */
+
 
 static int __init tps65217_init(void)
 {

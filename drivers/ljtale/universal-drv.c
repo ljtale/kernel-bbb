@@ -42,7 +42,7 @@ int __universal_drv_register(struct universal_driver *drv) {
     LJTALE_MSG(KERN_INFO, "universal driver register: %s\n", drv->name);
     return 0;
 }
-EXPORT_SYMBOL_GPL(__universal_drv_register);
+EXPORT_SYMBOL(__universal_drv_register);
 
 
 int __universal_drv_probe(struct universal_device *dev) {
@@ -59,7 +59,22 @@ err:
     LJTALE_MSG(KERN_INFO "universal driver initializaiton failed\n");
     return ret;
 }
-EXPORT_SYMBOL_GPL(__universal_drv_probe);
+EXPORT_SYMBOL(__universal_drv_probe);
+
+
+int __universal_dev_register(struct universal_device *dev) {
+    if (!dev) {
+        LJTALE_MSG(KERN_ERR, "universal device pointer null\n");
+        return -ENODEV;
+    }
+    /* temporarily the regisration only adds the device to the device list
+     * TODO: more registration information needed here later */
+    list_add_tail(&dev->dev_list, &universal_devices);
+    LJTALE_MSG(KERN_INFO, "universal device registered: %s\n", dev->name);
+    return 0;
+}
+EXPORT_SYMBOL(__universal_dev_register);
+
 
 /* TODO: function calls to revoke what has been done by the probe function */
 

@@ -15,6 +15,7 @@
 #include <linux/pm_domain.h>
 #include <linux/err.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 
 #include <linux/universal-drv.h>
 
@@ -48,3 +49,19 @@ struct universal_device *check_universal_driver(struct device *dev) {
     return uni_dev;
 }
 EXPORT_SYMBOL(check_universal_driver);
+
+
+struct universal_device *new_universal_device(struct device *dev) {
+    struct universal_device *uni_dev;
+    uni_dev = kzalloc(sizeof(struct universal_device), GFP_KERNEL);
+    if (!uni_dev) {
+        return NULL;
+    }
+    /* the device possibly has not had a driver yet */
+    /* temporarily I use the bus name to identify the universal device */
+    uni_dev->name = dev->bus->name;
+    uni_dev->dev = dev;
+    /* TODO: more initialization */
+    return uni_dev;
+}
+EXPORT_SYMBOL(new_universal_device);
