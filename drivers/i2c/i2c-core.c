@@ -683,7 +683,9 @@ static int i2c_device_probe(struct device *dev)
         if (universal_dev) {
             status = universal_driver_probe(universal_dev);
         } else {
-           status = driver->probe(client, i2c_match_id(driver->id_table,
+            LJTALE_MSG(KERN_INFO, 
+                    "universal device not available for this device\n");
+            status = driver->probe(client, i2c_match_id(driver->id_table,
                        client)); 
         }
 #if 0

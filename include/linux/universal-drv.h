@@ -125,6 +125,8 @@ struct drv_kernel_interface {
 
 struct universal_driver {
     const char *name;
+    /* the driver reference helps to use existing driver mechanisms such
+     * as the device-driver matching mechanism */
     struct device_driver *driver;
 
     /* universal data structures */
@@ -140,6 +142,8 @@ struct universal_driver {
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;
+    /* like the normal device driver, one such universal driver data structure
+     * is supposed to support one or more devices */
 };
 
 /* 
@@ -149,11 +153,9 @@ struct universal_driver {
  * */
 struct universal_device {
     const char *name;
-    
     struct device *dev;
-    
-    struct univeral_driver *drv;
 
+    struct universal_driver *drv;   
     void *private_data;
 
     /* Add the device to a global list for further reference */

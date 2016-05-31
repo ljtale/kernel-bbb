@@ -397,7 +397,8 @@ static int tps65217_universal_local_probe(struct universal_device *uni_dev) {
 }
 
 static struct register_accessor tps65217_regacc = {
-    /* device specific information */
+    /* device specific information
+     * FIXME: bus name is not really useful here?  */
     .bus_name = "i2c0",
     .reg_addr_bits = 8,
     .reg_val_bits = 8,
@@ -407,7 +408,9 @@ static struct register_accessor tps65217_regacc = {
 };
 
 struct universal_driver tps65217_universal_driver = {
+    /* use the existing driver name for binding */
     .name = "tps65217-universal-driver",
+    .driver = &tps65217_driver.driver,
     .regacc = &tps65217_regacc,
     .local_probe = tps65217_universal_local_probe,
 };
@@ -418,14 +421,15 @@ struct universal_driver tps65217_universal_driver = {
 static int __init tps65217_init(void)
 {
     /* ljtale starts */
-    int ret;
-    ret = universal_driver_register(&tps65217_universal_driver);
-    if (ret < 0) {
-        LJTALE_MSG(KERN_ERR, "universal driver registration faile: %d\n", ret);
+    int ret = 0;
+	ret = i2c_add_driver(&tps65217_driver);
+    if (ret < 0)
         return ret;
-    }
+    ret = universal_driver_register(&tps65217_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver registration faile: %d\n", ret);
+    return ret;
     /* ljtale ends */
-	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);
 

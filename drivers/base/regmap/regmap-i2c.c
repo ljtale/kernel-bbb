@@ -214,7 +214,12 @@ static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
 					const struct regmap_config *config)
 {
 	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
+        /* ljtale starts */
+    {
+        printk(KERN_INFO "ljtale-regmap_get_i2c_bus: get regmap_i2c\n");
 		return &regmap_i2c;
+    }
+    /* ljtale ends */
 	else if (config->val_bits == 16 && config->reg_bits == 8 &&
 		 i2c_check_functionality(i2c->adapter,
 					 I2C_FUNC_SMBUS_WORD_DATA))

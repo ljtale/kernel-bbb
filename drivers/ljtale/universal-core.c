@@ -58,10 +58,12 @@ struct universal_device *new_universal_device(struct device *dev) {
         return NULL;
     }
     /* the device possibly has not had a driver yet */
-    /* temporarily I use the bus name to identify the universal device */
+    /* temporarily I use the bus name to identify the universal device,
+     * here the universal device name really doesn't matter?  */
     uni_dev->name = dev->bus->name;
     uni_dev->dev = dev;
     /* TODO: more initialization */
+    uni_dev->drv = NULL;
     return uni_dev;
 }
 EXPORT_SYMBOL(new_universal_device);
