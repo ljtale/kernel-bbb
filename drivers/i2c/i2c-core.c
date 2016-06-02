@@ -682,9 +682,13 @@ static int i2c_device_probe(struct device *dev)
         universal_dev = check_universal_driver(dev);
         if (universal_dev) {
             status = universal_driver_probe(universal_dev);
+            LJTALE_MSG(KERN_INFO, 
+                    "universal driver probe should be called for %s\n",
+                    client->name);
         } else {
             LJTALE_MSG(KERN_INFO, 
-                    "universal device not available for this device\n");
+                    "universal device not available for device: %s\n",
+                    client->name);
             status = driver->probe(client, i2c_match_id(driver->id_table,
                        client)); 
         }
@@ -972,6 +976,9 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 {
 	struct i2c_client	*client;
 	int			status;
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    /* ljtale ends */
 
 	client = kzalloc(sizeof *client, GFP_KERNEL);
 	if (!client)
@@ -1010,6 +1017,27 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	client->dev.fwnode = info->fwnode;
 
 	i2c_dev_set_name(adap, client);
+
+    /* ljtale starts */
+    /* lets use the init_name pointer as a convenience to pass device name
+     * to the universal device */
+    client->dev.init_name = client->name;
+    /* ljtale: after creating an i2c device but before calling device_register
+     * we should create a universal device and register it to the universal
+     * driver. Therefore when the I2C bus tries to call probe for that device,
+     * it can check there has already been a universal device that is supported
+     * by a registered universal driver data */
+    LJTALE_MSG(KERN_INFO, "created an I2C device: %s\n", client->name);
+    uni_dev = new_universal_device(&client->dev);
+    if (uni_dev) {
+        status = universal_device_register(uni_dev);
+        if (status < 0)
+            LJTALE_MSG(KERN_ERR, "universal device registration failed\n");
+    }
+    else
+        LJTALE_MSG(KERN_ERR, "universal device creation failed\n");
+    /* ljtale ends */
+
 	status = device_register(&client->dev);
 	if (status)
 		goto out_err;
@@ -1765,7 +1793,7 @@ int i2c_register_driver(struct module *owner, struct i2c_driver *driver)
 	/* add the driver to the list of i2c drivers in the driver core */
 	driver->driver.owner = owner;
     /* ljtale: This is the start point where an i2c driver has something to
-     * wo with the i2c bus */
+     * do with the i2c bus */
 	driver->driver.bus = &i2c_bus_type;
 
 	/* When registration returns, the driver core
@@ -2322,22 +2350,8 @@ static int i2c_detect_address(struct i2c_client *temp_client,
 		dev_dbg(&adapter->dev, "Creating %s at 0x%02x\n",
 			info.type, info.addr);
 		client = i2c_new_device(adapter, &info);
-        /* ljtale: create an i2c client for the adapter */
-        /* ljtale starts */
-#if 0
 		if (client)
 			list_add_tail(&client->detected, &driver->clients);
-#endif
-        if (client) {
-            list_add_tail(&client->detected, &driver->clients);
-            struct universal_device *uni_dev;
-            uni_dev = new_universal_device(&client->dev);
-            if (uni_dev)
-                universal_device_register(uni_dev);
-            else
-                LJTALE_MSG(KERN_ERR, "universal device creation failed\n");
-        }
-        /* ljtale ends */
 		else
 			dev_err(&adapter->dev, "Failed creating %s at 0x%02x\n",
 				info.type, info.addr);

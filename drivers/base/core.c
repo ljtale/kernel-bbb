@@ -1114,6 +1114,8 @@ int device_add(struct device *dev)
 					     BUS_NOTIFY_ADD_DEVICE, dev);
 
 	kobject_uevent(&dev->kobj, KOBJ_ADD);
+    /* ljtale: device_register -> device_add -> bus_probe_device will 
+     * also call probe function if there is a dev-driver binding */
 	bus_probe_device(dev);
 	if (parent)
 		klist_add_tail(&dev->p->knode_parent,

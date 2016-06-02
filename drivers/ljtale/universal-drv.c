@@ -32,6 +32,29 @@ EXPORT_SYMBOL(universal_drivers);
 struct list_head universal_devices;
 EXPORT_SYMBOL(universal_devices);
 
+#ifdef LJTALE_DEBUG_ENABLE
+static void debug_list_print(void) {
+    struct list_head *p;
+    struct universal_device *dev;
+    struct universal_driver *drv;
+    int i = 0;
+    LJTALE_MSG(KERN_INFO, "current universal device and driver list: \n");
+    list_for_each(p, &universal_devices) {
+        dev = list_entry(p, struct universal_device, dev_list);
+        LJTALE_MSG(KERN_INFO, "universal_device: %s_%d\n", dev->name, i++);
+    }
+    i = 0;
+    list_for_each(p, &universal_drivers) {
+        drv = list_entry(p, struct universal_driver, drv_list);
+        LJTALE_MSG(KERN_INFO, "universal_driver: %s_%d\n", drv->name, i++);
+    }
+    LJTALE_MSG(KERN_INFO, "current universal device and driver list end.\n");
+}
+#else
+static void debug_list_print(void) {
+}
+#endif
+
 extern void regacc_lock_mutex(void *__regacc);
 extern void regacc_unlock_mutex(void *__regacc);
 
@@ -46,6 +69,7 @@ int __universal_drv_register(struct universal_driver *drv) {
     /* each driver should only have one instance of universal driver */
     list_add_tail(&drv->drv_list, &universal_drivers);
     LJTALE_MSG(KERN_INFO, "universal driver register: %s\n", drv->name);
+    debug_list_print();
     /* bind the universal driver data to the universal device */
     /* FIXME: we need a universal-driver-specific matching mechanism
      * Maybe also involves an id talbe just like the device tree, this
@@ -54,17 +78,23 @@ int __universal_drv_register(struct universal_driver *drv) {
         dev = list_entry(p, struct universal_device, dev_list);
         if (dev->dev->bus)
             if (dev->dev->bus->match && !dev->drv) {
-                ret = dev->dev->bus->match (dev->dev, drv->driver);
+                ret = dev->dev->bus->match(dev->dev, drv->driver);
                 if (ret) {
                     dev->drv = drv;
                     break;
                 }
             }
     }
+    /* if there is no match for this universal driver, fine, just exit */
     return 0;
 }
 EXPORT_SYMBOL(__universal_drv_register);
 
+
+int __universal_drv_unregister(struct universal_driver *drv) {
+    return 0;
+}
+EXPORT_SYMBOL(__universal_drv_unregister);
 
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
@@ -75,7 +105,7 @@ int __universal_drv_probe(struct universal_device *dev) {
                 "no universal driver for universal device: %s\n", dev->name);
         return -ENODEV;
     }
-    LJTALE_MSG(KERN_INFO, "universal driver initialization: %s\n", dev->name);
+    LJTALE_MSG(KERN_INFO, "universal driver probe: %s\n", dev->name);
 
     /* do a series of universal driver probe */
     /* ... */
@@ -100,6 +130,7 @@ int __universal_dev_register(struct universal_device *dev) {
      * TODO: more registration information needed here later */
     list_add_tail(&dev->dev_list, &universal_devices);
     LJTALE_MSG(KERN_INFO, "universal device registered: %s\n", dev->name);
+    debug_list_print();
     /* bind the universal driver data to the universal driver device */
     if (dev->dev->bus) {
         if(dev->dev->bus->match) {
@@ -123,6 +154,11 @@ int __universal_dev_register(struct universal_device *dev) {
     return 0;
 }
 EXPORT_SYMBOL(__universal_dev_register);
+
+int __universal_dev_unregister(struct universal_device *dev) {
+    return 0;
+}
+EXPORT_SYMBOL(__universal_dev_unregister);
 
 
 /* TODO: function calls to revoke what has been done by the probe function */

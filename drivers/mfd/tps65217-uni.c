@@ -391,6 +391,8 @@ static struct i2c_driver tps65217_driver = {
 static int tps65217_universal_local_probe(struct universal_device *uni_dev) {
     struct device *dev;
     struct i2c_client *client;
+
+    LJTALE_MSG(KERN_INFO, "local_probe for driver: %s\n", uni_dev->drv->name);
     dev = uni_dev->dev;
     client = to_i2c_client(dev);
     return tps65217_probe(client, tps65217_id_table); 

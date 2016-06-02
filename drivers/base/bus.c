@@ -892,6 +892,8 @@ int bus_register(struct bus_type *bus)
 
 	priv->subsys.kobj.kset = bus_kset;
 	priv->subsys.kobj.ktype = &bus_ktype;
+    /* ljtale: this line determines that bus_probe_device will call
+     * device_attach to try to attach a device to a driver */
 	priv->drivers_autoprobe = 1;
 
 	retval = kset_register(&priv->subsys);

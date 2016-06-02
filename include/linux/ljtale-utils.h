@@ -7,7 +7,7 @@
     }                                           \
     while(0)
 
-#define LJTALE_DEBUG_ENABLE
+// #define LJTALE_DEBUG_ENABLE
 
 #ifdef LJTALE_DEBUG_ENABLE
 #define LJTALE_PRINT(LEVEL, args...)           \

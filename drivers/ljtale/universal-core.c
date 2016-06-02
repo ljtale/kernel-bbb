@@ -37,16 +37,18 @@ void regacc_unlock_mutex(void *__regacc)
 struct universal_device *check_universal_driver(struct device *dev) {
     struct universal_device *uni_dev = NULL;
     struct list_head *p;
+    bool exist = false;
     list_for_each(p, &universal_devices) {
         uni_dev = list_entry(p, struct universal_device, dev_list);
         if (uni_dev->dev == dev) {
             /* compare the address values directly, the device pointer
              * should be unique */
+            exist = true;
             break;
         }
     }
     /* didn't find any match */
-    return uni_dev;
+    return (exist ? uni_dev : NULL);
 }
 EXPORT_SYMBOL(check_universal_driver);
 
@@ -60,7 +62,7 @@ struct universal_device *new_universal_device(struct device *dev) {
     /* the device possibly has not had a driver yet */
     /* temporarily I use the bus name to identify the universal device,
      * here the universal device name really doesn't matter?  */
-    uni_dev->name = dev->bus->name;
+    uni_dev->name = dev->init_name;
     uni_dev->dev = dev;
     /* TODO: more initialization */
     uni_dev->drv = NULL;

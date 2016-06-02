@@ -429,6 +429,8 @@ static int __device_attach(struct device_driver *drv, void *data)
 {
 	struct device *dev = data;
 
+    /* ljtale: this following function calls bus's match function to check
+     * if the driver supports the device */
 	if (!driver_match_device(drv, dev))
 		return 0;
 

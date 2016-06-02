@@ -167,13 +167,23 @@ extern int __universal_drv_register(struct universal_driver *drv);
 #define universal_driver_register(drv) \
     __universal_drv_register(drv)
 
+extern int __universal_drv_unregister(struct universal_driver *drv);
+#define universal_driver_unregister(drv) \
+    __universal_drv_unregister(drv)
+
+
 extern int __universal_dev_register(struct universal_device *dev);
 #define universal_device_register(dev) \
     __universal_dev_register(dev)
 
+extern int __universal_dev_unregister(struct universal_device *dev);
+#define universal_device_unregister \
+    __universal_dev_unregister(dev)
+
 extern int __universal_drv_probe(struct universal_device *dev);
 #define universal_driver_probe(dev) \
     __universal_drv_probe(dev)
+
 
 /* check if there is a universal driver for the device, if so
  * return the universal device handle, otherwise return NULL */
