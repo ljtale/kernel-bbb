@@ -22,16 +22,16 @@
 extern struct list_head universal_drivers;
 extern struct list_head universal_devices;
 
-void regacc_lock_mutex(void *__regacc)
+void regacc_lock_mutex(void *__dev)
 {
-    struct register_accessor *regacc = __regacc;
-    mutex_lock(&regacc->mutex);
+    struct universal_device *dev = __dev;
+    mutex_lock(&dev->lock);
 }
 
-void regacc_unlock_mutex(void *__regacc)
+void regacc_unlock_mutex(void *__dev)
 {
-    struct register_accessor *regacc = __regacc;
-    mutex_unlock(&regacc->mutex);
+    struct universal_device *dev = __dev;
+    mutex_unlock(&dev->lock);
 }
 
 struct universal_device *check_universal_driver(struct device *dev) {
@@ -69,3 +69,62 @@ struct universal_device *new_universal_device(struct device *dev) {
     return uni_dev;
 }
 EXPORT_SYMBOL(new_universal_device);
+
+/* For register accessors, there are two types of existing mechanism:
+ * 1) The regmap framework provides a unified accessor interfaces for mfds,
+ * such as the master-slave model buses, i2c or spi. Our hypothesis is drivers
+ * for i2c or spi devicew will share the same set of regmap accessors. That
+ * means we can build several fixed regmap buses, device vendors will only
+ * need to tell the universal driver what it wish to use
+ * 2) The load/store instruction set. For memory mapped I/O, device registers
+ * can be read/written by load/store instructions. Only the
+ * architecture-specific implementation of read/write would be different.
+ * Currently in my prototype, I'll first build regmap framework, then we can
+ * build a regmap-ish framework for memory mapped I/O */
+
+/* generic i2c eeprom read function
+ * parameter guessed by ljtale
+ * reg: the register address
+ * */
+int i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
+        void *val, size_t val_size) {
+    /* different from the at24 drive, we are working for universal driver,
+     * so we should have an agreement on what the context is with the 
+     * universal driver. Here I used universal_device */
+    struct universal_device *dev = context;
+    struct universal_driver *drv = dev->drv;
+    char *buf = val;
+    unsigned int offset;
+    int ret = 0;
+    
+    BUG_ON(!drv);
+    BUG_ON(reg_size != 4);
+    BUG_ON(drv->regacc->reg_val_bits != 8);
+    offset = __raw_readl(reg);
+    /* val bytes is always 1 */
+    if (unlikely(!val_size))
+        return val_size;
+    mutex_lock(&dev->lock);
+    while (val_size) {
+        ssize_t status;
+        // assume I have a read function
+        if (status <= 0) {
+            if (ret == 0)
+                ret = status;
+            break;
+        }
+        buf += status;
+        offset += status;
+        val_size -= status;
+        ret += status;
+    }
+    mutex_unlock(&dev->lock);
+    if (ret < 0)
+        return ret;
+    if (ret != val_size)
+        return -EINVAL;
+    return 0;
+}
+
+
+

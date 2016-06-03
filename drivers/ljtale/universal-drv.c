@@ -17,6 +17,10 @@
 
 #include <linux/universal-drv.h>
 
+/*===========extern variables and functions====*/
+extern void debug_list_print(void);
+extern struct regmap_bus *regmap_get_i2c_bus_general(void);
+
 /* 
  * global list to maintain driver childern of the universal driver
  * this is not actually a list of drivers, but a list of data structures
@@ -31,29 +35,6 @@ EXPORT_SYMBOL(universal_drivers);
  * */
 struct list_head universal_devices;
 EXPORT_SYMBOL(universal_devices);
-
-#ifdef LJTALE_DEBUG_ENABLE
-static void debug_list_print(void) {
-    struct list_head *p;
-    struct universal_device *dev;
-    struct universal_driver *drv;
-    int i = 0;
-    LJTALE_MSG(KERN_INFO, "current universal device and driver list: \n");
-    list_for_each(p, &universal_devices) {
-        dev = list_entry(p, struct universal_device, dev_list);
-        LJTALE_MSG(KERN_INFO, "universal_device: %s_%d\n", dev->name, i++);
-    }
-    i = 0;
-    list_for_each(p, &universal_drivers) {
-        drv = list_entry(p, struct universal_driver, drv_list);
-        LJTALE_MSG(KERN_INFO, "universal_driver: %s_%d\n", drv->name, i++);
-    }
-    LJTALE_MSG(KERN_INFO, "current universal device and driver list end.\n");
-}
-#else
-static void debug_list_print(void) {
-}
-#endif
 
 extern void regacc_lock_mutex(void *__regacc);
 extern void regacc_unlock_mutex(void *__regacc);
@@ -106,11 +87,15 @@ int __universal_drv_probe(struct universal_device *dev) {
         return -ENODEV;
     }
     LJTALE_MSG(KERN_INFO, "universal driver probe: %s\n", dev->name);
+    drv = dev->drv;
+    /* do a set of initialization */
 
     /* do a series of universal driver probe */
+    /* for register accessors */
+    mutex_init(&dev->lock);
+    
     /* ... */
     /* do a local probe */
-    drv = dev->drv;
     if (drv->local_probe)
         ret = drv->local_probe(dev);
     return ret;
@@ -165,8 +150,16 @@ EXPORT_SYMBOL(__universal_dev_unregister);
 
 
 static int __init init_universal_driver(void) {
+    struct regmap_bus *regmap_bus_temp;
+    struct regmap_config *regmap_config_temp;
     INIT_LIST_HEAD(&universal_drivers);
     INIT_LIST_HEAD(&universal_devices);
+    /* for register accessors, initialize regmap buses and normal load/store
+     * accessors */
+    regmap_bus_temp = regmap_get_i2c_bus_general();
+    i2c_regmap_bus = *regmap_bus_temp;
+    /* build a regmap bus for i2c eeprom device according to the at24 driver */
+
     return 0;
 }
 pure_initcall(init_universal_driver);

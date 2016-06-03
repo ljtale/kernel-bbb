@@ -595,6 +595,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
 
+    LJTALE_MSG(KERN_INFO, "at24_probe get called: %s\n", client->name);
+
     /* ljtale: who sets up the platform data for the device? */
 	if (client->dev.platform_data) {
         /* ljtale: struct direct assignment? not type safe */

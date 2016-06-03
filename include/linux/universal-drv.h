@@ -25,14 +25,18 @@ enum universal_req_type {
     REQUEST_IRQ,
 };
 
+/** =======================================================
+ * Universal driver data structures exposed to conventional driver
+ */
+
 /*
  * register accessor data structures and auxiliary types
  */
 
 typedef void (*regacc_lock)(void *);
 typedef void (*regacc_unlock)(void *);
-void regacc_lock_mutex(void *__regacc);
-void regacc_unlock_mutex(void *__regacc);
+void regacc_lock_mutex(void *__dev);
+void regacc_unlock_mutex(void *__dev);
 
 struct register_accessor {
     const char *bus_name;   /* the busto which the device is connected */
@@ -40,7 +44,6 @@ struct register_accessor {
     int reg_val_bits;
 
     /* synchronization primitives */
-    struct mutex mutex;    /* could use spinlocks for fast I/O */
     regacc_lock lock;
     regacc_unlock unlock;
     void *lock_arg;
@@ -156,11 +159,20 @@ struct universal_device {
     struct device *dev;
 
     struct universal_driver *drv;   
+     /* lock protects against concurrent access to this device, used by
+      * various purposes. Could add more locks. 
+      * Could use spinlocks for fast I/O */
+    struct mutex lock;
+
     void *private_data;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
 };
+
+/** =======================================================
+ * Universal driver model methods
+ */
 
  /* The registration function should be called from init calls */
 extern int __universal_drv_register(struct universal_driver *drv);
@@ -184,6 +196,7 @@ extern int __universal_drv_probe(struct universal_device *dev);
 #define universal_driver_probe(dev) \
     __universal_drv_probe(dev)
 
+/** ==== universal driver core methods ==== */
 
 /* check if there is a universal driver for the device, if so
  * return the universal device handle, otherwise return NULL */
@@ -192,9 +205,15 @@ struct universal_device *check_universal_driver(struct device *dev);
  * This creation is bus-agnostic */
 struct universal_device *new_universal_device(struct device *dev);
 
-/* TODO: debugfs support for universal driver debugging */
 
+/* ====== activity based variables and data structures === */
+static struct regmap_bus i2c_regmap_bus;
+static struct regmap_bus i2c_eeprom_regmap_bus;
+static struct regmap_bus spi_regmap_bus;
+static struct regmap_bus spi_eeprom_regmap_bus;
+
+/* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);
 
-#endif
+#endif /* _LINUX_UNIVERSAL_DRV_H */
 

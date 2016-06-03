@@ -210,6 +210,15 @@ static struct regmap_bus regmap_i2c = {
 	.val_format_endian_default = REGMAP_ENDIAN_BIG,
 };
 
+/* ljtale starts */
+/* conveniently get the regmap_i2c bus, assuming the check functionality
+ * of I2C_FUNC_I2C in the following will succeed */
+struct regmap_bus *regmap_get_i2c_bus_general(void) {
+    return &regmap_i2c;
+}
+EXPORT_SYMBOL(regmap_get_i2c_bus_general);
+/* ljtale ends */
+
 static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
 					const struct regmap_config *config)
 {
