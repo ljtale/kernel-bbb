@@ -388,20 +388,19 @@ static struct i2c_driver tps65217_driver = {
 };
 
 /* ljtale starts */
+
 static int tps65217_universal_local_probe(struct universal_device *uni_dev) {
-    struct device *dev;
     struct i2c_client *client;
 
-    LJTALE_MSG(KERN_INFO, "local_probe for driver: %s\n", uni_dev->drv->name);
-    dev = uni_dev->dev;
-    client = to_i2c_client(dev);
+    LJTALE_MSG(KERN_INFO, "universal local probe for driver: %s\n",
+            uni_dev->drv->name);
+    client = to_i2c_client(uni_dev->dev);
     return tps65217_probe(client, tps65217_id_table); 
 }
 
 static struct register_accessor tps65217_regacc = {
-    /* device specific information
-     * FIXME: bus name is not really useful here?  */
-    .bus_name = "i2c0",
+    /* device specific information */
+    .bus_name = "i2c",
     .reg_addr_bits = 8,
     .reg_val_bits = 8,
 
@@ -409,7 +408,7 @@ static struct register_accessor tps65217_regacc = {
     .regmap_support = true,
 };
 
-struct universal_driver tps65217_universal_driver = {
+static struct universal_driver tps65217_universal_driver = {
     /* use the existing driver name for binding */
     .name = "tps65217-universal-driver",
     .driver = &tps65217_driver.driver,

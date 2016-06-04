@@ -36,8 +36,11 @@ EXPORT_SYMBOL(universal_drivers);
 struct list_head universal_devices;
 EXPORT_SYMBOL(universal_devices);
 
-extern void regacc_lock_mutex(void *__regacc);
-extern void regacc_unlock_mutex(void *__regacc);
+struct regmap_bus i2c_regmap_bus;
+struct regmap_bus i2c_eeprom_regmap_bus;
+struct regmap_bus spi_regmap_bus;
+struct regmap_bus spi_eeprom_regmap_bus;
+
 
 int __universal_drv_register(struct universal_driver *drv) {
     struct universal_device *dev;
@@ -151,7 +154,7 @@ EXPORT_SYMBOL(__universal_dev_unregister);
 
 static int __init init_universal_driver(void) {
     struct regmap_bus *regmap_bus_temp;
-    struct regmap_config *regmap_config_temp;
+//    struct regmap_config *regmap_config_temp;
     INIT_LIST_HEAD(&universal_drivers);
     INIT_LIST_HEAD(&universal_devices);
     /* for register accessors, initialize regmap buses and normal load/store

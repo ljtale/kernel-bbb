@@ -82,11 +82,47 @@ EXPORT_SYMBOL(new_universal_device);
  * Currently in my prototype, I'll first build regmap framework, then we can
  * build a regmap-ish framework for memory mapped I/O */
 
-/* generic i2c eeprom read function
+
+static ssize_t i2c_eeprom_read(char *buf, unsigned offset, size_t count) {
+    struct i2c_msg msg[2];
+    u8 msgbuf[2];
+    struct i2c_client *client;
+    unsigned long timeout, read_time;
+    int status, i;
+
+    memset(msg, 0, sizeof(msg));
+
+    /* copy comment from drivers/misc/eeprom/at24.c */
+	/*
+	 * REVISIT some multi-address chips don't rollover page reads to
+	 * the next slave address, so we may need to truncate the count.
+	 * Those chips might need another quirk flag.
+	 *
+	 * If the real hardware used four adjacent 24c02 chips and that
+	 * were misconfigured as one 24c08, that would be a similar effect:
+	 * one "eeprom" file not four, but larger reads would fail when
+	 * they crossed certain pages.
+	 */
+
+	/*
+	 * Slave address and byte offset derive from the offset. Always
+	 * set the byte address; on a multi-master board, another master
+	 * may have changed the chip's "current" address pointer.
+	 */
+
+
+
+
+
+    return 0;
+}
+
+
+/* generic i2c eeprom read function for creating regmap bus
  * parameter guessed by ljtale
  * reg: the register address
  * */
-int i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
+int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
         void *val, size_t val_size) {
     /* different from the at24 drive, we are working for universal driver,
      * so we should have an agreement on what the context is with the 
@@ -108,6 +144,7 @@ int i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
     while (val_size) {
         ssize_t status;
         // assume I have a read function
+        status = 0;
         if (status <= 0) {
             if (ret == 0)
                 ret = status;

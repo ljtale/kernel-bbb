@@ -39,7 +39,7 @@ void regacc_lock_mutex(void *__dev);
 void regacc_unlock_mutex(void *__dev);
 
 struct register_accessor {
-    const char *bus_name;   /* the busto which the device is connected */
+    const char *bus_name;   /* the bus to which the device is connected */
     int reg_addr_bits;
     int reg_val_bits;
 
@@ -47,6 +47,12 @@ struct register_accessor {
     regacc_lock lock;
     regacc_unlock unlock;
     void *lock_arg;
+
+    /* callbacks that are necessary to do register read and write */
+    ssize_t (*regacc_read_func)(void *context, char *buf, 
+            unsigned addr, size_t count);
+    ssize_t (*regacc_write_func)(void *context, char *buf,
+            unsigned addr, size_t count);
 
     /* TODO: possible a way to describe regsiter layout, one-dimentional or
      * two dimentional */
@@ -207,10 +213,10 @@ struct universal_device *new_universal_device(struct device *dev);
 
 
 /* ====== activity based variables and data structures === */
-static struct regmap_bus i2c_regmap_bus;
-static struct regmap_bus i2c_eeprom_regmap_bus;
-static struct regmap_bus spi_regmap_bus;
-static struct regmap_bus spi_eeprom_regmap_bus;
+extern struct regmap_bus i2c_regmap_bus;
+extern struct regmap_bus i2c_eeprom_regmap_bus;
+extern struct regmap_bus spi_regmap_bus;
+extern struct regmap_bus spi_eeprom_regmap_bus;
 
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);
