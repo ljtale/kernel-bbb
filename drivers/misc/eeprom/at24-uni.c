@@ -874,6 +874,14 @@ static struct i2c_driver at24_driver = {
 
 /* ljtale starts */
 
+static struct of_device_id at24_of_match[] = {
+    {
+        .compatible = "atmel,at24",
+        .data = (void*)0,
+    },
+    {/* sentinel */},
+};
+
 static int at24_universal_local_probe(struct universal_device *uni_dev) {
     struct i2c_client *client;
 
@@ -896,6 +904,7 @@ static struct universal_driver at24_universal_driver = {
     .driver = &at24_driver.driver,
     .regacc = &at24_regacc,
     .local_probe = at24_universal_local_probe,
+    .of_match_table = at24_of_match,
 };
 
 /* ljtale ends */

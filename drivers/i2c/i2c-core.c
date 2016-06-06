@@ -1018,14 +1018,10 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	client->dev.of_node = info->of_node;
 	client->dev.fwnode = info->fwnode;
 
+    /* ljtale: name set by this is unique within i2c scope */
 	i2c_dev_set_name(adap, client);
 
     /* ljtale starts */
-    /* lets use the init_name pointer as a convenience to pass device name
-     * to the universal device */
-
-    // client->dev.init_name = client->name;
-
     /* ljtale: after creating an i2c device but before calling device_register
      * we should create a universal device and register it to the universal
      * driver. Therefore when the I2C bus tries to call probe for that device,
@@ -1129,7 +1125,7 @@ struct i2c_client *i2c_new_dummy(struct i2c_adapter *adapter, u16 address)
 	struct i2c_board_info info = {
 		I2C_BOARD_INFO("dummy", address),
 	};
-    LJTALE_MSG(KERN_INFO, "i2c_new_dummy...a new dummy i2c device\n");
+    LJTALE_MSG(KERN_INFO, "i2c_new_dummy...newed dummy i2c device\n");
 
 	return i2c_new_device(adapter, &info);
 }

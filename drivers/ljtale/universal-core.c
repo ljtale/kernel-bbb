@@ -46,7 +46,7 @@ struct universal_device *check_universal_driver(struct device *dev) {
         if (uni_dev->dev == dev && uni_dev->drv) {
             /* compare the address values directly, the device pointer
              * should be unique */
-            LJTALE_MSG(KERN_INFO, "universal device %d and driver: %d exist\n",
+            LJTALE_MSG(KERN_INFO, "universal device %s and driver: %s exist\n",
                     uni_dev->name, uni_dev->drv->name);
             exist = true;
             break;
@@ -68,13 +68,22 @@ struct universal_device *new_universal_device(struct device *dev) {
     /* the device possibly has not had a driver yet */
     /* temporarily I use the bus name to identify the universal device,
      * here the universal device name really doesn't matter?  */
-    uni_dev->name = dev->init_name;
+    uni_dev->name = dev_name(dev);
     uni_dev->dev = dev;
     /* TODO: more initialization */
     uni_dev->drv = NULL;
     return uni_dev;
 }
 EXPORT_SYMBOL(new_universal_device);
+
+/* match if there is a universal driver supporting the universal device
+ * match is based on the compatible string provided by both the universal
+ * driver and device */
+int universal_driver_match_device(struct universal_driver *drv,
+        struct universal_device *dev) {
+    return 1;
+}
+EXPORT_SYMBOL(universal_driver_match_device);
 
 /* For register accessors, there are two types of existing mechanism:
  * 1) The regmap framework provides a unified accessor interfaces for mfds,

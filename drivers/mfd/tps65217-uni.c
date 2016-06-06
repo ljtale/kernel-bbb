@@ -415,6 +415,7 @@ static struct universal_driver tps65217_universal_driver = {
     .driver = &tps65217_driver.driver,
     .regacc = &tps65217_regacc,
     .local_probe = tps65217_universal_local_probe,
+    .of_match_table = tps65217_of_match,
 };
 
 /* ljtale ends */

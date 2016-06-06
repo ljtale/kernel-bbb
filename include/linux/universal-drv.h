@@ -155,6 +155,7 @@ struct universal_driver {
     struct list_head drv_list;
     /* like the normal device driver, one such universal driver data structure
      * is supposed to support one or more devices */
+    struct of_device_id *of_match_table;
 };
 
 /* 
@@ -173,6 +174,10 @@ struct universal_device {
     struct mutex lock;
 
     void *private_data;
+
+    /* the compatible string should be get from device tree or similar way,
+     * temporarily we statically assign the compatible names */
+    char *compatible;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
