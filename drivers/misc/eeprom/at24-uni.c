@@ -602,6 +602,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
         /* ljtale: struct direct assignment? not type safe */
 		chip = *(struct at24_platform_data *)client->dev.platform_data;
 	} else {
+
+        LJTALE_MSG(KERN_INFO, "at24 chooses the id table to get data\n");
 		if (!id->driver_data)
 			return -ENODEV;
 
@@ -874,21 +876,16 @@ static struct i2c_driver at24_driver = {
 
 /* ljtale starts */
 
-static struct of_device_id at24_of_match[] = {
-    {
-        .compatible = "atmel,at24",
-        .data = (void*)0,
-    },
-    {/* sentinel */},
-};
-
 static int at24_universal_local_probe(struct universal_device *uni_dev) {
     struct i2c_client *client;
+    const struct i2c_device_id *i2c_id;
 
     LJTALE_MSG(KERN_INFO, "universal local probe for: %s\n",
             uni_dev->drv->name);
     client = to_i2c_client(uni_dev->dev);
-    return at24_probe(client, at24_ids);
+    i2c_id = i2c_match_id_general(at24_ids, client);
+    /* here is the problem, the at24_ids is not actually the id*/
+    return at24_probe(client, i2c_id);
 }
 
 static struct register_accessor at24_regacc = {
@@ -904,7 +901,6 @@ static struct universal_driver at24_universal_driver = {
     .driver = &at24_driver.driver,
     .regacc = &at24_regacc,
     .local_probe = at24_universal_local_probe,
-    .of_match_table = at24_of_match,
 };
 
 /* ljtale ends */

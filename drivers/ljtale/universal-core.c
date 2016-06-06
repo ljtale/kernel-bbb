@@ -76,15 +76,6 @@ struct universal_device *new_universal_device(struct device *dev) {
 }
 EXPORT_SYMBOL(new_universal_device);
 
-/* match if there is a universal driver supporting the universal device
- * match is based on the compatible string provided by both the universal
- * driver and device */
-int universal_driver_match_device(struct universal_driver *drv,
-        struct universal_device *dev) {
-    return 1;
-}
-EXPORT_SYMBOL(universal_driver_match_device);
-
 /* For register accessors, there are two types of existing mechanism:
  * 1) The regmap framework provides a unified accessor interfaces for mfds,
  * such as the master-slave model buses, i2c or spi. Our hypothesis is drivers

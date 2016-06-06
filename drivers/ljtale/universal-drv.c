@@ -17,10 +17,6 @@
 
 #include <linux/universal-drv.h>
 
-/*===========extern variables and functions====*/
-extern void debug_list_print(void);
-extern struct regmap_bus *regmap_get_i2c_bus_general(void);
-
 /* 
  * global list to maintain driver childern of the universal driver
  * this is not actually a list of drivers, but a list of data structures

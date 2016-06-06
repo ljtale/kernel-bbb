@@ -391,11 +391,13 @@ static struct i2c_driver tps65217_driver = {
 
 static int tps65217_universal_local_probe(struct universal_device *uni_dev) {
     struct i2c_client *client;
+    const struct i2c_device_id *i2c_id;
 
     LJTALE_MSG(KERN_INFO, "universal local probe for driver: %s\n",
             uni_dev->drv->name);
     client = to_i2c_client(uni_dev->dev);
-    return tps65217_probe(client, tps65217_id_table); 
+    i2c_id = i2c_match_id_general(tps65217_id_table, client);
+    return tps65217_probe(client, i2c_id); 
 }
 
 static struct register_accessor tps65217_regacc = {
@@ -415,7 +417,6 @@ static struct universal_driver tps65217_universal_driver = {
     .driver = &tps65217_driver.driver,
     .regacc = &tps65217_regacc,
     .local_probe = tps65217_universal_local_probe,
-    .of_match_table = tps65217_of_match,
 };
 
 /* ljtale ends */

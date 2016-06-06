@@ -155,7 +155,6 @@ struct universal_driver {
     struct list_head drv_list;
     /* like the normal device driver, one such universal driver data structure
      * is supposed to support one or more devices */
-    struct of_device_id *of_match_table;
 };
 
 /* 
@@ -174,10 +173,6 @@ struct universal_device {
     struct mutex lock;
 
     void *private_data;
-
-    /* the compatible string should be get from device tree or similar way,
-     * temporarily we statically assign the compatible names */
-    char *compatible;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
@@ -224,6 +219,12 @@ extern struct regmap_bus i2c_regmap_bus;
 extern struct regmap_bus i2c_eeprom_regmap_bus;
 extern struct regmap_bus spi_regmap_bus;
 extern struct regmap_bus spi_eeprom_regmap_bus;
+
+extern void debug_list_print(void);
+extern struct regmap_bus *regmap_get_i2c_bus_general(void);
+/* FIXME: this definition should be moved to individual i2c device drivers */
+extern const struct i2c_device_id *i2c_match_id_general(
+        const struct i2c_device_id *id, const struct i2c_client *client);
 
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);

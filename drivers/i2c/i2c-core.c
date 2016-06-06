@@ -458,6 +458,22 @@ static const struct i2c_device_id *i2c_match_id(const struct i2c_device_id *id,
 	return NULL;
 }
 
+/* ljtale starts */
+/* export the i2c_match_id to out side of i2c corei, temporarily used for 
+ * universal driver probe */
+const struct i2c_device_id *i2c_match_id_general(
+        const struct i2c_device_id *id, const struct i2c_client *client) {
+    while (id->name[0]) {
+        if (strcmp(client->name, id->name) == 0)
+            return id;
+        id++;
+    }
+    return NULL;
+} 
+EXPORT_SYMBOL(i2c_match_id_general);
+
+/* ljtale ends */
+
 /* ljtale: the match function is called either iteratively over the list of 
  * drivers on the bus when a device is detected or iteratively over the list of
  * devices on the bus when a driver is registered. The driver should
