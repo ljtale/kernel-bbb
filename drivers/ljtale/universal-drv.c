@@ -117,7 +117,6 @@ int __universal_dev_register(struct universal_device *dev) {
     /* temporarily the regisration only adds the device to the device list
      * TODO: more registration information needed here later */
     list_add_tail(&dev->dev_list, &universal_devices);
-    LJTALE_MSG(KERN_INFO, "universal device registered: %s\n", dev->name);
     debug_list_print();
     /* bind the universal driver data to the universal driver device */
     if (dev->dev->bus) {
@@ -139,6 +138,7 @@ int __universal_dev_register(struct universal_device *dev) {
     } 
     else
         return -ENODEV;
+    LJTALE_MSG(KERN_INFO, "universal device registered: %s\n", dev->name);
     return 0;
 }
 EXPORT_SYMBOL(__universal_dev_register);
@@ -162,6 +162,7 @@ static int __init init_universal_driver(void) {
     regmap_bus_temp = regmap_get_i2c_bus_general();
     i2c_regmap_bus = *regmap_bus_temp;
     /* build a regmap bus for i2c eeprom device according to the at24 driver */
+
 
     return 0;
 }

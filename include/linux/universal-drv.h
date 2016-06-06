@@ -42,7 +42,7 @@ struct register_accessor {
     const char *bus_name;   /* the bus to which the device is connected */
     int reg_addr_bits;
     int reg_val_bits;
-
+    unsigned int max_register;
     /* synchronization primitives */
     regacc_lock lock;
     regacc_unlock unlock;
@@ -81,8 +81,10 @@ struct register_accessor {
  */
 
 struct irq_config {
+    int irq;
     irqreturn_t (*handler)(int irq, void *data);
     irqreturn_t (*thread_fn)(int irq, void *data);
+    bool irq_sharing;
     /* irq could come from static platform information, or from device tree,
      * which we can get at runtime */
 };

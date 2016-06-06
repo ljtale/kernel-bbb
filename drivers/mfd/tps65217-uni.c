@@ -403,6 +403,7 @@ static struct register_accessor tps65217_regacc = {
     .bus_name = "i2c",
     .reg_addr_bits = 8,
     .reg_val_bits = 8,
+    .max_register = TPS65217_REG_MAX,
 
     /* driver-specific (ad-hoc) information */
     .regmap_support = true,

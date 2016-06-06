@@ -34,15 +34,20 @@ void regacc_unlock_mutex(void *__dev)
     mutex_unlock(&dev->lock);
 }
 
+/* check if there is a universal device for the existing struct device, also
+ * check if there is a universal driver for that device. If both conditions
+ * are true, return the universal device pointer, otherwise return NULL */
 struct universal_device *check_universal_driver(struct device *dev) {
     struct universal_device *uni_dev = NULL;
     struct list_head *p;
     bool exist = false;
     list_for_each(p, &universal_devices) {
         uni_dev = list_entry(p, struct universal_device, dev_list);
-        if (uni_dev->dev == dev) {
+        if (uni_dev->dev == dev && uni_dev->drv) {
             /* compare the address values directly, the device pointer
              * should be unique */
+            LJTALE_MSG(KERN_INFO, "universal device %d and driver: %d exist\n",
+                    uni_dev->name, uni_dev->drv->name);
             exist = true;
             break;
         }
@@ -55,6 +60,7 @@ EXPORT_SYMBOL(check_universal_driver);
 
 struct universal_device *new_universal_device(struct device *dev) {
     struct universal_device *uni_dev;
+    /* FIXME: probably should use devm for proper memory management? */
     uni_dev = kzalloc(sizeof(struct universal_device), GFP_KERNEL);
     if (!uni_dev) {
         return NULL;
@@ -81,87 +87,4 @@ EXPORT_SYMBOL(new_universal_device);
  * architecture-specific implementation of read/write would be different.
  * Currently in my prototype, I'll first build regmap framework, then we can
  * build a regmap-ish framework for memory mapped I/O */
-
-
-static ssize_t i2c_eeprom_read(char *buf, unsigned offset, size_t count) {
-    struct i2c_msg msg[2];
-    u8 msgbuf[2];
-    struct i2c_client *client;
-    unsigned long timeout, read_time;
-    int status, i;
-
-    memset(msg, 0, sizeof(msg));
-
-    /* copy comment from drivers/misc/eeprom/at24.c */
-	/*
-	 * REVISIT some multi-address chips don't rollover page reads to
-	 * the next slave address, so we may need to truncate the count.
-	 * Those chips might need another quirk flag.
-	 *
-	 * If the real hardware used four adjacent 24c02 chips and that
-	 * were misconfigured as one 24c08, that would be a similar effect:
-	 * one "eeprom" file not four, but larger reads would fail when
-	 * they crossed certain pages.
-	 */
-
-	/*
-	 * Slave address and byte offset derive from the offset. Always
-	 * set the byte address; on a multi-master board, another master
-	 * may have changed the chip's "current" address pointer.
-	 */
-
-
-
-
-
-    return 0;
-}
-
-
-/* generic i2c eeprom read function for creating regmap bus
- * parameter guessed by ljtale
- * reg: the register address
- * */
-int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
-        void *val, size_t val_size) {
-    /* different from the at24 drive, we are working for universal driver,
-     * so we should have an agreement on what the context is with the 
-     * universal driver. Here I used universal_device */
-    struct universal_device *dev = context;
-    struct universal_driver *drv = dev->drv;
-    char *buf = val;
-    unsigned int offset;
-    int ret = 0;
-    
-    BUG_ON(!drv);
-    BUG_ON(reg_size != 4);
-    BUG_ON(drv->regacc->reg_val_bits != 8);
-    offset = __raw_readl(reg);
-    /* val bytes is always 1 */
-    if (unlikely(!val_size))
-        return val_size;
-    mutex_lock(&dev->lock);
-    while (val_size) {
-        ssize_t status;
-        // assume I have a read function
-        status = 0;
-        if (status <= 0) {
-            if (ret == 0)
-                ret = status;
-            break;
-        }
-        buf += status;
-        offset += status;
-        val_size -= status;
-        ret += status;
-    }
-    mutex_unlock(&dev->lock);
-    if (ret < 0)
-        return ret;
-    if (ret != val_size)
-        return -EINVAL;
-    return 0;
-}
-
-
 

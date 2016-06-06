@@ -687,10 +687,12 @@ static int i2c_device_probe(struct device *dev)
                     client->name);
         } else {
             LJTALE_MSG(KERN_INFO, 
-                    "universal device not available for device: %s\n",
+                    "universal driver not available for device: %s\n",
                     client->name);
             status = driver->probe(client, i2c_match_id(driver->id_table,
                        client)); 
+            LJTALE_MSG(KERN_INFO, "conventional driver probe for device: %s "
+                    "return status: %d\n", client->name, status);
         }
 #if 0
 		status = driver->probe(client, i2c_match_id(driver->id_table,
@@ -1021,7 +1023,9 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
     /* ljtale starts */
     /* lets use the init_name pointer as a convenience to pass device name
      * to the universal device */
-    client->dev.init_name = client->name;
+
+    // client->dev.init_name = client->name;
+
     /* ljtale: after creating an i2c device but before calling device_register
      * we should create a universal device and register it to the universal
      * driver. Therefore when the I2C bus tries to call probe for that device,
@@ -1049,6 +1053,9 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 
 	dev_dbg(&adap->dev, "client [%s] registered with bus id %s\n",
 		client->name, dev_name(&client->dev));
+    if (client->dev.driver)
+        LJTALE_MSG(KERN_INFO, "i2c device: %s bound to driver: %s\n",
+                client->name, client->dev.driver->name);
 
 	return client;
 
@@ -1122,6 +1129,7 @@ struct i2c_client *i2c_new_dummy(struct i2c_adapter *adapter, u16 address)
 	struct i2c_board_info info = {
 		I2C_BOARD_INFO("dummy", address),
 	};
+    LJTALE_MSG(KERN_INFO, "i2c_new_dummy...a new dummy i2c device\n");
 
 	return i2c_new_device(adapter, &info);
 }

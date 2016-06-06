@@ -234,6 +234,9 @@ static int kobject_add_internal(struct kobject *kobj)
 
 		/* be noisy on error issues */
 		if (error == -EEXIST)
+            /* ljtale: i2c dummy device created failed with this error,
+             * indicating that there is already a dummy created in the same
+             * directory, but why it is the case? */
 			WARN(1, "%s failed for %s with "
 			     "-EEXIST, don't try to register things with "
 			     "the same name in the same directory.\n",

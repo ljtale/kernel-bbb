@@ -275,6 +275,8 @@ EXPORT_SYMBOL_GPL(device_bind_driver);
 static atomic_t probe_count = ATOMIC_INIT(0);
 static DECLARE_WAIT_QUEUE_HEAD(probe_waitqueue);
 
+/* ljtale: IMPORTANT: this function should have important problem with 
+ * dummy i2c device probe */
 static int really_probe(struct device *dev, struct device_driver *drv)
 {
 	int ret = 0;
@@ -285,6 +287,7 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 		 drv->bus->name, __func__, drv->name, dev_name(dev));
 	WARN_ON(!list_empty(&dev->devres_head));
 
+    /* ljtale: after a successul match, the driver is attached to the device */
 	dev->driver = drv;
 
 	/* If using pinctrl, bind pins now before probing */
@@ -312,6 +315,9 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 	 */
 	devices_kset_move_last(dev);
 
+    /* ljtale: bus probe will call the bus-specific probe function for 
+     * bus-specific driver probe function, for example: i2c bus will have to
+     * decode what the i2c_driver probe is and call the probe function */
 	if (dev->bus->probe) {
 		ret = dev->bus->probe(dev);
 		if (ret)

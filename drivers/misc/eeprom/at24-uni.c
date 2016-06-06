@@ -622,6 +622,13 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		chip.setup = NULL;
 		chip.context = NULL;
 	}
+    /* ljtale starts */
+    /* device knowledge about chip should be static, I'll do an ad-hoc print */
+    LJTALE_MSG(KERN_INFO, "chip byte len: %d\n", chip.byte_len);
+    LJTALE_MSG(KERN_INFO, "chip page size: %d\n", chip.page_size);
+    LJTALE_MSG(KERN_INFO, "chip flag: %x\n", chip.flags);
+    LJTALE_MSG(KERN_INFO, "chip setup: %d\n", (unsigned int)chip.setup);
+    /* ljtale ends */
 
 	if (!is_power_of_2(chip.byte_len))
 		dev_warn(&client->dev,
@@ -685,6 +692,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	else
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
+
+    LJTALE_MSG(KERN_INFO, "eeprom num addresses %d\n", num_addresses); 
 #if 0
     /* ljtale starts */
     /* populate the universal driver fields for at24 */
@@ -797,6 +806,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			err = -EADDRINUSE;
 			goto err_clients;
 		}
+        LJTALE_MSG(KERN_INFO, "eeprom num addresses %d:%dth\n", 
+            num_addresses, i);
 	}
 
     /* ljtale: this is just a wrapper for the generic driver data set
@@ -820,6 +831,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 
 err_clients:
+    LJTALE_MSG(KERN_INFO, "client: %s created error dummy\n", client->name);
 
 	for (i = 1; i < num_addresses; i++)
 		if (at24->client[i])
@@ -828,6 +840,8 @@ err_clients:
 err_out:
 	ida_simple_remove(&at24_ida, nvmem_config->id);
 
+    /* ljtale: dummy i2c device creation failed with error code: 98, address
+     * already in use */
 	return err;
 }
 
