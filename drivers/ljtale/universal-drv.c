@@ -155,9 +155,9 @@ static int __init init_universal_driver(void) {
     INIT_LIST_HEAD(&universal_devices);
     /* for register accessors, initialize regmap buses and normal load/store
      * accessors */
-    regmap_bus_temp = regmap_get_i2c_bus_general();
-    i2c_regmap_bus = *regmap_bus_temp;
+    i2c_regmap_bus = *regmap_get_i2c_bus_general();
     /* build a regmap bus for i2c eeprom device according to the at24 driver */
+    i2c_eeprom_regmap_bus.read = regmap_i2c_eeprom_read;
 
 
     return 0;

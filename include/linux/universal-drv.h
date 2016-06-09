@@ -238,6 +238,10 @@ extern struct regmap_bus *regmap_get_i2c_bus_general(void);
 /* FIXME: this definition should be moved to individual i2c device drivers */
 extern const struct i2c_device_id *i2c_match_id_general(
         const struct i2c_device_id *id, const struct i2c_client *client);
+extern int regmap_i2c_eeprom_read(void *context, const void *reg,
+       size_t reg_size, void *val, size_t val_size);
+extern int regmap_i2c_eeprom_write(void *context, const void *data,
+        size_t val_size);
 
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);

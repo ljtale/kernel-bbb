@@ -173,7 +173,7 @@ int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
      * as the context passed to the regmap, however here I'll pass the
      * universal device pointer as the context */
     struct universal_device *uni_dev = context;
-   struct register_accessor *regacc;
+   struct register_accessor *regacc = NULL;
    unsigned int offset;
    int ret;
 
@@ -181,7 +181,10 @@ int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
        regacc = uni_dev->drv->regacc;
    BUG_ON(!regacc);
    BUG_ON(reg_size != 4);
-   BUG_ON(regacc->reg_val_bits != 8);
+   if (regacc)
+      BUG_ON(regacc->reg_val_bits != 8);
+   else
+       return -EINVAL;
    offset = __raw_readl(reg);
 
    ret = eeprom_read(uni_dev, val, offset, val_size);
@@ -191,8 +194,10 @@ int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
        return -EINVAL;
    return 0;
 }
+EXPORT_SYMBOL(regmap_i2c_eeprom_read);
 
 int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
     
     return 0;
 } 
+EXPORT_SYMBOL(regmap_i2c_eeprom_write);
