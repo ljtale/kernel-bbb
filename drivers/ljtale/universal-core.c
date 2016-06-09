@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 
 #include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 
 extern struct list_head universal_drivers;
 extern struct list_head universal_devices;
@@ -113,7 +114,7 @@ static ssize_t i2c_eeprom_read(struct universal_device *uni_dev, char *buf,
     /* no SMBUS will be used, we jump to i2c semantics directly */
     i = 0;
     if (eeprom_clients->flags & 0x80)
-        /* little endian as here */
+        /* big endian as here */
         msgbuf[i++] = offset >> 8;
     msgbuf[i++] = offset;
 
@@ -173,31 +174,153 @@ int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
      * as the context passed to the regmap, however here I'll pass the
      * universal device pointer as the context */
     struct universal_device *uni_dev = context;
-   struct register_accessor *regacc = NULL;
-   unsigned int offset;
-   int ret;
+    struct register_accessor *regacc = NULL;
+    unsigned int offset;
+    int ret;
+   
+    if (uni_dev->drv)
+        regacc = uni_dev->drv->regacc;
 
-   if (uni_dev->drv)
-       regacc = uni_dev->drv->regacc;
-   BUG_ON(!regacc);
-   BUG_ON(reg_size != 4);
-   if (regacc)
-      BUG_ON(regacc->reg_val_bits != 8);
-   else
-       return -EINVAL;
-   offset = __raw_readl(reg);
-
-   ret = eeprom_read(uni_dev, val, offset, val_size);
-   if (ret < 0)
-       return ret;
-   if (ret != val_size)
-       return -EINVAL;
-   return 0;
+    BUG_ON(!regacc);
+    BUG_ON(reg_size != 4);
+    if (regacc)
+        BUG_ON(regacc->reg_val_bits != 8);
+    else
+        return -EINVAL;
+ 
+    offset = __raw_readl(reg);
+  
+    ret = eeprom_read(uni_dev, val, offset, val_size);
+    if (ret < 0)
+        return ret;
+    if (ret != val_size)
+        return -EINVAL;
+    return 0;
 }
 EXPORT_SYMBOL(regmap_i2c_eeprom_read);
 
-int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
+/* The same as in the at24.c at24 drive, we use page mode writes */
+static int i2c_eeprom_write(struct universal_device *uni_dev, const char *buf,
+       unsigned offset, size_t count) {
+    struct i2c_client *client = to_i2c_client(uni_dev->dev);
+    struct i2c_eeprom_client *eeprom_clients = &client->clients;
+    struct i2c_msg msg;
+    ssize_t status = 0;
+    int i;
+    unsigned long timeout, write_time;
+    unsigned next_page;
+
+    /* choose the client in case of multiple clients in one chip */
+    if (eeprom_clients->flags & 0x80) {
+        /* hardcoded the flag for 16-bit address pointer, i.e., 0x80 */
+        i = offset >> 16;
+        offset &= 0xffff;
+    } else {
+        i = offset >> 8;
+        offset &= 0xff;
+    }
+    client = eeprom_clients->clients[i];
+
+    if (count > eeprom_clients->write_max)
+        count = eeprom_clients->write_max;
+
+    next_page = roundup(offset + 1, eeprom_clients->page_size);
+    if (offset + count > next_page)
+        count = next_page - offset;
+    /* default i2c calls for all I/Os */
+    i = 0;
+    msg.addr = client->addr;
+    msg.flags = 0;
+    msg.buf = eeprom_clients->write_buf; 
+    if (eeprom_clients->flags & 0x80)
+        msg.buf[i++] = offset >> 8;
+    msg.buf[i++] = offset;
+    memcpy(&msg.buf[i], buf, count);
+    msg.len = i + count;
+
+    timeout = jiffies + msecs_to_jiffies(eeprom_clients->write_timeout);
+    do {
+        write_time = jiffies;
+        status = i2c_transfer(client->adapter, &msg, 1);
+        if (status == 1)
+            status = count;
+        dev_dbg(&client->dev, "write %zu@%d --> %zd (%ld)\n",
+                count, offset, status, jiffies);
+        if (status == count)
+            return count;
+        msleep(1);
+    } while (time_before(write_time, timeout));
+    return -ETIMEDOUT;
+} 
+
+
+static int eeprom_write(struct universal_device *uni_dev, const char *buf,
+        loff_t off, size_t count) {
+    ssize_t ret = 0;
+    ssize_t status;
+
+    if (unlikely(!count))
+        return count;
+
+    mutex_lock(&uni_dev->lock);
+    while (count) {
+        status = i2c_eeprom_write(uni_dev, buf, off, count);
+        if (status < 0) {
+            if (ret == 0)
+                ret = status;
+            break;
+        }
+        buf += status;
+        off += status;
+        count -= status;
+        ret += status;
+    }
+    mutex_unlock(&uni_dev->lock);
+    return ret;
+}
+
+int regmap_i2c_eeprom_gather_write(void *context, const void *reg,
+        size_t reg_size, const void *val, size_t val_size) {
+    struct universal_device *uni_dev = context;
+    struct register_accessor *regacc = NULL;
+    unsigned int offset;
+    int ret;
     
+    BUG_ON(reg_size != 4);
+    if (uni_dev->drv)
+        regacc = uni_dev->drv->regacc;
+    BUG_ON(!regacc);
+    BUG_ON(regacc->reg_val_bits != 8);
+
+    offset = __raw_readl(reg);
+
+    ret = eeprom_write(uni_dev, val, offset, val_size);
+    if (ret < 0)
+        return ret;
+    if (ret != val_size)
+        return -EINVAL;
     return 0;
+}
+EXPORT_SYMBOL(regmap_i2c_eeprom_gather_write);
+
+int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
+    /* same as the read function, here we pass the context for eeprom write
+     * using universal_device */
+    struct universal_device *uni_dev = context;
+    struct register_accessor *regacc = NULL;
+    unsigned int reg_bytes, offset;
+    if (uni_dev->drv)
+        regacc = uni_dev->drv->regacc;
+    if (!regacc)
+        return -EINVAL;
+
+    reg_bytes = regacc->reg_addr_bits / 8;
+    offset = reg_bytes;
+
+    BUG_ON(reg_bytes != 4);
+    BUG_ON(count <= offset);
+
+    return regmap_i2c_eeprom_gather_write(context, data, reg_bytes,
+            data + offset, count - offset);
 } 
 EXPORT_SYMBOL(regmap_i2c_eeprom_write);

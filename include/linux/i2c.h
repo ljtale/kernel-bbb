@@ -205,6 +205,8 @@ struct i2c_eeprom_client {
     u8 flags;
     unsigned io_limit;
     unsigned write_timeout;
+    unsigned write_max;
+    u8 *write_buf;
 };
 /* ljtale ends */
 

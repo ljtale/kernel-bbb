@@ -813,6 +813,13 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
     /* following should be constants */
     client->clients.io_limit = io_limit;
     client->clients.write_timeout = write_timeout;
+    client->clients.write_max = at24->write_max; 
+    client->clients.write_buf = devm_kzalloc(&client->dev,
+            at24->write_max + 2, GFP_KERNEL);
+    if (!client->clients.write_buf) {
+        err = -ENOMEM;
+        goto err_out;
+    }
     /* ljtale ends */
 
     /* ljtale: this is just a wrapper for the generic driver data set

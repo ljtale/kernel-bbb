@@ -88,10 +88,10 @@ int __universal_drv_probe(struct universal_device *dev) {
     LJTALE_MSG(KERN_INFO, "universal driver probe: %s\n", dev->name);
     drv = dev->drv;
     /* do a set of initialization */
-
+    mutex_init(&dev->lock);
     /* do a series of universal driver probe */
     /* for register accessors */
-    mutex_init(&dev->lock);
+    /*TODO: regmap */
     
     /* ... */
     /* do a local probe */
@@ -149,7 +149,6 @@ EXPORT_SYMBOL(__universal_dev_unregister);
 
 
 static int __init init_universal_driver(void) {
-    struct regmap_bus *regmap_bus_temp;
 //    struct regmap_config *regmap_config_temp;
     INIT_LIST_HEAD(&universal_drivers);
     INIT_LIST_HEAD(&universal_devices);
@@ -158,7 +157,10 @@ static int __init init_universal_driver(void) {
     i2c_regmap_bus = *regmap_get_i2c_bus_general();
     /* build a regmap bus for i2c eeprom device according to the at24 driver */
     i2c_eeprom_regmap_bus.read = regmap_i2c_eeprom_read;
-
+    i2c_eeprom_regmap_bus.write = regmap_i2c_eeprom_write;
+    i2c_eeprom_regmap_bus.gather_write = regmap_i2c_eeprom_gather_write;
+    i2c_eeprom_regmap_bus.reg_format_endian_default = REGMAP_ENDIAN_NATIVE;
+    i2c_eeprom_regmap_bus.val_format_endian_default = REGMAP_ENDIAN_NATIVE;
 
     return 0;
 }

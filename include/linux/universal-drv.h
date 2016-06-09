@@ -242,6 +242,8 @@ extern int regmap_i2c_eeprom_read(void *context, const void *reg,
        size_t reg_size, void *val, size_t val_size);
 extern int regmap_i2c_eeprom_write(void *context, const void *data,
         size_t val_size);
+extern int regmap_i2c_eeprom_gather_write(void *context, const void *reg,
+                    size_t reg_size, const void *val, size_t val_size);
 
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);
