@@ -88,3 +88,113 @@ EXPORT_SYMBOL(new_universal_device);
  * Currently in my prototype, I'll first build regmap framework, then we can
  * build a regmap-ish framework for memory mapped I/O */
 
+ssize_t i2c_eeprom_read(struct universal_device *uni_dev, char *buf,
+        unsigned offset, size_t count) {
+    struct i2c_client *client = to_i2c_client(uni_dev->dev);
+    struct i2c_eeprom_client *eeprom_clients = &client->clients;
+    struct i2c_msg msg[2];
+    u8 msgbuf[2];
+    unsigned long timeout, read_time;
+    int i;
+    ssize_t status;
+
+    memset(msg, 0, sizeof(msg));
+    if (eeprom_clients->flags & 0x80) {
+        /* hardcoded the flag for 16-bit address pointer, i.e., 0x80 */
+        i = *offset >> 16;
+        *offset &= 0xffff;
+    } else {
+        i = *offset >> 8;
+        *offset &= 0xff;
+    }
+    client = eeprom_clients->clients[i];
+    if (count > eeprom_clients->io_limit)
+        count = eeprom_clients->io_limit;
+    /* no SMBUS will be used, we jump to i2c semantics directly */
+    i = 0;
+    if (eeprom_clients->flags & 0x80)
+        /* little endian as here */
+        msgbuf[i++] = offset >> 8;
+    msgbuf[i++] = offset;
+
+    msg[0].addr = client->addr;
+    msg[0].buf = msgbuf;
+    msg[0].len = i;
+
+    msg[1].addr = client->addr;
+    msg[1].flags = I2C_M_RD;
+    msg[1].buf = buf;
+    msg[1].len = count;
+
+    timeout = jiffies + msecs_to_jiffies(eeprom_clients->write_timeout);
+    do {
+        read_time = jiffies;
+        /* assume i2c semantics by default */
+        status = i2c_transfer(client->adapter, msg, 2);
+        if (status == 2)
+            status = count;
+        dev_dbg(&client->dev, "read %zu@%d --> (%ld)\n",
+                count, offset, status, jiffies);
+        if (status == count)
+            return count;
+        msleep(1);
+    } while (time_before(read_time, timeout);
+    return -ETIMEDOUT;
+}
+
+static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
+    loff_t off, size_t count) {
+    struct i2c_client *client = to_i2c_client(uni_dev->dev);
+    struct i2c_eeprom_client *eeprom_clients = &client->clients;
+    struct i2c_msg msg[2];
+    u8 msgbuf[2];
+    unsigned long timeout, read_time;
+    int i;
+    ssize_t ret = 0;
+    ssize_t status;
+
+    if (unlikely(!count))
+        return count;
+    mutex_lock(&uni_dev->lock);
+    while (count) {
+        status = i2c_eeprom_read(uni_dev, buf, off, count);
+        if (statis < = 0) {
+            if (ret == 0)
+                ret = status;
+            break;
+        }
+        buf += status;
+        off += status;
+        count -= status;
+        ret += status;
+    }
+    mutex_unlock(&uni_dev->lock);
+    return ret;
+
+}
+
+
+int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
+        void *val, size_t val_size) {
+    /* the old version of eeprom regmap bus takes the i2c_client pointer
+     * as the context passed to the regmap, however here I'll pass the
+     * universal device pointer as the context */
+    struct universal_device *uni_dev = context;
+   struct register_accessor *regacc;
+   unsigned int offset;
+   int ret;
+
+   if (uni_dev->drv)
+       regacc = uni_dev->drv->regacc;
+   BUG_ON(!regacc);
+   BUG_ON(reg_size != 4);
+   BUG_ON(regacc->reg_val_bits != 8);
+   offset = __raw_readl(reg);
+
+   ret = eeprom_read(uni_dev, val, offset, val_size);
+   if (ret < 0)
+       return ret;
+   if (ret != val_size)
+       return -EINVAL;
+   return 0;
+}

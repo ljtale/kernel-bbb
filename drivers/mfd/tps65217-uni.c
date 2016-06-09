@@ -409,6 +409,7 @@ static struct register_accessor tps65217_regacc = {
 
     /* driver-specific (ad-hoc) information */
     .regmap_support = true,
+    .regmap_bus = "i2c_regmap_bus",
 };
 
 static struct universal_driver tps65217_universal_driver = {

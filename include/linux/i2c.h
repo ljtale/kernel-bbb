@@ -195,6 +195,19 @@ struct i2c_driver {
 };
 #define to_i2c_driver(d) container_of(d, struct i2c_driver, driver)
 
+/* ljtale starts */
+struct i2c_eeprom_client {
+    struct i2c_client *clients;
+    int num_addresses;
+    u32 byte_len;
+    u16 page_size;
+    /* TODO: eeprom platform data etc. */
+    u8 flags;
+    unsigned io_limit;
+    unsigned write_timeout;
+};
+/* ljtale ends */
+
 /**
  * struct i2c_client - represent an I2C slave device
  * @flags: I2C_CLIENT_TEN indicates the device uses a ten bit chip address;
@@ -227,6 +240,8 @@ struct i2c_client {
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 	i2c_slave_cb_t slave_cb;	/* callback for slave mode	*/
 #endif
+    struct i2c_eeprom_client clients;
+
 };
 #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
 

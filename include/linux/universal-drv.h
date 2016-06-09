@@ -10,6 +10,7 @@
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/platform_data/at24.h>
 
 #include <linux/ljtale-utils.h>
 
@@ -72,6 +73,7 @@ struct register_accessor {
 
     /* ad-hoc fields */
     bool regmap_support;
+    const char *regmap_bus;
     struct regmap *regmap;
 };
 
@@ -140,7 +142,9 @@ struct universal_driver {
      * as the device-driver matching mechanism */
     struct device_driver *driver;
 
-    /* universal data structures */
+    /* universal data structures, some of the information should be device
+     * specific, theoretcially one universal device model should have
+     * enough device information for the universal driver */
     struct register_accessor *regacc;
 
     /* local data structrue that is only known to the conventional drivers */
@@ -172,7 +176,8 @@ struct universal_device {
       * Could use spinlocks for fast I/O */
     struct mutex lock;
 
-    void *private_data;
+    /* at24 eeprom specific data structures, no, not going to work */
+    struct at24_platform_data at24_chip;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
@@ -218,7 +223,15 @@ struct universal_device *new_universal_device(struct device *dev);
 extern struct regmap_bus i2c_regmap_bus;
 extern struct regmap_bus i2c_eeprom_regmap_bus;
 extern struct regmap_bus spi_regmap_bus;
+/* FIXME: no spi eeprom regmap buses? */
 extern struct regmap_bus spi_eeprom_regmap_bus;
+
+enum regmap_buses {
+    I2C_REGMAP_BUS,
+    I2C_EEPROM_REGMAP_BUS,
+    SPI_REGMAP_BUS,
+    SPI_EEPROM_REGMAP_BUS,
+};
 
 extern void debug_list_print(void);
 extern struct regmap_bus *regmap_get_i2c_bus_general(void);

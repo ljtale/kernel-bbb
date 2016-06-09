@@ -283,6 +283,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 		dev_err(config->dev, "Regmap not found\n");
 		return ERR_PTR(-EINVAL);
 	}
+    /* TODO: regmap pointer will be get from the universal device */
 
 	nvmem = kzalloc(sizeof(*nvmem), GFP_KERNEL);
 	if (!nvmem)

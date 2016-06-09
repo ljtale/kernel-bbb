@@ -569,17 +569,6 @@ static struct regmap_bus regmap_at24_bus = {
 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 };
 
-#if 0
-/* ljtale starts */
-static struct universal_drv at24_universal_driver = {
-    .name = "at24-universal",
-    .config = {
-        .regmap_bus = &regmap_at24_bus,
-    },
-}; 
-/* ljtale ends */
-#endif
-
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct at24_platform_data chip;
@@ -624,13 +613,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		chip.setup = NULL;
 		chip.context = NULL;
 	}
-    /* ljtale starts */
-    /* device knowledge about chip should be static, I'll do an ad-hoc print */
-    LJTALE_MSG(KERN_INFO, "chip byte len: %d\n", chip.byte_len);
-    LJTALE_MSG(KERN_INFO, "chip page size: %d\n", chip.page_size);
-    LJTALE_MSG(KERN_INFO, "chip flag: %x\n", chip.flags);
-    LJTALE_MSG(KERN_INFO, "chip setup: %d\n", (unsigned int)chip.setup);
-    /* ljtale ends */
 
 	if (!is_power_of_2(chip.byte_len))
 		dev_warn(&client->dev,
@@ -673,6 +655,15 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			chip.page_size = 1;
 		}
 	}
+
+    /* ljtale starts */
+    /* device knowledge about chip should be static, I'll do an ad-hoc print */
+    LJTALE_MSG(KERN_INFO, "chip byte len: %d\n", chip.byte_len);
+    LJTALE_MSG(KERN_INFO, "chip page size: %d\n", chip.page_size);
+    LJTALE_MSG(KERN_INFO, "chip flag: %x\n", chip.flags);
+    LJTALE_MSG(KERN_INFO, "use smbus: %d\n", use_smbus);
+    LJTALE_MSG(KERN_INFO, "use smbus write: %d\n", use_smbus_write);
+    /* ljtale ends */
 
 	regmap_config = devm_kzalloc(&client->dev, sizeof(*regmap_config),
 			GFP_KERNEL);
@@ -811,6 +802,18 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
         LJTALE_MSG(KERN_INFO, "eeprom num addresses %d:%dth\n", 
             num_addresses, i);
 	}
+    /* ljtale starts */
+    /* ljtale: give the dummy information to i2c client data, all these info
+     * should be static knowledge and come from the device vendors */
+    client->clients.clients = at24->client;
+    client->clients.num_addresses = num_addresses;
+    client->clients.byte_len = chip.byte_len;
+    client->clients.page_size = chip.page_size;
+    client->clients.flags = chip.flags;
+    /* following should be constants */
+    client->clients.io_limit = io_limit;
+    client->clients.write_timeout = write_timeout;
+    /* ljtale ends */
 
     /* ljtale: this is just a wrapper for the generic driver data set
      * function: dev_set_drvdata()  */
@@ -834,7 +837,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 err_clients:
     LJTALE_MSG(KERN_INFO, "client: %s created error dummy\n", client->name);
-
 	for (i = 1; i < num_addresses; i++)
 		if (at24->client[i])
 			i2c_unregister_device(at24->client[i]);
