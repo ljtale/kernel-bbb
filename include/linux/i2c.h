@@ -197,7 +197,7 @@ struct i2c_driver {
 
 /* ljtale starts */
 struct i2c_eeprom_client {
-    struct i2c_client *clients;
+    struct i2c_client **clients;
     int num_addresses;
     u32 byte_len;
     u16 page_size;

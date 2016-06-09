@@ -88,7 +88,7 @@ EXPORT_SYMBOL(new_universal_device);
  * Currently in my prototype, I'll first build regmap framework, then we can
  * build a regmap-ish framework for memory mapped I/O */
 
-ssize_t i2c_eeprom_read(struct universal_device *uni_dev, char *buf,
+static ssize_t i2c_eeprom_read(struct universal_device *uni_dev, char *buf,
         unsigned offset, size_t count) {
     struct i2c_client *client = to_i2c_client(uni_dev->dev);
     struct i2c_eeprom_client *eeprom_clients = &client->clients;
@@ -101,11 +101,11 @@ ssize_t i2c_eeprom_read(struct universal_device *uni_dev, char *buf,
     memset(msg, 0, sizeof(msg));
     if (eeprom_clients->flags & 0x80) {
         /* hardcoded the flag for 16-bit address pointer, i.e., 0x80 */
-        i = *offset >> 16;
-        *offset &= 0xffff;
+        i = offset >> 16;
+        offset &= 0xffff;
     } else {
-        i = *offset >> 8;
-        *offset &= 0xff;
+        i = offset >> 8;
+        offset &= 0xff;
     }
     client = eeprom_clients->clients[i];
     if (count > eeprom_clients->io_limit)
@@ -133,23 +133,17 @@ ssize_t i2c_eeprom_read(struct universal_device *uni_dev, char *buf,
         status = i2c_transfer(client->adapter, msg, 2);
         if (status == 2)
             status = count;
-        dev_dbg(&client->dev, "read %zu@%d --> (%ld)\n",
+        dev_dbg(&client->dev, "read %zu@%d --> %d(%ld)\n",
                 count, offset, status, jiffies);
         if (status == count)
             return count;
         msleep(1);
-    } while (time_before(read_time, timeout);
+    } while (time_before(read_time, timeout));
     return -ETIMEDOUT;
 }
 
 static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
     loff_t off, size_t count) {
-    struct i2c_client *client = to_i2c_client(uni_dev->dev);
-    struct i2c_eeprom_client *eeprom_clients = &client->clients;
-    struct i2c_msg msg[2];
-    u8 msgbuf[2];
-    unsigned long timeout, read_time;
-    int i;
     ssize_t ret = 0;
     ssize_t status;
 
@@ -158,7 +152,7 @@ static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
     mutex_lock(&uni_dev->lock);
     while (count) {
         status = i2c_eeprom_read(uni_dev, buf, off, count);
-        if (statis < = 0) {
+        if (status <= 0) {
             if (ret == 0)
                 ret = status;
             break;
@@ -170,7 +164,6 @@ static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
     }
     mutex_unlock(&uni_dev->lock);
     return ret;
-
 }
 
 
@@ -198,3 +191,8 @@ int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
        return -EINVAL;
    return 0;
 }
+
+int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
+    
+    return 0;
+} 
