@@ -26,6 +26,20 @@ enum universal_req_type {
     REQUEST_IRQ,
 };
 
+/* ====== activity based variables and data structures === */
+extern struct regmap_bus i2c_regmap_bus;
+extern struct regmap_bus i2c_eeprom_regmap_bus;
+extern struct regmap_bus spi_regmap_bus;
+/* FIXME: no spi eeprom regmap buses? */
+extern struct regmap_bus spi_eeprom_regmap_bus;
+
+enum regmap_buses {
+    I2C_REGMAP_BUS,
+    I2C_EEPROM_REGMAP_BUS,
+    SPI_REGMAP_BUS,
+    SPI_EEPROM_REGMAP_BUS,
+};
+
 /** =======================================================
  * Universal driver data structures exposed to conventional driver
  */
@@ -49,12 +63,6 @@ struct register_accessor {
     regacc_unlock unlock;
     void *lock_arg;
 
-    /* callbacks that are necessary to do register read and write */
-    ssize_t (*regacc_read_func)(void *context, char *buf, 
-            unsigned addr, size_t count);
-    ssize_t (*regacc_write_func)(void *context, char *buf,
-            unsigned addr, size_t count);
-
     /* TODO: possible a way to describe regsiter layout, one-dimentional or
      * two dimentional */
     // struct reg_layout layout;
@@ -73,7 +81,7 @@ struct register_accessor {
 
     /* ad-hoc fields */
     bool regmap_support;
-    const char *regmap_bus;
+    enum regmap_buses regmap_bus;
     struct regmap *regmap;
 };
 
@@ -144,7 +152,11 @@ struct universal_driver {
 
     /* universal data structures, some of the information should be device
      * specific, theoretcially one universal device model should have
-     * enough device information for the universal driver */
+     * enough device information for the universal driver.
+     * TODO: the fields of register accessors are divided into two parts, one
+     * is universal driver specific such as the accessor methods function
+     * pointers, the other is universal device specific such as device register
+     * address bits and value bits */
     struct register_accessor *regacc;
 
     /* local data structrue that is only known to the conventional drivers */
@@ -176,9 +188,6 @@ struct universal_device {
       * Could use spinlocks for fast I/O */
     struct mutex lock;
 
-    /* at24 eeprom specific data structures, no, not going to work */
-    struct at24_platform_data at24_chip;
-
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
 };
@@ -195,7 +204,6 @@ extern int __universal_drv_register(struct universal_driver *drv);
 extern int __universal_drv_unregister(struct universal_driver *drv);
 #define universal_driver_unregister(drv) \
     __universal_drv_unregister(drv)
-
 
 extern int __universal_dev_register(struct universal_device *dev);
 #define universal_device_register(dev) \
@@ -219,19 +227,6 @@ struct universal_device *check_universal_driver(struct device *dev);
 struct universal_device *new_universal_device(struct device *dev);
 
 
-/* ====== activity based variables and data structures === */
-extern struct regmap_bus i2c_regmap_bus;
-extern struct regmap_bus i2c_eeprom_regmap_bus;
-extern struct regmap_bus spi_regmap_bus;
-/* FIXME: no spi eeprom regmap buses? */
-extern struct regmap_bus spi_eeprom_regmap_bus;
-
-enum regmap_buses {
-    I2C_REGMAP_BUS,
-    I2C_EEPROM_REGMAP_BUS,
-    SPI_REGMAP_BUS,
-    SPI_EEPROM_REGMAP_BUS,
-};
 
 extern void debug_list_print(void);
 extern struct regmap_bus *regmap_get_i2c_bus_general(void);
@@ -244,6 +239,9 @@ extern int regmap_i2c_eeprom_write(void *context, const void *data,
         size_t val_size);
 extern int regmap_i2c_eeprom_gather_write(void *context, const void *reg,
                     size_t reg_size, const void *val, size_t val_size);
+extern void _populate_regmap_config(struct register_accessor *regacc,
+        struct regmap_config *config);
+extern struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc);
 
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);

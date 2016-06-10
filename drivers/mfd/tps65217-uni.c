@@ -258,6 +258,16 @@ static int tps65217_probe(struct i2c_client *client,
 
     /* ljtale starts */
     printk(KERN_INFO "ljtale: tps65217 probe get called\n");
+    struct universal_device *uni_dev;
+    struct register_accessor *regacc;
+
+    uni_dev = check_universal_driver(&client->dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
+                client->name);
+        return -EINVAL;
+    }
+    regacc = uni_dev->drv->regacc;
     /* ljtale ends */
 
 	node = client->dev.of_node;
@@ -308,7 +318,7 @@ static int tps65217_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, tps);
 	tps->dev = &client->dev;
 	tps->id = chip_id;
-
+#if 0
     tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
 	if (IS_ERR(tps->regmap)) {
 		ret = PTR_ERR(tps->regmap);
@@ -316,7 +326,8 @@ static int tps65217_probe(struct i2c_client *client,
 			ret);
 		return ret;
 	}
-
+#endif
+    tps->regmap = regacc->regmap; 
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;
 
@@ -409,7 +420,7 @@ static struct register_accessor tps65217_regacc = {
 
     /* driver-specific (ad-hoc) information */
     .regmap_support = true,
-    .regmap_bus = "i2c_regmap_bus",
+    .regmap_bus = I2C_REGMAP_BUS,
 };
 
 static struct universal_driver tps65217_universal_driver = {

@@ -79,6 +79,8 @@ EXPORT_SYMBOL(__universal_drv_unregister);
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
     struct universal_driver *drv;
+//    struct device *con_dev;
+    struct register_accessor *regacc;
     
     if (!dev || !dev->drv) {
         LJTALE_MSG(KERN_WARNING, 
@@ -89,14 +91,37 @@ int __universal_drv_probe(struct universal_device *dev) {
     drv = dev->drv;
     /* do a set of initialization */
     mutex_init(&dev->lock);
+
     /* do a series of universal driver probe */
     /* for register accessors */
-    /*TODO: regmap */
-    
+    /* Initialize the register accessors for the device. If the device uses
+     * regmap support, instantiate a regmap instance for the device, otherwise
+     * instantiate a universal register accessor for the device.*/
+    regacc = drv->regacc;
+    BUG_ON(!regacc);
+    if (regacc->regmap_support) {
+        struct regmap_config universal_regmap_config;
+        struct regmap_bus *regmap_bus;
+        _populate_regmap_config(regacc, &universal_regmap_config);
+        regmap_bus = _choose_regmap_bus(regacc);
+        BUG_ON(!regmap_bus);
+        regacc->regmap = devm_regmap_init(dev->dev, regmap_bus, dev->dev,
+                &universal_regmap_config);
+        if (IS_ERR(regacc->regmap)) {
+            ret = PTR_ERR(regacc->regmap);
+            goto err;
+        }
+     } else {
+         /* TODO: memory-mapped I/O register accessors initialization */
+     }
+
     /* ... */
     /* do a local probe */
     if (drv->local_probe)
         ret = drv->local_probe(dev);
+    return ret;
+err:
+    /* TODO: error handling */
     return ret;
 }
 EXPORT_SYMBOL(__universal_drv_probe);

@@ -170,14 +170,23 @@ static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
 
 int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
         void *val, size_t val_size) {
-    /* the old version of eeprom regmap bus takes the i2c_client pointer
+    /* The old version of eeprom regmap bus takes the i2c_client pointer
      * as the context passed to the regmap, however here I'll pass the
-     * universal device pointer as the context */
-    struct universal_device *uni_dev = context;
+     * conventional device pointer as the context to be compatible with
+     * the generic i2c regmap bus. Doing this makes it possible to reuse
+     * regmap initialization code */
+    struct device *dev = context;
+    struct universal_device *uni_dev;
     struct register_accessor *regacc = NULL;
     unsigned int offset;
     int ret;
-   
+    
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver unavailable for device: %s\n",
+                dev_name(dev));
+        return -EINVAL;
+    }
     if (uni_dev->drv)
         regacc = uni_dev->drv->regacc;
 
@@ -281,11 +290,18 @@ static int eeprom_write(struct universal_device *uni_dev, const char *buf,
 
 int regmap_i2c_eeprom_gather_write(void *context, const void *reg,
         size_t reg_size, const void *val, size_t val_size) {
-    struct universal_device *uni_dev = context;
+    struct device *dev = context;
+    struct universal_device *uni_dev;
     struct register_accessor *regacc = NULL;
     unsigned int offset;
     int ret;
     
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver unavailable for device: %s\n",
+                dev_name(dev));
+        return -EINVAL;
+    }
     BUG_ON(reg_size != 4);
     if (uni_dev->drv)
         regacc = uni_dev->drv->regacc;
@@ -305,10 +321,18 @@ EXPORT_SYMBOL(regmap_i2c_eeprom_gather_write);
 
 int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
     /* same as the read function, here we pass the context for eeprom write
-     * using universal_device */
-    struct universal_device *uni_dev = context;
+     * using conventioal device and use it to get the universal device */
+    struct device *dev = context;
+    struct universal_device *uni_dev;
     struct register_accessor *regacc = NULL;
     unsigned int reg_bytes, offset;
+
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver unavailable for device: %s\n",
+                dev_name(dev));
+        return -EINVAL;
+    }
     if (uni_dev->drv)
         regacc = uni_dev->drv->regacc;
     if (!regacc)
@@ -324,3 +348,82 @@ int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
             data + offset, count - offset);
 } 
 EXPORT_SYMBOL(regmap_i2c_eeprom_write);
+
+
+int universal_reg_read(struct device *dev, unsigned int reg, 
+        unsigned int *val) {
+    struct universal_device *uni_dev;
+    struct register_accessor *regacc = NULL;
+    
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        dev_dbg(dev, "universal driver not available for device: %s\n",
+                dev_name(dev));
+        return -EINVAL;
+    }
+    /* check_universal_driver already make sure the drv pointer for uni_dev
+     * is not NULL */
+    regacc = uni_dev->drv->regacc;
+    BUG_ON(!regacc);
+    if (regacc->regmap_support)
+        return regmap_read(regacc->regmap, reg, val);
+    else if (regacc->regacc_read)
+        return regacc->regacc_read(dev, reg, val);
+        
+    else 
+        LJTALE_MSG(KERN_ERR, "no universal reg read method for device: %s\n",
+                dev_name(dev));
+    return -EINVAL;
+}
+
+
+int universal_reg_write(struct device *dev, unsigned int reg,
+        unsigned int val) {
+    struct universal_device *uni_dev;
+    struct register_accessor *regacc = NULL;
+    
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        dev_dbg(dev, "universal driver not available for device: %s\n",
+                dev_name(dev));
+        return -EINVAL;
+    }
+    /* check_universal_driver already make sure the drv pointer for uni_dev
+     * is not NULL */
+    regacc = uni_dev->drv->regacc;
+    BUG_ON(!regacc);
+    if (regacc->regmap_support)
+        return regmap_write(regacc->regmap, reg, val);
+    else if (regacc->regacc_write)
+        return regacc->regacc_write(dev, reg, val);
+    else 
+        LJTALE_MSG(KERN_ERR, "no universal reg write method for device: %s\n",
+                dev_name(dev));
+    return -EINVAL;
+}
+
+void _populate_regmap_config(struct register_accessor *regacc, 
+        struct regmap_config *config) {
+    /* outside world makes sure both regacc and config are valid */
+    config->reg_bits = regacc->reg_addr_bits;
+    config->val_bits = regacc->reg_val_bits;
+    config->max_register = regacc->max_register;
+    /* FIXME: cache mechanism should be passed to regacc as well */
+    config->cache_type = REGCACHE_NONE;
+}
+
+struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc) {
+    /* outside world makes sure regacc is valid */
+    switch(regacc->regmap_bus) {
+        case I2C_REGMAP_BUS:
+            return &i2c_regmap_bus;
+        case I2C_EEPROM_REGMAP_BUS:
+            return &i2c_eeprom_regmap_bus;
+        case SPI_REGMAP_BUS:
+            return &spi_regmap_bus;
+        case SPI_EEPROM_REGMAP_BUS:
+            return &spi_eeprom_regmap_bus;
+        default:
+            return NULL;
+    }
+}

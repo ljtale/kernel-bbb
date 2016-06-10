@@ -902,7 +902,9 @@ static struct register_accessor at24_regacc = {
     .bus_name = "i2c",
     .reg_addr_bits = 32,
     .reg_val_bits = 8,
+
     .regmap_support = true,
+    .regmap_bus = I2C_EEPROM_REGMAP_BUS,
 };
 
 static struct universal_driver at24_universal_driver = {
