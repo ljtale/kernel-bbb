@@ -274,6 +274,8 @@ static inline unsigned long tps65217_chip_id(struct tps65217 *tps65217)
 	return tps65217->id;
 }
 
+/* ljtale starts */
+#if 0
 int tps65217_reg_read(struct tps65217 *tps, unsigned int reg,
 					unsigned int *val);
 int tps65217_reg_write(struct tps65217 *tps, unsigned int reg,
@@ -282,5 +284,16 @@ int tps65217_set_bits(struct tps65217 *tps, unsigned int reg,
 		unsigned int mask, unsigned int val, unsigned int level);
 int tps65217_clear_bits(struct tps65217 *tps, unsigned int reg,
 		unsigned int mask, unsigned int level);
+#endif
+int tps65217_reg_read(struct device *dev, unsigned int reg,
+					unsigned int *val);
+int tps65217_reg_write(struct device *dev, unsigned int reg,
+			unsigned int val, unsigned int level);
+int tps65217_set_bits(struct device *dev, unsigned int reg,
+		unsigned int mask, unsigned int val, unsigned int level);
+int tps65217_clear_bits(struct device *dev, unsigned int reg,
+		unsigned int mask, unsigned int level);
+
+/* ljtale ends */
 
 #endif /*  __LINUX_MFD_TPS65217_H */

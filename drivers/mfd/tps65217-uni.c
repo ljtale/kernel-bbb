@@ -36,6 +36,7 @@
 
 /* ljtale starts */
 #include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 /* ljtale ends */
 
 static const struct mfd_cell tps65217s[] = {
@@ -48,6 +49,8 @@ static const struct mfd_cell tps65217s[] = {
 		.of_compatible = "ti,tps65217-bl",
 	},
 };
+
+#if 0
 
 /**
  * tps65217_reg_read: Read a single tps65217 register.
@@ -62,7 +65,16 @@ int tps65217_reg_read(struct tps65217 *tps, unsigned int reg,
 	return regmap_read(tps->regmap, reg, val);
 }
 EXPORT_SYMBOL_GPL(tps65217_reg_read);
+#endif
 
+/* ljtale starts */
+int tps65217_reg_read(struct device *dev, unsigned int reg,
+        unsigned int *val) {
+    return universal_reg_read(dev, reg, val);
+}
+EXPORT_SYMBOL_GPL(tps65217_reg_read);
+
+#if 0
 /**
  * tps65217_reg_write: Write a single tps65217 register.
  *
@@ -107,7 +119,46 @@ int tps65217_reg_write(struct tps65217 *tps, unsigned int reg,
 	}
 }
 EXPORT_SYMBOL_GPL(tps65217_reg_write);
+#endif
 
+/* ljtale starts */
+int tps65217_reg_write(struct device *dev, unsigned int reg,
+			unsigned int val, unsigned int level)
+{
+	int ret;
+	unsigned int xor_reg_val;
+
+	switch (level) {
+	case TPS65217_PROTECT_NONE:
+        return universal_reg_write(dev, reg, val);
+	case TPS65217_PROTECT_L1:
+		xor_reg_val = reg ^ TPS65217_PASSWORD_REGS_UNLOCK;
+        ret = universal_reg_write(dev, TPS65217_REG_PASSWORD, xor_reg_val);
+		if (ret < 0)
+			return ret;
+
+        ret = universal_reg_write(dev, reg, val);
+	case TPS65217_PROTECT_L2:
+		xor_reg_val = reg ^ TPS65217_PASSWORD_REGS_UNLOCK;
+        ret = universal_reg_write(dev, TPS65217_REG_PASSWORD, xor_reg_val);
+		if (ret < 0)
+			return ret;
+        ret = universal_reg_write(dev, reg, val);
+		if (ret < 0)
+			return ret;
+        ret = universal_reg_write(dev, TPS65217_REG_PASSWORD, xor_reg_val);
+		if (ret < 0)
+			return ret;
+        return universal_reg_write(dev, reg, val);
+	default:
+		return -EINVAL;
+	}
+}
+EXPORT_SYMBOL_GPL(tps65217_reg_write);
+
+/* ljtale ends */
+
+#if 0
 /**
  * tps65217_update_bits: Modify bits w.r.t mask, val and level.
  *
@@ -138,7 +189,33 @@ static int tps65217_update_bits(struct tps65217 *tps, unsigned int reg,
 
 	return ret;
 }
+#endif
+/* ljtale starts */
+static int tps65217_update_bits(struct device *dev, unsigned int reg,
+		unsigned int mask, unsigned int val, unsigned int level)
+{
+	int ret;
+	unsigned int data;
 
+	ret = tps65217_reg_read(dev, reg, &data);
+	if (ret) {
+		dev_err(dev, "Read from reg 0x%x failed\n", reg);
+		return ret;
+	}
+
+	data &= ~mask;
+	data |= val & mask;
+
+	ret = tps65217_reg_write(dev, reg, data, level);
+	if (ret)
+		dev_err(dev, "Write for reg 0x%x failed\n", reg);
+
+	return ret;
+}
+
+/* ljtale ends */
+
+#if 0
 int tps65217_set_bits(struct tps65217 *tps, unsigned int reg,
 		unsigned int mask, unsigned int val, unsigned int level)
 {
@@ -152,6 +229,22 @@ int tps65217_clear_bits(struct tps65217 *tps, unsigned int reg,
 	return tps65217_update_bits(tps, reg, mask, 0, level);
 }
 EXPORT_SYMBOL_GPL(tps65217_clear_bits);
+#endif
+
+int tps65217_set_bits(struct device *dev, unsigned int reg,
+		unsigned int mask, unsigned int val, unsigned int level)
+{
+	return tps65217_update_bits(dev, reg, mask, val, level);
+}
+EXPORT_SYMBOL_GPL(tps65217_set_bits);
+
+int tps65217_clear_bits(struct device *dev, unsigned int reg,
+		unsigned int mask, unsigned int level)
+{
+	return tps65217_update_bits(dev, reg, mask, 0, level);
+}
+EXPORT_SYMBOL_GPL(tps65217_clear_bits);
+
 
 static const struct regmap_config tps65217_regmap_config = {
 	.reg_bits = 8,
@@ -164,7 +257,7 @@ static const struct of_device_id tps65217_of_match[] = {
 	{ .compatible = "ti,tps65217", .data = (void *)TPS65217 },
 	{ /* sentinel */ },
 };
-
+#if 0
 static irqreturn_t tps65217_irq(int irq, void *irq_data)
 {
 	struct tps65217 *tps = irq_data;
@@ -200,6 +293,45 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 
 	return IRQ_HANDLED;
 }
+#endif
+
+/* ljtale starts */
+static irqreturn_t tps65217_irq(int irq, void *irq_data)
+{
+	struct tps65217 *tps = irq_data;
+	unsigned int int_reg = 0, status_reg = 0;
+
+	tps65217_reg_read(tps->dev, TPS65217_REG_INT, &int_reg);
+	tps65217_reg_read(tps->dev, TPS65217_REG_STATUS, &status_reg);
+	if (status_reg)
+		dev_dbg(tps->dev, "status now: 0x%X\n", status_reg);
+
+	if (!int_reg)
+		return IRQ_NONE;
+
+	if (int_reg & TPS65217_INT_PBI) {
+		/* Handle push button */
+		dev_dbg(tps->dev, "power button status change\n");
+		input_report_key(tps->pwr_but, KEY_POWER,
+				status_reg & TPS65217_STATUS_PB);
+		input_sync(tps->pwr_but);
+	}
+	if (int_reg & TPS65217_INT_ACI) {
+		/* Handle AC power status change */
+		dev_dbg(tps->dev, "AC power status change\n");
+		/* Press KEY_POWER when AC not present */
+		input_report_key(tps->pwr_but, KEY_POWER,
+				~status_reg & TPS65217_STATUS_ACPWR);
+		input_sync(tps->pwr_but);
+	}
+	if (int_reg & TPS65217_INT_USBI) {
+		/* Handle USB power status change */
+		dev_dbg(tps->dev, "USB power status change\n");
+	}
+
+	return IRQ_HANDLED;
+}
+/* ljtale ends */
 
 static int tps65217_probe_pwr_but(struct tps65217 *tps)
 {
@@ -223,6 +355,7 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 		dev_err(tps->dev, "Failed to register button device\n");
 		return ret;
 	}
+    /* TODO: put irq configuration in the universal driver */
 	ret = devm_request_threaded_irq(tps->dev,
 		tps->irq, NULL, tps65217_irq, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 		"tps65217", tps);
@@ -232,14 +365,15 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 	}
 
 	/* enable the power button interrupt */
-	ret = tps65217_reg_read(tps, TPS65217_REG_INT, &int_reg);
+	ret = tps65217_reg_read(tps->dev, TPS65217_REG_INT, &int_reg);
 	if (ret < 0) {
 		dev_err(tps->dev, "Failed to read INT reg\n");
 		return ret;
 	}
     /* ljtale: power button monitor bit in the interrupt register */
 	int_reg &= ~TPS65217_INT_PBM;
-	tps65217_reg_write(tps, TPS65217_REG_INT, int_reg, TPS65217_PROTECT_NONE);
+	tps65217_reg_write(tps->dev, TPS65217_REG_INT, int_reg, 
+            TPS65217_PROTECT_NONE);
 	return 0;
 }
 
@@ -327,7 +461,8 @@ static int tps65217_probe(struct i2c_client *client,
 		return ret;
 	}
 #endif
-    tps->regmap = regacc->regmap; 
+    /*FIXME: NO more regmap pointer in the tps data structures */
+    // tps->regmap = regacc->regmap; 
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;
 
@@ -348,7 +483,7 @@ static int tps65217_probe(struct i2c_client *client,
 		return ret;
 	}
 
-	ret = tps65217_reg_read(tps, TPS65217_REG_CHIPID, &version);
+	ret = tps65217_reg_read(tps->dev, TPS65217_REG_CHIPID, &version);
 	if (ret < 0) {
 		dev_err(tps->dev, "Failed to read revision register: %d\n",
 			ret);
@@ -357,7 +492,7 @@ static int tps65217_probe(struct i2c_client *client,
 
 	/* Set the PMIC to shutdown on PWR_EN toggle */
 	if (status_off) {
-		ret = tps65217_set_bits(tps, TPS65217_REG_STATUS,
+		ret = tps65217_set_bits(tps->dev, TPS65217_REG_STATUS,
 				TPS65217_STATUS_OFF, TPS65217_STATUS_OFF,
 				TPS65217_PROTECT_NONE);
 		if (ret)

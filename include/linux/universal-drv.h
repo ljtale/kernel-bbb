@@ -94,6 +94,7 @@ struct irq_config {
     int irq;
     irqreturn_t (*handler)(int irq, void *data);
     irqreturn_t (*thread_fn)(int irq, void *data);
+    unsigned long irqflags;
     bool irq_sharing;
     /* irq could come from static platform information, or from device tree,
      * which we can get at runtime */

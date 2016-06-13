@@ -79,7 +79,7 @@ static int tps65217_pmic_enable(struct regulator_dev *dev)
 		return -EINVAL;
 
 	/* Enable the regulator and password protection is level 1 */
-	return tps65217_set_bits(tps, TPS65217_REG_ENABLE,
+	return tps65217_set_bits(tps->dev, TPS65217_REG_ENABLE,
 				 dev->desc->enable_mask, dev->desc->enable_mask,
 				 TPS65217_PROTECT_L1);
 }
@@ -93,7 +93,7 @@ static int tps65217_pmic_disable(struct regulator_dev *dev)
 		return -EINVAL;
 
 	/* Disable the regulator and password protection is level 1 */
-	return tps65217_clear_bits(tps, TPS65217_REG_ENABLE,
+	return tps65217_clear_bits(tps->dev, TPS65217_REG_ENABLE,
 				   dev->desc->enable_mask, TPS65217_PROTECT_L1);
 }
 
@@ -105,13 +105,13 @@ static int tps65217_pmic_set_voltage_sel(struct regulator_dev *dev,
 	unsigned int rid = rdev_get_id(dev);
 
 	/* Set the voltage based on vsel value and write protect level is 2 */
-	ret = tps65217_set_bits(tps, dev->desc->vsel_reg, dev->desc->vsel_mask,
+	ret = tps65217_set_bits(tps->dev, dev->desc->vsel_reg, dev->desc->vsel_mask,
 				selector, TPS65217_PROTECT_L2);
 
 	/* Set GO bit for DCDCx to initiate voltage transistion */
 	switch (rid) {
 	case TPS65217_DCDC_1 ... TPS65217_DCDC_3:
-		ret = tps65217_set_bits(tps, TPS65217_REG_DEFSLEW,
+		ret = tps65217_set_bits(tps->dev, TPS65217_REG_DEFSLEW,
 				       TPS65217_DEFSLEW_GO, TPS65217_DEFSLEW_GO,
 				       TPS65217_PROTECT_L2);
 		break;
@@ -134,7 +134,7 @@ static int tps65217_pmic_set_suspend_enable(struct regulator_dev *dev)
 	if (rid < TPS65217_DCDC_1 || rid > TPS65217_LDO_4)
 		return -EINVAL;
 
-	return tps65217_clear_bits(tps, dev->desc->bypass_reg,
+	return tps65217_clear_bits(tps->dev, dev->desc->bypass_reg,
 				   dev->desc->bypass_mask,
 				   TPS65217_PROTECT_L1);
 }
@@ -150,7 +150,7 @@ static int tps65217_pmic_set_suspend_disable(struct regulator_dev *dev)
 	if (!regulator_data[rid].strobe)
 		return -EINVAL;
 
-	return tps65217_set_bits(tps, dev->desc->bypass_reg,
+	return tps65217_set_bits(tps->dev, dev->desc->bypass_reg,
 				 dev->desc->bypass_mask,
 				 regulator_data[rid].strobe,
 				 TPS65217_PROTECT_L1);
@@ -252,7 +252,10 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
 					       &config);
 
 		/* Store default strobe info */
-		ret = tps65217_reg_read(tps, regulators[i].bypass_reg, &val);
+        /* ljtale starts */
+		ret = tps65217_reg_read(tps->dev, regulators[i].bypass_reg, &val);
+		// ret = tps65217_reg_read(tps, regulators[i].bypass_reg, &val);
+        /* ljtale ends */
 
 		regulator_data[i].strobe = val & regulators[i].bypass_mask;
 
