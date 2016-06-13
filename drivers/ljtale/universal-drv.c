@@ -100,6 +100,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     regacc = drv->regacc;
     BUG_ON(!regacc);
     if (regacc->regmap_support) {
+        LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", dev->name);
         struct regmap_config universal_regmap_config;
         struct regmap_bus *regmap_bus;
         _populate_regmap_config(regacc, &universal_regmap_config);
@@ -108,6 +109,7 @@ int __universal_drv_probe(struct universal_device *dev) {
         regacc->regmap = devm_regmap_init(dev->dev, regmap_bus, dev->dev,
                 &universal_regmap_config);
         if (IS_ERR(regacc->regmap)) {
+            LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s\n", dev->name);
             ret = PTR_ERR(regacc->regmap);
             goto err;
         }
