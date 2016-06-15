@@ -37,6 +37,8 @@ struct regmap_bus i2c_eeprom_regmap_bus;
 struct regmap_bus spi_regmap_bus;
 struct regmap_bus spi_eeprom_regmap_bus;
 
+int regmap_debug_cnt = 0;
+EXPORT_SYMBOL(regmap_debug_cnt);
 
 int __universal_drv_register(struct universal_driver *drv) {
     struct universal_device *dev;
@@ -102,14 +104,15 @@ int __universal_drv_probe(struct universal_device *dev) {
     if (regacc->regmap_support) {
         LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", dev->name);
         struct regmap_config universal_regmap_config;
-        struct regmap_bus *regmap_bus;
+        const struct regmap_bus *regmap_bus;
         _populate_regmap_config(regacc, &universal_regmap_config);
         regmap_bus = _choose_regmap_bus(regacc);
         BUG_ON(!regmap_bus);
         regacc->regmap = devm_regmap_init(dev->dev, regmap_bus, dev->dev,
                 &universal_regmap_config);
         if (IS_ERR(regacc->regmap)) {
-            LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s\n", dev->name);
+            LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s: %d\n", 
+                    dev->name, regmap_debug_cnt);
             ret = PTR_ERR(regacc->regmap);
             goto err;
         }

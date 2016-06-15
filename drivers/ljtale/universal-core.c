@@ -47,7 +47,7 @@ struct universal_device *check_universal_driver(struct device *dev) {
         if (uni_dev->dev == dev && uni_dev->drv) {
             /* compare the address values directly, the device pointer
              * should be unique */
-            LJTALE_MSG(KERN_INFO, "universal device %s and driver: %s exist\n",
+            LJTALE_LEVEL_DEBUG(-1, "universal device %s and driver: %s exist\n",
                     uni_dev->name, uni_dev->drv->name);
             exist = true;
             break;
@@ -405,6 +405,8 @@ int universal_reg_write(struct device *dev, unsigned int reg,
 void _populate_regmap_config(struct register_accessor *regacc, 
         struct regmap_config *config) {
     /* outside world makes sure both regacc and config are valid */
+    /* clear out the config memory */
+    memset(config, 0, sizeof(*config));
     config->reg_bits = regacc->reg_addr_bits;
     config->val_bits = regacc->reg_val_bits;
     config->max_register = regacc->max_register;

@@ -18,6 +18,13 @@ then
         make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- mrproper
         exit
     fi
+
+    if [ $1 == menuconfig ]
+    then 
+        make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- bb.org_defconfig
+        make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- menuconfig
+        exit
+    fi
     
     # the following two lines should only execute once unless the kernel
     # configuration need to be changed
