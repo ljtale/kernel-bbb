@@ -26,6 +26,10 @@
 #include <linux/regmap.h>
 #include <linux/slab.h>
 
+/* ljtale starts */
+#include <linux/universal-drv.h>
+/* ljtale ends */
+
 struct nvmem_device {
 	const char		*name;
 	struct regmap		*regmap;
@@ -274,6 +278,11 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 	struct device_node *np;
 	struct regmap *rm;
 	int rval;
+    /* ljtale starts */
+    struct universal_device *uni_dev = NULL;
+    struct universal_driver *uni_drv = NULL;
+    struct register_accessor *regacc = NULL;
+    /* ljtale ends */
 
 	if (!config->dev)
 		return ERR_PTR(-EINVAL);
@@ -284,6 +293,26 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 		return ERR_PTR(-EINVAL);
 	}
     /* TODO: regmap pointer will be get from the universal device */
+    /* ljtale starts */
+    uni_dev = check_universal_driver(config->dev);
+    if (!uni_drv) {
+        LJTALE_MSG(KERN_ERR, "universal driver not available for %s\n",
+                dev_name(config->dev));
+        return ERR_PTR(-EINVAL);
+    }
+    BUG_ON(!uni_dev->drv);
+    uni_drv = uni_dev->drv;
+    BUG_ON(!uni_drv->regacc);
+    regacc = uni_drv->regacc;
+    /* nvmem is based on regmap, so regmap support must be ture here */
+    BUG_ON(!regacc->regmap_support);
+    rm = regacc->regmap;
+    if (!rm) {
+        dev_err(config->dev, "Regmap not found\n");
+        return ERR_PTR(-EINVAL);
+    }
+    /* ljtale ends */
+
 
 	nvmem = kzalloc(sizeof(*nvmem), GFP_KERNEL);
 	if (!nvmem)

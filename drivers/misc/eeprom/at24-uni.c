@@ -72,12 +72,14 @@ struct at24_data {
 	 */
 	struct mutex lock;
 
-	u8 *writebuf;
-	unsigned write_max;
-	unsigned num_addresses;
+    /* ljtale starts */
+//	u8 *writebuf;
+    unsigned write_max;
+//	unsigned num_addresses;
 
-	struct regmap_config *regmap_config;
-	struct regmap *regmap;
+//	struct regmap_config *regmap_config;
+//	struct regmap *regmap;
+    /* ljtale ends */
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
 
@@ -336,8 +338,10 @@ static ssize_t at24_eeprom_write(struct at24_data *at24, const char *buf,
 	client = at24_translate_offset(at24, &offset);
 
 	/* write_max is at most a page */
-	if (count > at24->write_max)
-		count = at24->write_max;
+	// if (count > at24->write_max)
+	//	count = at24->write_max;
+    if (count > client->clients.write_max)
+        count = client->clients.write_max;
 
 	/* Never roll over backwards, to the start of this page */
 	next_page = roundup(offset + 1, at24->chip.page_size);
@@ -352,7 +356,8 @@ static ssize_t at24_eeprom_write(struct at24_data *at24, const char *buf,
 		msg.flags = 0;
 
 		/* msg.buf is u8 and casts will mask the values */
-		msg.buf = at24->writebuf;
+		// msg.buf = at24->writebuf;
+        msg.buf = client->clients.write_buf;
 		if (at24->chip.flags & AT24_FLAG_ADDR16)
 			msg.buf[i++] = offset >> 8;
 
@@ -484,6 +489,7 @@ static void at24_get_ofdata(struct i2c_client *client,
 { }
 #endif /* CONFIG_OF */
 
+#if 0
 static int regmap_at24_read(void *context,
 			    const void *reg, size_t reg_size,
 			    void *val, size_t val_size)
@@ -568,6 +574,7 @@ static struct regmap_bus regmap_at24_bus = {
 	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 };
+#endif
 
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -579,8 +586,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int err;
 	unsigned i, num_addresses;
 	kernel_ulong_t magic;
-	struct regmap_config *regmap_config;
-	struct regmap *regmap;
+//	struct regmap_config *regmap_config;
+//	struct regmap *regmap;
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
 
@@ -664,7 +671,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
     LJTALE_MSG(KERN_INFO, "use smbus: %d\n", use_smbus);
     LJTALE_MSG(KERN_INFO, "use smbus write: %d\n", use_smbus_write);
     /* ljtale ends */
-
+#if 0
 	regmap_config = devm_kzalloc(&client->dev, sizeof(*regmap_config),
 			GFP_KERNEL);
 	if (IS_ERR(regmap_config)) {
@@ -679,7 +686,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	regmap_config->val_bits = 8;
 	regmap_config->cache_type = REGCACHE_NONE;
 	regmap_config->max_register = chip.byte_len;
-
+#endif
 	if (chip.flags & AT24_FLAG_TAKE8ADDR)
 		num_addresses = 8;
 	else
@@ -687,19 +694,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
 
     LJTALE_MSG(KERN_INFO, "eeprom num addresses %d\n", num_addresses); 
+
 #if 0
-    /* ljtale starts */
-    /* populate the universal driver fields for at24 */
-    at24_universal_driver.dev = &client->dev;
-    at24_universal_driver.config.regmap_bus_context = client;
-    at24_universal_driver.config.regmap_config = regmap_config;
-    universal_drv_init(&at24_universal_driver);
-    /* FIXME: the regmap pointer for this driver should be put into a data 
-     * structure for the driver's use, but the data structure format 
-     * needs more thinking 
-     */
-    regmap = at24_universal_driver.config.regmap;
-#endif
 	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
 	regmap = devm_regmap_init(&client->dev, &regmap_at24_bus,
 			client, regmap_config);
@@ -709,7 +705,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			__func__, err);
 		return err;
 	}
-
+#endif
 	nvmem_config = devm_kzalloc(&client->dev, sizeof(*nvmem_config),
 			GFP_KERNEL);
 	if (IS_ERR(nvmem_config)) {
@@ -746,8 +742,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err_out;
 	}
 
-	at24->regmap = regmap;
-	at24->regmap_config = regmap_config;
+//	at24->regmap = regmap;
+//	at24->regmap_config = regmap_config;
 	at24->nvmem_config = nvmem_config;
 	at24->nvmem_dev = nvmem_dev;
 
@@ -755,8 +751,8 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	at24->use_smbus = use_smbus;
 	at24->use_smbus_write = use_smbus_write;
     /* ljtale: another chip copy... */
-	at24->chip = chip;
-	at24->num_addresses = num_addresses;
+//	at24->chip = chip;
+//	at24->num_addresses = num_addresses;
 
 	at24->macc.read = at24_macc_read;
 
@@ -775,12 +771,14 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			at24->write_max = write_max;
 
 			/* buffer (data + address at the beginning) */
+            /*
 			at24->writebuf = devm_kzalloc(&client->dev,
 				write_max + 2, GFP_KERNEL);
 			if (!at24->writebuf) {
 				err = -ENOMEM;
 				goto err_out;
 			}
+            */
 		} else {
 			dev_warn(&client->dev,
 				"cannot write due to controller restrictions.");
@@ -837,6 +835,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	/* export data to kernel code */
+    /* ljtale: note, macc is no longer used in the latest kernel */
 	if (chip.setup)
 		chip.setup(&at24->macc, chip.context);
 
@@ -863,7 +862,7 @@ static int at24_remove(struct i2c_client *client)
 
 	at24 = i2c_get_clientdata(client);
 
-	for (i = 1; i < at24->num_addresses; i++)
+	for (i = 1; i < client->clients.num_addresses; i++)
 		i2c_unregister_device(at24->client[i]);
 
 	nvmem_unregister(at24->nvmem_dev);
