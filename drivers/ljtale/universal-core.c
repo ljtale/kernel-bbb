@@ -429,3 +429,13 @@ struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc) {
             return NULL;
     }
 }
+
+int __universal_get_irq(struct universal_device *uni_dev) {
+    struct irq_config *irq_config;
+    /* supposedly the uni_dev has already been matched with a universal driver
+     * instance */
+    BUG_ON(!uni_dev->drv);
+    irq_config = uni_dev->drv->irq_config;
+    BUG_ON(!irq_config);
+    return 0;
+}

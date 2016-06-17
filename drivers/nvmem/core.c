@@ -286,21 +286,21 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
 
 	if (!config->dev)
 		return ERR_PTR(-EINVAL);
-
+    /*
 	rm = dev_get_regmap(config->dev, NULL);
 	if (!rm) {
 		dev_err(config->dev, "Regmap not found\n");
 		return ERR_PTR(-EINVAL);
 	}
+    */
     /* TODO: regmap pointer will be get from the universal device */
     /* ljtale starts */
     uni_dev = check_universal_driver(config->dev);
-    if (!uni_drv) {
+    if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for %s\n",
                 dev_name(config->dev));
         return ERR_PTR(-EINVAL);
     }
-    BUG_ON(!uni_dev->drv);
     uni_drv = uni_dev->drv;
     BUG_ON(!uni_drv->regacc);
     regacc = uni_drv->regacc;

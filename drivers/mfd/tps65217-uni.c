@@ -391,9 +391,9 @@ static int tps65217_probe(struct i2c_client *client,
 	int ret;
 
     /* ljtale starts */
-    printk(KERN_INFO "ljtale: tps65217 probe get called\n");
     struct universal_device *uni_dev;
     struct register_accessor *regacc;
+    printk(KERN_INFO "ljtale: tps65217 probe get called\n");
 
     uni_dev = check_universal_driver(&client->dev);
     if (!uni_dev) {
@@ -465,6 +465,8 @@ static int tps65217_probe(struct i2c_client *client,
     // tps->regmap = regacc->regmap; 
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;
+
+    LJTALE_LEVEL_DEBUG(2, "tps irq: %d, irq_gpio: %d\n", irq, irq_gpio);
 
 	/* we got an irq, request it */
     /* ljtale: also enable the power button interrupt */
@@ -558,11 +560,19 @@ static struct register_accessor tps65217_regacc = {
     .regmap_bus = I2C_REGMAP_BUS,
 };
 
+static struct irq_config tps65217_irq_config = {
+    .handler = NULL,
+    .thread_fn = NULL,
+    .irqflags = 0,
+    .irq_sharing = false,
+};
+
 static struct universal_driver tps65217_universal_driver = {
     /* use the existing driver name for binding */
     .name = "tps65217-universal-driver",
     .driver = &tps65217_driver.driver,
     .regacc = &tps65217_regacc,
+    .irq_config = &tps65217_irq_config,
     .local_probe = tps65217_universal_local_probe,
 };
 

@@ -81,8 +81,10 @@ EXPORT_SYMBOL(__universal_drv_unregister);
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
     struct universal_driver *drv;
-//    struct device *con_dev;
+    struct regmap_config universal_regmap_config;
+    const struct regmap_bus *regmap_bus;
     struct register_accessor *regacc;
+    struct irq_config *irq_config;
     
     if (!dev || !dev->drv) {
         LJTALE_MSG(KERN_WARNING, 
@@ -100,30 +102,38 @@ int __universal_drv_probe(struct universal_device *dev) {
      * regmap support, instantiate a regmap instance for the device, otherwise
      * instantiate a universal register accessor for the device.*/
     regacc = drv->regacc;
-    BUG_ON(!regacc);
-    if (regacc->regmap_support) {
-        LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", dev->name);
-        struct regmap_config universal_regmap_config;
-        const struct regmap_bus *regmap_bus;
-        _populate_regmap_config(regacc, &universal_regmap_config);
-        regmap_bus = _choose_regmap_bus(regacc);
-        BUG_ON(!regmap_bus);
-        regacc->regmap = devm_regmap_init(dev->dev, regmap_bus, dev->dev,
-                &universal_regmap_config);
-        if (IS_ERR(regacc->regmap)) {
-            LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s: %d\n", 
-                    dev->name, regmap_debug_cnt);
-            ret = PTR_ERR(regacc->regmap);
-            goto err;
-        }
-     } else {
-         /* TODO: memory-mapped I/O register accessors initialization */
-     }
+    if (regacc) {
+        if (regacc->regmap_support) {
+            LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", dev->name);
+            _populate_regmap_config(regacc, &universal_regmap_config);
+            regmap_bus = _choose_regmap_bus(regacc);
+            BUG_ON(!regmap_bus);
+            regacc->regmap = devm_regmap_init(dev->dev, regmap_bus, dev->dev,
+                    &universal_regmap_config);
+            if (IS_ERR(regacc->regmap)) {
+                LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s: %d\n", 
+                        dev->name, regmap_debug_cnt);
+                ret = PTR_ERR(regacc->regmap);
+                goto err;
+            }
+         } else {
+             /* TODO: memory-mapped I/O register accessors initialization */
+         }
+    }
+
+    irq_config = drv->irq_config;
+    if (irq_config) {
+        LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", dev->name);
+        /* first try to get irq number from device tree or whatever */
+        irq_config->irq = __universal_get_irq(dev);
+
+    }
 
     /* ... */
     /* do a local probe */
     if (drv->local_probe)
         ret = drv->local_probe(dev);
+    LJTALE_MSG(KERN_INFO, "universal driver probe done: %s\n", dev->name);
     return ret;
 err:
     /* TODO: error handling */

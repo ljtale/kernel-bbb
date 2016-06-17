@@ -91,11 +91,19 @@ struct register_accessor {
  */
 
 struct irq_config {
+    /* irq number should be got dynamically from the universal driver. But
+     * basically the irq is set statically in the device tree or through PCI
+     * configuration, thus TODO: IRQ either comes from device tree node or
+     * from the universal driver code compiler that compiles the device
+     * knowledge into universal driver data structures. */
     int irq;
     irqreturn_t (*handler)(int irq, void *data);
     irqreturn_t (*thread_fn)(int irq, void *data);
     unsigned long irqflags;
     bool irq_sharing;
+    /* indicate if we need to get gpio irq in case the normal irq is
+     * not available */
+    bool get_gpio_irq;
     /* irq could come from static platform information, or from device tree,
      * which we can get at runtime */
 };
@@ -159,6 +167,8 @@ struct universal_driver {
      * pointers, the other is universal device specific such as device register
      * address bits and value bits */
     struct register_accessor *regacc;
+    /* IRQ configuration */
+    struct irq_config *irq_config;
 
     /* local data structrue that is only known to the conventional drivers */
     void *local_data;
@@ -230,6 +240,7 @@ struct universal_device *new_universal_device(struct device *dev);
 
 
 extern void debug_list_print(void);
+/* regmap related functions */
 extern struct regmap_bus *regmap_get_i2c_bus_general(void);
 /* FIXME: this definition should be moved to individual i2c device drivers */
 extern const struct i2c_device_id *i2c_match_id_general(
@@ -243,6 +254,10 @@ extern int regmap_i2c_eeprom_gather_write(void *context, const void *reg,
 extern void _populate_regmap_config(struct register_accessor *regacc,
         struct regmap_config *config);
 extern struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc);
+
+/* IRQ configuration related functions */
+extern int __universal_get_irq(struct universal_device *uni_dev);
+
 
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);
