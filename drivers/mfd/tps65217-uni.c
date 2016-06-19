@@ -377,7 +377,6 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 	return 0;
 }
 
-
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
 {
@@ -391,8 +390,11 @@ static int tps65217_probe(struct i2c_client *client,
 	int ret;
 
     /* ljtale starts */
+    /* FIXME: here is an assumption, any activity that needs a context to
+     * implement will require population of the device knowledge at runtime */
     struct universal_device *uni_dev;
     struct register_accessor *regacc;
+    struct irq_config *irq_config;
     printk(KERN_INFO "ljtale: tps65217 probe get called\n");
 
     uni_dev = check_universal_driver(&client->dev);
@@ -402,6 +404,7 @@ static int tps65217_probe(struct i2c_client *client,
         return -EINVAL;
     }
     regacc = uni_dev->drv->regacc;
+    irq_config = uni_dev->drv->irq_config;
     /* ljtale ends */
 
 	node = client->dev.of_node;
@@ -452,16 +455,10 @@ static int tps65217_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, tps);
 	tps->dev = &client->dev;
 	tps->id = chip_id;
-#if 0
-    tps->regmap = devm_regmap_init_i2c(client, &tps65217_regmap_config);
-	if (IS_ERR(tps->regmap)) {
-		ret = PTR_ERR(tps->regmap);
-		dev_err(tps->dev, "Failed to allocate register map: %d\n",
-			ret);
-		return ret;
-	}
-#endif
-    /*FIXME: NO more regmap pointer in the tps data structures */
+
+    /* ljtale starts */
+    irq_config->irq_context = tps;
+    /* ljtale ends */
     // tps->regmap = regacc->regmap; 
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;
@@ -562,9 +559,12 @@ static struct register_accessor tps65217_regacc = {
 
 static struct irq_config tps65217_irq_config = {
     .handler = NULL,
-    .thread_fn = NULL,
-    .irqflags = 0,
+    .thread_fn = tps65217_irq,
+    .irq_flags = IRQF_TRIGGER_LOW | IRQF_ONESHOT,
     .irq_sharing = false,
+    .platform_irq = false,
+    .defered_probe = false,
+    .get_gpio_irq = true,
 };
 
 static struct universal_driver tps65217_universal_driver = {

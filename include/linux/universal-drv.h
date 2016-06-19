@@ -99,11 +99,23 @@ struct irq_config {
     int irq;
     irqreturn_t (*handler)(int irq, void *data);
     irqreturn_t (*thread_fn)(int irq, void *data);
-    unsigned long irqflags;
+    unsigned long irq_flags;
+    /* usually the irq context is device specific, because the handling
+     * of the interrupt is device specific. Therefore the irq_context must
+     * be provided through the conventional device driveris */
+    void *irq_context;
     bool irq_sharing;
     /* indicate if we need to get gpio irq in case the normal irq is
      * not available */
     bool get_gpio_irq;
+    /* indicate if we need to get platform resource to get irq in case
+     * the normal irq is not available */
+    bool platform_irq;
+    /* the irq could indicate whether the device support defered probe,
+     * if the device supports defered probe, we need to check the irq 
+     * domain, if the irq domain is not available, we shoule return 
+     * proper error code */
+    bool defered_probe;
     /* irq could come from static platform information, or from device tree,
      * which we can get at runtime */
 };
@@ -256,7 +268,7 @@ extern void _populate_regmap_config(struct register_accessor *regacc,
 extern struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc);
 
 /* IRQ configuration related functions */
-extern int __universal_get_irq(struct universal_device *uni_dev);
+extern int __universal_get_irq(struct universal_device *uni_dev, int index);
 
 
 /* TODO: debugfs support for universal driver debugging */

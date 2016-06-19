@@ -100,6 +100,8 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
 			return ret;
 	}
 
+    /* ljtale: if the device node does not get irq, use the platform
+     * resource to get irq, which is the conventional way to get irq */
 	r = platform_get_resource(dev, IORESOURCE_IRQ, num);
 	/*
 	 * The resources may pass trigger flags to the irqs that need

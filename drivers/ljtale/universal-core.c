@@ -11,6 +11,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
+#include <linux/of_gpio.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_domain.h>
 #include <linux/err.h>
@@ -430,12 +431,56 @@ struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc) {
     }
 }
 
-int __universal_get_irq(struct universal_device *uni_dev) {
+int __universal_get_irq(struct universal_device *uni_dev, int index) {
     struct irq_config *irq_config;
+    struct device *dev = uni_dev->dev;
+    struct of_phandle_args oirq;
+    int ret = -EINVAL;
     /* supposedly the uni_dev has already been matched with a universal driver
      * instance */
     BUG_ON(!uni_dev->drv);
     irq_config = uni_dev->drv->irq_config;
     BUG_ON(!irq_config);
-    return 0;
+    /* first try to get irq from device tree node if there is one */
+    if (dev->of_node) {
+        ret = of_irq_parse_one(dev->of_node, index, &oirq);
+        if (ret)
+            /* of irq parse one should return 0 on success, otherwise it
+             * should return error code */
+            goto no_device_node_irq;
+        if (irq_config->defered_probe) {
+            struct irq_domain *domain;
+            domain = irq_find_host(oirq.np);
+            if (!domain)
+                ret = -EPROBE_DEFER;
+                goto no_device_node_irq;
+        }
+        ret = irq_create_of_mapping(&oirq);
+    }
+no_device_node_irq:
+    if (ret >=0 || ret == -EPROBE_DEFER)
+        return ret;
+    else if (irq_config->platform_irq) {
+        struct resource *r;
+        struct platform_device *pdev;
+        /* in this case, the struct device must be a platform device,
+         * otherwise there should be some problems */
+        pdev = to_platform_device(dev);
+        BUG_ON(!pdev);
+        r = platform_get_resource(pdev, IORESOURCE_IRQ, index);
+        if (r && r->flags & IORESOURCE_BITS)
+            irqd_set_trigger_type(irq_get_irq_data(r->start),
+                    r->flags & IORESOURCE_BITS);
+        return r ? r->start : -ENXIO;
+
+    } else if (irq_config->get_gpio_irq) {
+        /* get irq from gpio pin */
+        int irq_gpio = -1;
+        irq_gpio = of_get_named_gpio(dev->of_node, "irq-gpio", 0);
+        if (irq_gpio >= 0 ) {
+            /* TODO: as I checked, this piece of code is not used 
+             * at present, will add later */
+        }
+    } 
+    return ret;
 }
