@@ -333,16 +333,23 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 }
 /* ljtale ends */
 
-static int tps65217_probe_pwr_but(struct tps65217 *tps)
-{
-	int ret;
-	tps->pwr_but = devm_input_allocate_device(tps->dev);
+/* ljtale starts */
+/* Post irq config should be device-specific. The universal driver will
+ * make sure that only when the IRQ is available and successfully requested
+ * can this post irq configuration function be called */
+/* this function is for tps65217 power button probe */
+static int tps65217_post_irq_config(struct universal_device *uni_dev) {
+    int ret;
+    unsigned int int_reg;
+    /* Assume the device data has been set */
+    struct tps65217 *tps = dev_get_drvdata(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(2, "post IRQ configuration: %s\n", uni_dev->name);
+	tps->pwr_but = devm_input_allocate_device(uni_dev->dev);
 	if (!tps->pwr_but) {
 		dev_err(tps->dev,
 			"Failed to allocated pwr_but input device\n");
 		return -ENOMEM;
 	}
-
 	tps->pwr_but->evbit[0] = BIT_MASK(EV_KEY);
 	tps->pwr_but->keybit[BIT_WORD(KEY_POWER)] = BIT_MASK(KEY_POWER);
 	tps->pwr_but->name = "tps65217_pwr_but";
@@ -353,13 +360,7 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 		dev_err(tps->dev, "Failed to register button device\n");
 		return ret;
 	}
-	return 0;
-}
 
-/* ljtale starts */
-static int tps65217_post_irq_config(struct universal_device *uni_dev) {
-    int ret;
-    unsigned int int_reg;
     /* after requesting an IRQ, enable the IRQ on the devie */
     ret = tps65217_reg_read(uni_dev->dev, TPS65217_REG_INT, &int_reg);
 	if (ret < 0) {
@@ -383,7 +384,6 @@ static int tps65217_probe(struct i2c_client *client,
 	const struct of_device_id *match;
 	struct device_node *node;
 	bool status_off = false;
-	int irq = -1, irq_gpio = -1;
 	int ret;
 
     /* ljtale starts */
@@ -392,7 +392,7 @@ static int tps65217_probe(struct i2c_client *client,
     struct universal_device *uni_dev;
     struct register_accessor *regacc;
     struct irq_config *irq_config;
-    printk(KERN_INFO "ljtale: tps65217 probe get called\n");
+    LJTALE_MSG(KERN_INFO,"ljtale: tps65217 probe get called\n");
 
     uni_dev = check_universal_driver(&client->dev);
     if (!uni_dev) {
@@ -458,19 +458,6 @@ static int tps65217_probe(struct i2c_client *client,
     irq_config->irq_context = tps;
     /* ljtale ends */
     // tps->regmap = regacc->regmap; 
-	tps->irq = irq;
-	tps->irq_gpio = irq_gpio;
-
-
-	/* we got an irq, request it */
-    /* ljtale: also enable the power button interrupt */
-	if (tps->irq >= 0) {
-		ret = tps65217_probe_pwr_but(tps);
-		if (ret < 0) {
-			dev_err(tps->dev, "Failed to probe pwr_but\n");
-			return ret;
-		}
-	}
 
 	ret = mfd_add_devices(tps->dev, -1, tps65217s,
 			      ARRAY_SIZE(tps65217s), NULL, 0, NULL);

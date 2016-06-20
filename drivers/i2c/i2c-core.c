@@ -697,10 +697,10 @@ static int i2c_device_probe(struct device *dev)
         /* ljtale starts */
         universal_dev = check_universal_driver(dev);
         if (universal_dev) {
-            status = universal_driver_probe(universal_dev);
             LJTALE_MSG(KERN_INFO, 
                     "universal driver probe should be called for %s\n",
                     client->name);
+            status = universal_driver_probe(universal_dev);
         } else {
             LJTALE_MSG(KERN_INFO, 
                     "universal driver not available for device: %s\n",
