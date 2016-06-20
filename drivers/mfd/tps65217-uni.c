@@ -336,8 +336,6 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 static int tps65217_probe_pwr_but(struct tps65217 *tps)
 {
 	int ret;
-	unsigned int int_reg;
-
 	tps->pwr_but = devm_input_allocate_device(tps->dev);
 	if (!tps->pwr_but) {
 		dev_err(tps->dev,
@@ -355,27 +353,26 @@ static int tps65217_probe_pwr_but(struct tps65217 *tps)
 		dev_err(tps->dev, "Failed to register button device\n");
 		return ret;
 	}
-    /* TODO: put irq configuration in the universal driver */
-	ret = devm_request_threaded_irq(tps->dev,
-		tps->irq, NULL, tps65217_irq, IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-		"tps65217", tps);
-	if (ret != 0) {
-		dev_err(tps->dev, "Failed to request IRQ %d\n", tps->irq);
-		return ret;
-	}
+	return 0;
+}
 
-	/* enable the power button interrupt */
-	ret = tps65217_reg_read(tps->dev, TPS65217_REG_INT, &int_reg);
+/* ljtale starts */
+static int tps65217_post_irq_config(struct universal_device *uni_dev) {
+    int ret;
+    unsigned int int_reg;
+    /* after requesting an IRQ, enable the IRQ on the devie */
+    ret = tps65217_reg_read(uni_dev->dev, TPS65217_REG_INT, &int_reg);
 	if (ret < 0) {
-		dev_err(tps->dev, "Failed to read INT reg\n");
+		dev_err(uni_dev->dev, "Failed to read INT reg\n");
 		return ret;
 	}
     /* ljtale: power button monitor bit in the interrupt register */
 	int_reg &= ~TPS65217_INT_PBM;
-	tps65217_reg_write(tps->dev, TPS65217_REG_INT, int_reg, 
+	tps65217_reg_write(uni_dev->dev, TPS65217_REG_INT, int_reg, 
             TPS65217_PROTECT_NONE);
-	return 0;
+    return 0;
 }
+/* ljtale ends */
 
 static int tps65217_probe(struct i2c_client *client,
 				const struct i2c_device_id *ids)
@@ -418,9 +415,10 @@ static int tps65217_probe(struct i2c_client *client,
 		chip_id = (unsigned long)match->data;
 		status_off = of_property_read_bool(node,
 					"ti,pmic-shutdown-controller");
-
+#if 0
 		/* at first try to get irq via OF method */
 		irq = irq_of_parse_and_map(node, 0);
+        LJTALE_LEVEL_DEBUG(2, "tps irq: %d, irq_gpio: %d\n", irq, irq_gpio);
 		if (irq <= 0) {
 			irq = -1;
 			irq_gpio = of_get_named_gpio(node, "irq-gpio", 0);
@@ -441,8 +439,8 @@ static int tps65217_probe(struct i2c_client *client,
 				}
 			}
 		}
+#endif
 	}
-
 	if (!chip_id) {
 		dev_err(&client->dev, "id is null.\n");
 		return -ENODEV;
@@ -463,7 +461,6 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->irq = irq;
 	tps->irq_gpio = irq_gpio;
 
-    LJTALE_LEVEL_DEBUG(2, "tps irq: %d, irq_gpio: %d\n", irq, irq_gpio);
 
 	/* we got an irq, request it */
     /* ljtale: also enable the power button interrupt */
@@ -565,6 +562,7 @@ static struct irq_config tps65217_irq_config = {
     .platform_irq = false,
     .defered_probe = false,
     .get_gpio_irq = true,
+    .post_irq_config = tps65217_post_irq_config,
 };
 
 static struct universal_driver tps65217_universal_driver = {

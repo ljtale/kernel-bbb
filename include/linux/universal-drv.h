@@ -116,8 +116,13 @@ struct irq_config {
      * domain, if the irq domain is not available, we shoule return 
      * proper error code */
     bool defered_probe;
-    /* irq could come from static platform information, or from device tree,
-     * which we can get at runtime */
+    /* Interrupt handling is device-specific, thus we should put the IRQ
+     * configuration after the local probe to make sure that device-specific
+     * information is available to set up IRQ. Also, usually IRQ
+     * configuration also involves enabling IRQ, which also is device-specific,
+     * we put this as a call back to the conventional driver */
+    int (*post_irq_config)(struct universal_device *uni_dev);
+
 };
 
 

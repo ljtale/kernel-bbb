@@ -121,6 +121,15 @@ int __universal_drv_probe(struct universal_device *dev) {
          }
     }
 
+
+    /* ... */
+    /* do a local probe */
+    if (drv->local_probe) {
+        ret = drv->local_probe(dev);
+        if (ret < 0)
+            goto local_probe_err;
+    }
+
     irq_config = drv->irq_config;
     if (irq_config) {
         LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", dev->name);
@@ -131,27 +140,29 @@ int __universal_drv_probe(struct universal_device *dev) {
             dev_err(dev->dev, "universal irq unavailable\n");
             goto irq_config_err;
         }
+        LJTALE_LEVEL_DEBUG(2, "device %s gets IRQ: %d\n", 
+                dev->name, irq_config->irq);
         /* if the irq is good, config the irq with interrupt handlers */
         ret = devm_request_threaded_irq(dev->dev,
                 irq_config->irq, irq_config->handler, irq_config->thread_fn,
                 irq_config->irq_flags, dev->name, irq_config->irq_context);
-        if (ret) {
+        if (ret != 0) {
             dev_err(dev->dev, "universal probe failed to request IRQ %d\n",
                     irq_config->irq);
             goto irq_config_err;
         }
-
+        /* any post irq configuration things to do */
+        if (irq_config->post_irq_config) {
+            ret = irq_config->post_irq_config(dev);
+            if (ret != 0)
+                goto irq_config_err;
+        }
     }
-
-    /* ... */
-    /* do a local probe */
-    if (drv->local_probe)
-        ret = drv->local_probe(dev);
-    LJTALE_MSG(KERN_INFO, "universal driver probe done: %s\n", dev->name);
+    LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
-    
-irq_config_err:
 regacc_err:
+local_probe_err:
+irq_config_err:
 err:
     /* TODO: error handling */
     return ret;

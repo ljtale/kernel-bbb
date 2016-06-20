@@ -1,0 +1,8 @@
+LNX=$(pwd)
+    
+find  $LNX                                                                \
+    -path "$LNX/arch/*" ! -path "$LNX/arch/arm*" -prune -o               \
+    -path "$LNX/include/asm-*" ! -path "$LNX/include/asm-arm*" -prune -o \
+    -path "$LNX/tmp*" -prune -o                                           \
+    -path "$LNX/scripts*" -prune -o                                       \
+        -name "*.[chxsS]" -print > ./ctags.files
