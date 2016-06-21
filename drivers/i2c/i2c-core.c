@@ -1055,6 +1055,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
     /* TODO: more generically, universal driver should be created for every
      * device. Since each bus will have its unique way to create a bus device,
      * putting the universal driver creation into the device_register function
+     * (will go to device_add function inside)
      * will achieve that goal. But currently for small testing set,we only
      * target i2c devices*/
     /* ljtale ends */

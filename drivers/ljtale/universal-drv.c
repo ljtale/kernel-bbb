@@ -95,6 +95,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     drv = dev->drv;
     /* do a set of initialization */
     mutex_init(&dev->lock);
+    spin_lock_init(&dev->spinlock);
 
     /* do a series of universal driver probe */
     /* for register accessors */

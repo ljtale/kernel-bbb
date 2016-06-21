@@ -42,6 +42,7 @@
 
 /* ljtale */
 #include <linux/central-pm.h>
+#include <linux/universal-drv.h>
 
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
@@ -1584,11 +1585,36 @@ static struct platform_driver omap_i2c_driver = {
 	},
 };
 
+/* ljtale starts */
+static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev;
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s -- device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    pdev = to_platform_device(uni_dev->dev);
+    return omap_i2c_probe(pdev);
+}
+
+static struct universal_driver omap_i2c_universal_driver = {
+    .name = "omap-i2c-universal-driver",
+    .driver = &omap_i2c_driver.driver,
+    .regacc = NULL,
+    .irq_config = NULL,
+    .local_probe = omap_i2c_universal_local_probe,
+};
+
+/* ljtale ends */
 /* I2C may be needed to bring up other drivers */
 static int __init
 omap_i2c_init_driver(void)
 {
-	return platform_driver_register(&omap_i2c_driver);
+    int ret;
+    ret = platform_driver_register(&omap_i2c_driver);
+    if (ret < 0) 
+        return ret;
+    ret = universal_driver_register(&omap_i2c_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver registeration fail: %d\n", ret);
+    return ret;
 }
 subsys_initcall(omap_i2c_init_driver);
 

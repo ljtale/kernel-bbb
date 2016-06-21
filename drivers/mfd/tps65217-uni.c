@@ -573,7 +573,7 @@ static int __init tps65217_init(void)
         return ret;
     ret = universal_driver_register(&tps65217_universal_driver);
     if (ret < 0)
-        LJTALE_MSG(KERN_ERR, "universal driver registration faile: %d\n", ret);
+        LJTALE_MSG(KERN_ERR, "universal driver registration fail: %d\n", ret);
     return ret;
     /* ljtale ends */
 }

@@ -214,8 +214,23 @@ struct universal_device {
      /* lock protects against concurrent access to this device, used by
       * various purposes. Could add more locks. 
       * Could use spinlocks for fast I/O */
+#if 0
+    union {
+        struct mutex lock;
+        struct {
+            spinlock_t spinlock;
+            unsigned long spinlock_flags;
+        };
+    };
+#endif
+    /* FIXME: to save memory and make the lock mechanism generic, we could
+     * put the mutex lock and spin lock variables in the same location as
+     * above using union. */
     struct mutex lock;
-
+    struct {
+        spinlock_t  spinlock;
+        unsigned long spinlock_flags;
+    };
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
 };
