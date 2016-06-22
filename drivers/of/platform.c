@@ -23,6 +23,10 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 
+/* ljtale starts */
+#include <linux/universal-drv.h>
+/* ljtale ends */
+
 const struct of_device_id of_default_bus_match_table[] = {
 	{ .compatible = "simple-bus", },
 	{ .compatible = "simple-mfd", },
@@ -139,6 +143,8 @@ struct platform_device *of_device_alloc(struct device_node *np,
 	}
 
 	dev->dev.of_node = of_node_get(np);
+    /* ljtale: for root node, the parent is passed as NULL, thus for childern
+     * of the root node, the parent is set to the pseudo platform bus */
 	dev->dev.parent = parent ? : &platform_bus;
 
 	if (bus_id)
@@ -172,6 +178,7 @@ static struct platform_device *of_platform_device_create_pdata(
 					struct device *parent)
 {
 	struct platform_device *dev;
+    struct universal_device *uni_dev;
 
 	if (!of_device_is_available(np) ||
 	    of_node_test_and_set_flag(np, OF_POPULATED))
@@ -183,10 +190,35 @@ static struct platform_device *of_platform_device_create_pdata(
 
 	dev->dev.bus = &platform_bus_type;
 	dev->dev.platform_data = platform_data;
+    /* ljtale: there is alreay a dma configuration from device tree */
 	of_dma_configure(&dev->dev, dev->dev.of_node);
 
+    /* ljtale starts */
+    /* ljtale: after creating the platform device and before the the device
+     * is added to the device hierarchy, this is the place where the universal
+     * device creation should be inserted. Because we check the universal
+     * device list to see if there is a universal driver for a device when
+     * calling device probe, this makes sure when a driver
+     * is bound to a device the universal driver probe could be called if it
+     * is available. */
+    LJTALE_LEVEL_DEBUG(3, "created a platform device: %s\n",
+            dev_name(&dev->dev));
+    /* FIXME: the above print information could be massive, mute it if necess */
+    uni_dev = new_universal_device(&dev->dev);
+    if (uni_dev) {
+        int status = universal_device_register(uni_dev);
+        if (status < 0)
+            dev_err(&dev->dev, "universal device registration failed: %s\n",
+                    dev_name(&dev->dev));
+    }
+    else
+        dev_err(&dev->dev, "universal device creation failed: %s\n",
+                dev_name(&dev->dev));
+    /* ljtale ends */
 	if (of_device_add(dev) != 0) {
 		of_dma_deconfigure(&dev->dev);
+        /* ljtale: platform_device_put is used to destory platform device 
+         * for error cases */
 		platform_device_put(dev);
 		goto err_clear_flag;
 	}
@@ -340,6 +372,9 @@ static int of_platform_bus_create(struct device_node *bus,
 	if (strict && (!of_get_property(bus, "compatible", NULL))) {
 		pr_debug("%s() - skipping %s, no compatible prop\n",
 			 __func__, bus->full_name);
+        /* ljtale: the cpu node does not have a compatible property, 
+         * but the nodes below cpu node has compatible property, which will
+         * be handled separately */
 		return 0;
 	}
 
@@ -359,9 +394,20 @@ static int of_platform_bus_create(struct device_node *bus,
 	}
 
 	dev = of_platform_device_create_pdata(bus, bus_id, platform_data, parent);
+    /* ljtale: NOTE, after calling of_platform_device_create_pdata for all the
+     * children of the root node, the below if statement checks if the device
+     * is created successfully and its compatible property is matched with 
+     * the default bus table (e.g., simple-bus). For BBB, the ocp node
+     * satisfies this check, thus this function will continue to create a
+     * platform device for every child of the ocp node. After successfully
+     * creating platform devices for a child of the ocp node, the if statement
+     * checks again but finds that the compatible property is not matched
+     * with the default bus table, thus this function returns 0.
+     * Recursively a platform device will be created for each one of the
+     * children of the ocp node and this function stops.
+     */
 	if (!dev || !of_match_node(matches, bus))
 		return 0;
-
 	for_each_child_of_node(bus, child) {
 		pr_debug("   create child: %s\n", child->full_name);
 		rc = of_platform_bus_create(child, matches, lookup, &dev->dev, strict);

@@ -275,8 +275,6 @@ EXPORT_SYMBOL_GPL(device_bind_driver);
 static atomic_t probe_count = ATOMIC_INIT(0);
 static DECLARE_WAIT_QUEUE_HEAD(probe_waitqueue);
 
-/* ljtale: IMPORTANT: this function should have important problem with 
- * dummy i2c device probe */
 static int really_probe(struct device *dev, struct device_driver *drv)
 {
 	int ret = 0;
@@ -322,6 +320,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
 		ret = dev->bus->probe(dev);
 		if (ret)
 			goto probe_failed;
+    /* ljtale: but for platform devices, the platform_bus_type does not
+     * provides valid probe/remove callbacks, thus the driver's probe
+     * has to be valid to probe the device. This is done when a platform
+     * driver is registered with the platform core. */
 	} else if (drv->probe) {
 		ret = drv->probe(dev);
 		if (ret)

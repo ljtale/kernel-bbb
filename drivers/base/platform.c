@@ -27,6 +27,8 @@
 #include <linux/clk/clk-conf.h>
 #include <linux/limits.h>
 
+#include <linux/universal-drv.h>
+
 #include "base.h"
 #include "power/power.h"
 
@@ -511,6 +513,9 @@ static int platform_drv_probe(struct device *_dev)
 	struct platform_driver *drv = to_platform_driver(_dev->driver);
 	struct platform_device *dev = to_platform_device(_dev);
 	int ret;
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    /* ljtale ends */
 
 	ret = of_clk_set_defaults(_dev->of_node, false);
 	if (ret < 0)
@@ -518,7 +523,26 @@ static int platform_drv_probe(struct device *_dev)
 
 	ret = dev_pm_domain_attach(_dev, true);
 	if (ret != -EPROBE_DEFER) {
+        /* ljtale: this is where the platform device is probed using the 
+         * probe function from the corresponding platform driver. Code should
+         * be inserted here to call the universal driver probe */
+        /* ljtale starts */
+        uni_dev = check_universal_driver(_dev);
+        if (uni_dev) {
+            LJTALE_LEVEL_DEBUG(2, "universal driver probe should be called "
+                    "for %s\n", dev->name);
+            ret = universal_driver_probe(uni_dev);
+        } else {
+            LJTALE_LEVEL_DEBUG(3, "universal driver not available: %s\n",
+                    dev->name);
+            ret = drv->probe(dev);
+            LJTALE_LEVEL_DEBUG(3, "conventional driver probe for device: %s "
+                    "return status: %d\n", dev->name, ret);
+        }
+#if 0
 		ret = drv->probe(dev);
+#endif
+        /* ljtale ends */
 		if (ret)
 			dev_pm_domain_detach(_dev, true);
 	}
