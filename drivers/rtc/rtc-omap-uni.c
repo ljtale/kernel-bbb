@@ -870,7 +870,47 @@ static struct platform_driver omap_rtc_driver = {
 	.id_table	= omap_rtc_id_table,
 };
 
+/* ljtale starts */
+static int omap_rtc_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev;
+    LJTALE_LEVEL_DEBUG(2, "universal local probe on driver: %s -- device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    pdev = to_platform_device(uni_dev->dev);
+    return omap_rtc_probe(pdev);
+}
+
+static struct universal_driver omap_rtc_universal_driver = {
+    .name = "omap-rtc-universal-driver",
+    .driver = &omap_rtc_driver.driver,
+    .regacc = NULL,
+    .irq_config = NULL,
+    .local_probe = omap_rtc_universal_local_probe,
+};
+/* ljtale ends */
+/* ljtale starts */
+#if 0
 module_platform_driver(omap_rtc_driver);
+#endif 
+static int __init
+omap_rtc_driver_init(void) {
+    int ret;
+    ret = platform_driver_register(&omap_rtc_driver);
+    if (ret < 0)
+        return ret;
+    ret = universal_driver_register(&omap_rtc_universal_driver);
+    if (ret < 0) 
+        LJTALE_MSG(KERN_ERR, "universal driver registration fail: %s -- %d\n", 
+                omap_rtc_universal_driver.name, ret);
+    return ret;
+}
+module_init(omap_rtc_driver_init);
+
+static void __exit
+omap_rtc_driver_exit(void) {
+    platform_driver_unregister(&omap_rtc_driver);
+}
+module_exit(omap_rtc_driver_exit);
+/* ljtale ends */
 
 MODULE_ALIAS("platform:omap_rtc");
 MODULE_AUTHOR("George G. Davis (and others)");

@@ -186,6 +186,8 @@ struct universal_driver {
     struct register_accessor *regacc;
     /* IRQ configuration */
     struct irq_config *irq_config;
+    /* DMA configuration */
+    struct dma_config *dma_config;
 
     /* local data structrue that is only known to the conventional drivers */
     void *local_data;

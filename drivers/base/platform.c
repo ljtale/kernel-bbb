@@ -529,7 +529,7 @@ static int platform_drv_probe(struct device *_dev)
         /* ljtale starts */
         uni_dev = check_universal_driver(_dev);
         if (uni_dev) {
-            LJTALE_LEVEL_DEBUG(2, "universal driver probe should be called "
+            LJTALE_LEVEL_DEBUG(3, "universal driver probe should be called "
                     "for %s\n", dev->name);
             ret = universal_driver_probe(uni_dev);
         } else {

@@ -43,7 +43,7 @@
 #include "davinci_cpdma.h"
 
 /* ljtale starts */
-#include <linux/ljtale-utils.h>
+#include <linux/universal-drv.h>
 /* ljtale ends */
 
 #define CPSW_DEBUG	(NETIF_MSG_HW		| NETIF_MSG_WOL		| \
@@ -2500,7 +2500,7 @@ static int cpsw_probe(struct platform_device *pdev)
 	int ret = 0, i;
 	int irq;
 
-    LJTALE_MSG(KERN_INFO, "cpsw probe called\n");
+    LJTALE_LEVEL_DEBUG(2, "cpsw probe called\n");
 	ndev = alloc_etherdev(sizeof(struct cpsw_priv));
 	if (!ndev) {
 		dev_err(&pdev->dev, "error allocating net_device\n");

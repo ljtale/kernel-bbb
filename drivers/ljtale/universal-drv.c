@@ -37,9 +37,6 @@ struct regmap_bus i2c_eeprom_regmap_bus;
 struct regmap_bus spi_regmap_bus;
 struct regmap_bus spi_eeprom_regmap_bus;
 
-int regmap_debug_cnt = 0;
-EXPORT_SYMBOL(regmap_debug_cnt);
-
 int __universal_drv_register(struct universal_driver *drv) {
     struct universal_device *dev;
     struct list_head *p;
@@ -78,13 +75,72 @@ int __universal_drv_unregister(struct universal_driver *drv) {
 }
 EXPORT_SYMBOL(__universal_drv_unregister);
 
+static int universal_regacc_config(struct universal_device *uni_dev, 
+        struct register_accessor *regacc) {
+    struct regmap_config universal_regmap_config;
+    const struct regmap_bus *regmap_bus;
+    int ret;
+    if (regacc->regmap_support) {
+        LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", uni_dev->name);
+        _populate_regmap_config(regacc, &universal_regmap_config);
+        regmap_bus = _choose_regmap_bus(regacc);
+        BUG_ON(!regmap_bus);
+        regacc->regmap = devm_regmap_init(uni_dev->dev, regmap_bus,
+                uni_dev->dev, &universal_regmap_config);
+        if (IS_ERR(regacc->regmap)) {
+            LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s\n",uni_dev->name);
+            ret = PTR_ERR(regacc->regmap);
+            return ret;
+        }
+     } else {
+         /* first request a memory resource */
+     }
+    return 0;
+}
+
+
+static int universal_irq_config(struct universal_device *uni_dev,
+        struct irq_config *irq_config) {
+    int ret;
+    LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", uni_dev->name);
+    /* first try to get irq number from device tree or whatever */
+    irq_config->irq = __universal_get_irq(uni_dev, 0);
+    if (irq_config->irq < 0) {
+        ret = irq_config->irq;
+        dev_err(uni_dev->dev, "universal irq unavailable\n");
+        return ret;
+    }
+    LJTALE_LEVEL_DEBUG(2, "device %s gets IRQ: %d\n", 
+            uni_dev->name, irq_config->irq);
+    /* if the irq is good, config the irq with interrupt handlers */
+    ret = devm_request_threaded_irq(uni_dev->dev,
+            irq_config->irq, irq_config->handler, irq_config->thread_fn,
+            irq_config->irq_flags, uni_dev->name, irq_config->irq_context);
+    if (ret != 0) {
+        dev_err(uni_dev->dev, "universal probe failed to request IRQ %d\n",
+                irq_config->irq);
+        return ret;
+    }
+    /* any post irq configuration things to do */
+    if (irq_config->post_irq_config) {
+        ret = irq_config->post_irq_config(uni_dev);
+        if (ret != 0)
+            return ret;
+    }
+    return 0;
+}
+
+static int universal_dma_config(struct universal_device *uni_dev,
+        struct dma_config *dma_config) {
+    return 0;
+}
+
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
     struct universal_driver *drv;
-    struct regmap_config universal_regmap_config;
-    const struct regmap_bus *regmap_bus;
     struct register_accessor *regacc;
     struct irq_config *irq_config;
+    struct dma_config *dma_config;
     
     if (!dev || !dev->drv) {
         LJTALE_MSG(KERN_WARNING, 
@@ -104,25 +160,17 @@ int __universal_drv_probe(struct universal_device *dev) {
      * instantiate a universal register accessor for the device.*/
     regacc = drv->regacc;
     if (regacc) {
-        if (regacc->regmap_support) {
-            LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", dev->name);
-            _populate_regmap_config(regacc, &universal_regmap_config);
-            regmap_bus = _choose_regmap_bus(regacc);
-            BUG_ON(!regmap_bus);
-            regacc->regmap = devm_regmap_init(dev->dev, regmap_bus, dev->dev,
-                    &universal_regmap_config);
-            if (IS_ERR(regacc->regmap)) {
-                LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s: %d\n", 
-                        dev->name, regmap_debug_cnt);
-                ret = PTR_ERR(regacc->regmap);
-                goto regacc_err;
-            }
-         } else {
-             /* TODO: memory-mapped I/O register accessors initialization */
-         }
+        ret = universal_regacc_config(dev, regacc);
+        if (ret < 0)
+            goto regacc_err;
     }
 
-
+    dma_config = drv->dma_config;
+    if (dma_config) {
+        ret = universal_dma_config(dev, dma_config);
+        if (ret < 0)
+            goto err;
+    }
     /* ... */
     /* do a local probe */
     if (drv->local_probe) {
@@ -133,31 +181,9 @@ int __universal_drv_probe(struct universal_device *dev) {
 
     irq_config = drv->irq_config;
     if (irq_config) {
-        LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", dev->name);
-        /* first try to get irq number from device tree or whatever */
-        irq_config->irq = __universal_get_irq(dev, 0);
-        if (irq_config->irq < 0) {
-            ret = irq_config->irq;
-            dev_err(dev->dev, "universal irq unavailable\n");
+        ret = universal_irq_config(dev, irq_config);
+        if (ret != 0)
             goto irq_config_err;
-        }
-        LJTALE_LEVEL_DEBUG(2, "device %s gets IRQ: %d\n", 
-                dev->name, irq_config->irq);
-        /* if the irq is good, config the irq with interrupt handlers */
-        ret = devm_request_threaded_irq(dev->dev,
-                irq_config->irq, irq_config->handler, irq_config->thread_fn,
-                irq_config->irq_flags, dev->name, irq_config->irq_context);
-        if (ret != 0) {
-            dev_err(dev->dev, "universal probe failed to request IRQ %d\n",
-                    irq_config->irq);
-            goto irq_config_err;
-        }
-        /* any post irq configuration things to do */
-        if (irq_config->post_irq_config) {
-            ret = irq_config->post_irq_config(dev);
-            if (ret != 0)
-                goto irq_config_err;
-        }
     }
     LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
