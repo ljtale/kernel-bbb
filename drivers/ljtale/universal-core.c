@@ -48,7 +48,7 @@ struct universal_device *check_universal_driver(struct device *dev) {
         if (uni_dev->dev == dev && uni_dev->drv) {
             /* compare the address values directly, the device pointer
              * should be unique */
-            LJTALE_LEVEL_DEBUG(-1, "universal device %s and driver: %s exist\n",
+            LJTALE_LEVEL_DEBUG(5, "universal device %s and driver: %s exist\n",
                     uni_dev->name, uni_dev->drv->name);
             exist = true;
             break;
@@ -451,9 +451,11 @@ int __universal_get_irq(struct universal_device *uni_dev, int index) {
         if (irq_config->defered_probe) {
             struct irq_domain *domain;
             domain = irq_find_host(oirq.np);
-            if (!domain)
+            if (!domain) {
+                LJTALE_LEVEL_DEBUG(4,"domain: 0x%x\n", domain); 
                 ret = -EPROBE_DEFER;
                 goto no_device_node_irq;
+            }
         }
         ret = irq_create_of_mapping(&oirq);
     }

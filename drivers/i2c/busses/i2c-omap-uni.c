@@ -1303,6 +1303,38 @@ static struct i2c_bus_recovery_info omap_i2c_bus_recovery_info = {
 	.recover_bus		= i2c_generic_scl_recovery,
 };
 
+static int omap_i2c_post_irq_config(struct universal_device *uni_dev) {
+    int r;
+    struct i2c_adapter *adap;
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    struct omap_i2c_dev *dev = platform_get_drvdata(pdev);
+    adap = &dev->adapter;
+    i2c_set_adapdata(adap, dev);
+	adap->owner = THIS_MODULE;
+	adap->class = I2C_CLASS_DEPRECATED;
+	strlcpy(adap->name, "OMAP I2C adapter", sizeof(adap->name));
+	adap->algo = &omap_i2c_algo;
+	adap->dev.parent = &pdev->dev;
+	adap->dev.of_node = pdev->dev.of_node;
+	adap->bus_recovery_info = &omap_i2c_bus_recovery_info;
+
+	/* i2c device drivers may be active on return from add_adapter() */
+	adap->nr = pdev->id;
+	r = i2c_add_numbered_adapter(adap);
+	if (r) {
+		dev_err(dev->dev, "failure adding adapter\n");
+		goto err_unuse_clocks;
+	}
+	pm_runtime_mark_last_busy(dev->dev);
+	pm_runtime_put_autosuspend(dev->dev);
+	return 0;
+err_unuse_clocks:
+	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+	pm_runtime_put(dev->dev);
+	pm_runtime_disable(&pdev->dev);
+	return r;
+}
+
 static int
 omap_i2c_probe(struct platform_device *pdev)
 {
@@ -1487,7 +1519,7 @@ omap_i2c_probe(struct platform_device *pdev)
     /* any runtime parameter population */
     irq_config->irq_context = dev;
     /* ljtale ends */
-
+#if 0
 	adap = &dev->adapter;
 	i2c_set_adapdata(adap, dev);
 	adap->owner = THIS_MODULE;
@@ -1511,13 +1543,14 @@ omap_i2c_probe(struct platform_device *pdev)
 
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
-
 	return 0;
 
 err_unuse_clocks:
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 	pm_runtime_put(dev->dev);
 	pm_runtime_disable(&pdev->dev);
+#endif
+    return 0;
 err_free_mem:
 
 	return r;
@@ -1622,7 +1655,7 @@ static struct irq_config omap_i2c_irq_config = {
     .platform_irq = true,
     .defered_probe = true,
     .get_gpio_irq = false,
-    .post_irq_config = NULL,
+    .post_irq_config = omap_i2c_post_irq_config,
 };
 
 static struct universal_driver omap_i2c_universal_driver = {

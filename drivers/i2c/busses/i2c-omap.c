@@ -1327,6 +1327,7 @@ omap_i2c_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "no irq resource?\n");
 		return irq;
 	}
+    LJTALE_LEVEL_DEBUG(3, "omap i2c irq: %d\n", irq);
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
 	if (!dev)

@@ -105,7 +105,7 @@ static int universal_irq_config(struct universal_device *uni_dev,
     LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", uni_dev->name);
     /* first try to get irq number from device tree or whatever */
     irq_config->irq = __universal_get_irq(uni_dev, 0);
-    if (irq_config->irq < 0) {
+    if (irq_config->irq <= 0) {
         ret = irq_config->irq;
         dev_err(uni_dev->dev, "universal irq unavailable\n");
         return ret;
@@ -222,7 +222,7 @@ int __universal_dev_register(struct universal_device *dev) {
            }
            if (!dev->drv) {
                LJTALE_MSG(KERN_WARNING, 
-                       "universal device: %s does not find a" 
+                       "universal device: %s does not find a " 
                        "universal driver data to match\n", dev->name);
            }
         }
