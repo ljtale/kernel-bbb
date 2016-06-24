@@ -60,7 +60,8 @@ int __universal_drv_register(struct universal_driver *drv) {
                 ret = dev->dev->bus->match(dev->dev, drv->driver);
                 if (ret) {
                     dev->drv = drv;
-                    break;
+                    /* useless continue line */
+                    continue;
                 }
             }
     }

@@ -79,10 +79,12 @@ struct register_accessor {
     int (*regacc_write)(struct device *dev, unsigned int reg, unsigned int val); 
     /* TODO: more accessors, like set bits */
 
-    /* ad-hoc fields */
+    /* regmap ad-hoc fields */
     bool regmap_support;
     enum regmap_buses regmap_bus;
     struct regmap *regmap;
+
+    /* MMIO fields */
 };
 
 

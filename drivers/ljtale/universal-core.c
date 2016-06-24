@@ -452,7 +452,7 @@ int __universal_get_irq(struct universal_device *uni_dev, int index) {
             struct irq_domain *domain;
             domain = irq_find_host(oirq.np);
             if (!domain) {
-                LJTALE_LEVEL_DEBUG(4,"domain: 0x%x\n", domain); 
+                LJTALE_LEVEL_DEBUG(4,"domain: 0x%x\n",(unsigned int) domain); 
                 ret = -EPROBE_DEFER;
                 goto no_device_node_irq;
             }
