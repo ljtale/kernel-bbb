@@ -561,27 +561,30 @@ static struct universal_driver tps65217_universal_driver = {
     .local_probe = tps65217_universal_local_probe,
 };
 
-/* ljtale ends */
+static int __init universal_tps65217_init(void)
+{
+    int ret = 0;
+    ret = universal_driver_register(&tps65217_universal_driver);
+    if (ret < 0)
+        LJTALE_LEVEL_DEBUG(2, "universal driver register failed: %d\n", ret);
+    return ret;
+}
+/* FIXME: for earlier universal driver registration, use pure/core/postcore
+ * init calls accordingly */
+arch_initcall(universal_tps65217_init);
 
+/* TODO: a unviersal driver exit function is needed */
+
+/* ljtale ends */
 
 static int __init tps65217_init(void)
 {
-    /* ljtale starts */
-    int ret = 0;
-	ret = i2c_add_driver(&tps65217_driver);
-    if (ret < 0)
-        return ret;
-    ret = universal_driver_register(&tps65217_universal_driver);
-    if (ret < 0)
-        LJTALE_MSG(KERN_ERR, "universal driver registration fail: %d\n", ret);
-    return ret;
-    /* ljtale ends */
+	return i2c_add_driver(&tps65217_driver);
 }
 subsys_initcall(tps65217_init);
 
 static void __exit tps65217_exit(void)
 {
-    /* TODO: a unviersal driver exit function is needed */
 	i2c_del_driver(&tps65217_driver);
 }
 module_exit(tps65217_exit);

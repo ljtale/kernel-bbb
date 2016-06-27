@@ -913,27 +913,29 @@ static struct universal_driver at24_universal_driver = {
     .local_probe = at24_universal_local_probe,
 };
 
+static int __init universal_at24_init(void)
+{
+    int ret;
+    ret = universal_driver_register(&at24_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
+    return ret;
+}
+/* FIXME: for earlier universal driver register, use pure/core/postcore
+ * init calls */
+arch_initcall(universal_at24_init);
+
 /* ljtale ends */
 
 static int __init at24_init(void)
 {
-    int ret;
 	if (!io_limit) {
 		pr_err("at24: io_limit must not be 0!\n");
 		return -EINVAL;
 	}
 
 	io_limit = rounddown_pow_of_two(io_limit);
-    ret = i2c_add_driver(&at24_driver);
-    if (ret < 0)
-        return ret;
-
-    /* ljtale starts */
-    ret = universal_driver_register(&at24_universal_driver);
-    if (ret < 0)
-        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
-    return ret;
-    /* ljtale ends */
+    return i2c_add_driver(&at24_driver);
 }
 module_init(at24_init);
 

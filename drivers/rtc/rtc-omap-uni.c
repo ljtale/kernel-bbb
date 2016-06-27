@@ -886,31 +886,22 @@ static struct universal_driver omap_rtc_universal_driver = {
     .irq_config = NULL,
     .local_probe = omap_rtc_universal_local_probe,
 };
-/* ljtale ends */
-/* ljtale starts */
-#if 0
-module_platform_driver(omap_rtc_driver);
-#endif 
+
 static int __init
-omap_rtc_driver_init(void) {
+universal_omap_rtc_init(void) {
     int ret;
-    ret = platform_driver_register(&omap_rtc_driver);
-    if (ret < 0)
-        return ret;
     ret = universal_driver_register(&omap_rtc_universal_driver);
     if (ret < 0) 
         LJTALE_MSG(KERN_ERR, "universal driver registration fail: %s -- %d\n", 
                 omap_rtc_universal_driver.name, ret);
     return ret;
 }
-module_init(omap_rtc_driver_init);
+arch_initcall(universal_omap_rtc_init);
+/* TODO: universal exit call */
 
-static void __exit
-omap_rtc_driver_exit(void) {
-    platform_driver_unregister(&omap_rtc_driver);
-}
-module_exit(omap_rtc_driver_exit);
 /* ljtale ends */
+
+module_platform_driver(omap_rtc_driver);
 
 MODULE_ALIAS("platform:omap_rtc");
 MODULE_AUTHOR("George G. Davis (and others)");

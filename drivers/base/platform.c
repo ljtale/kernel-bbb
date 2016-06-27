@@ -529,15 +529,15 @@ static int platform_drv_probe(struct device *_dev)
         /* ljtale starts */
         uni_dev = check_universal_driver(_dev);
         if (uni_dev) {
-            LJTALE_LEVEL_DEBUG(3, "universal driver probe should be called "
-                    "for %s\n", dev->name);
+            LJTALE_LEVEL_DEBUG(3, "universal driver probe for: %s at %s "
+                    ,dev->name, __func__);
             ret = universal_driver_probe(uni_dev);
         } else {
             LJTALE_LEVEL_DEBUG(3, "universal driver not available: %s\n",
                     dev->name);
             ret = drv->probe(dev);
-            LJTALE_LEVEL_DEBUG(3, "conventional driver probe for device: %s "
-                    "return status: %d\n", dev->name, ret);
+            LJTALE_LEVEL_DEBUG(3, "conventional driver probe for: %s"
+                    "return status: %d at %s \n", dev->name, ret, __func__);
         }
 #if 0
 		ret = drv->probe(dev);

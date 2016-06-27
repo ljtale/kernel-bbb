@@ -1608,14 +1608,7 @@ static struct universal_driver omap_i2c_universal_driver = {
 static int __init
 omap_i2c_init_driver(void)
 {
-    int ret;
-    ret = platform_driver_register(&omap_i2c_driver);
-    if (ret < 0) 
-        return ret;
-    ret = universal_driver_register(&omap_i2c_universal_driver);
-    if (ret < 0)
-        LJTALE_MSG(KERN_ERR, "universal driver registeration fail: %d\n", ret);
-    return ret;
+    return platform_driver_register(&omap_i2c_driver);
 }
 subsys_initcall(omap_i2c_init_driver);
 

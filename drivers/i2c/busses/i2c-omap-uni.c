@@ -1666,19 +1666,25 @@ static struct universal_driver omap_i2c_universal_driver = {
     .local_probe = omap_i2c_universal_local_probe,
 };
 
-/* ljtale ends */
-/* I2C may be needed to bring up other drivers */
-static int __init
-omap_i2c_init_driver(void)
+static int __init universal_omap_i2c_init(void)
 {
     int ret;
-    ret = platform_driver_register(&omap_i2c_driver);
-    if (ret < 0) 
-        return ret;
     ret = universal_driver_register(&omap_i2c_universal_driver);
     if (ret < 0)
         LJTALE_MSG(KERN_ERR, "universal driver registeration fail: %d\n", ret);
     return ret;
+}
+arch_initcall(universal_omap_i2c_init);
+
+/* TODO: universal exit init call */
+
+/* ljtale ends */
+
+/* I2C may be needed to bring up other drivers */
+static int __init
+omap_i2c_init_driver(void)
+{
+    return platform_driver_register(&omap_i2c_driver);
 }
 subsys_initcall(omap_i2c_init_driver);
 
