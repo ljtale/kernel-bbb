@@ -879,10 +879,20 @@ static int omap_rtc_universal_local_probe(struct universal_device *uni_dev) {
     return omap_rtc_probe(pdev);
 }
 
+static struct register_accessor omap_rtc_regacc = {
+    .bus_name = "platform",
+    .reg_addr_bits = 8, /* It could support both 8 and 16 bits */
+    .reg_val_bits = 32,
+
+    /* MMIO specific information */
+};
+
 static struct universal_driver omap_rtc_universal_driver = {
     .name = "omap-rtc-universal-driver",
     .driver = &omap_rtc_driver.driver,
-    .regacc = NULL,
+    .regacc = &omap_rtc_regacc,
+    /* FIXME: RTC has two interrupts, a single interrupt structure cannot
+     * deal with this situation */
     .irq_config = NULL,
     .local_probe = omap_rtc_universal_local_probe,
 };

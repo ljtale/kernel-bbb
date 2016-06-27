@@ -80,14 +80,16 @@ static int universal_regacc_config(struct universal_device *uni_dev,
         struct register_accessor *regacc) {
     struct regmap_config universal_regmap_config;
     const struct regmap_bus *regmap_bus;
+    struct device *dev = uni_dev->dev;
+    struct platform_device *pdev;
     int ret;
     if (regacc->regmap_support) {
         LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", uni_dev->name);
         _populate_regmap_config(regacc, &universal_regmap_config);
         regmap_bus = _choose_regmap_bus(regacc);
         BUG_ON(!regmap_bus);
-        regacc->regmap = devm_regmap_init(uni_dev->dev, regmap_bus,
-                uni_dev->dev, &universal_regmap_config);
+        regacc->regmap = devm_regmap_init(dev, regmap_bus, dev, 
+                &universal_regmap_config);
         if (IS_ERR(regacc->regmap)) {
             LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s\n",uni_dev->name);
             ret = PTR_ERR(regacc->regmap);
@@ -95,6 +97,14 @@ static int universal_regacc_config(struct universal_device *uni_dev,
         }
      } else {
          /* first request a memory resource */
+         struct resource *res;
+         /* FIXME: Assume the memory-mapped I/O is a platform device feature */
+         pdev = to_platform_device(dev);
+         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+         regacc->base = devm_ioremap_resource(dev, res);
+         if (IS_ERR(regacc->base))
+             return PTR_ERR(regacc->base);
+         /* universal read/write will need to use this base address */
      }
     return 0;
 }

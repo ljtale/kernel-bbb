@@ -85,6 +85,7 @@ struct register_accessor {
     struct regmap *regmap;
 
     /* MMIO fields */
+    void __iomem *base;
 };
 
 

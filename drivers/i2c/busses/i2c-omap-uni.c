@@ -1646,6 +1646,13 @@ static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
     return omap_i2c_probe(pdev);
 }
 
+static struct register_accessor omap_i2c_regacc = {
+    .bus_name = "platform",
+    .reg_addr_bits = 16,
+    .reg_val_bits = 32,
+    /* MMIO specific information */
+};
+
 /* FIXME: There could be something that can be extracted from the IRQ handlers*/
 static struct irq_config omap_i2c_irq_config = {
     .handler = omap_i2c_isr,
@@ -1661,7 +1668,7 @@ static struct irq_config omap_i2c_irq_config = {
 static struct universal_driver omap_i2c_universal_driver = {
     .name = "omap-i2c-universal-driver",
     .driver = &omap_i2c_driver.driver,
-    .regacc = NULL,
+    .regacc = &omap_i2c_regacc,
     .irq_config = &omap_i2c_irq_config,
     .local_probe = omap_i2c_universal_local_probe,
 };
