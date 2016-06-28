@@ -1351,9 +1351,10 @@ omap_i2c_probe(struct platform_device *pdev)
 	u16 minor, major;
 
     /* ljtale starts */
+    int i;
     struct universal_device *uni_dev;
     struct register_accessor  *regacc;
-    struct irq_config *irq_config;
+    struct irq_config_num *irq_config_num;
     LJTALE_LEVEL_DEBUG(3, "omap i2c local probe get called\n");
 
     uni_dev = check_universal_driver(&pdev->dev);
@@ -1363,7 +1364,7 @@ omap_i2c_probe(struct platform_device *pdev)
         return -EINVAL;
     }
     regacc = uni_dev->drv->regacc;
-    irq_config = uni_dev->drv->irq_config;
+    irq_config_num = uni_dev->drv->irq_config_num;
     /* ljtale ends */
 
 #if 0
@@ -1517,7 +1518,8 @@ omap_i2c_probe(struct platform_device *pdev)
 #endif
     /* ljtale starts */
     /* any runtime parameter population */
-    irq_config->irq_context = dev;
+    for (i = 0; i < irq_config_num->irq_num; i++) 
+        irq_config_num->irq_config[1].irq_context = dev;
     /* ljtale ends */
 #if 0
 	adap = &dev->adapter;
@@ -1654,22 +1656,30 @@ static struct register_accessor omap_i2c_regacc = {
 };
 
 /* FIXME: There could be something that can be extracted from the IRQ handlers*/
-static struct irq_config omap_i2c_irq_config = {
-    .handler = omap_i2c_isr,
-    .thread_fn = omap_i2c_isr_thread,
-    .irq_flags = IRQF_NO_SUSPEND | IRQF_ONESHOT,
-    .irq_sharing = false,
-    .platform_irq = true,
-    .defered_probe = true,
-    .get_gpio_irq = false,
-    .post_irq_config = omap_i2c_post_irq_config,
+static struct irq_config omap_i2c_irq_config[] = {
+    {
+        .irq_index = 0,
+        .handler = omap_i2c_isr,
+        .thread_fn = omap_i2c_isr_thread,
+        .irq_flags = IRQF_NO_SUSPEND | IRQF_ONESHOT,
+        .irq_sharing = false,
+        .platform_irq = true,
+        .defered_probe = true,
+        .get_gpio_irq = false,
+        .post_irq_config = omap_i2c_post_irq_config,
+    },
+};
+
+static struct irq_config_num omap_i2c_irq_config_num = {
+    .irq_config = omap_i2c_irq_config,
+    .irq_num = 1,
 };
 
 static struct universal_driver omap_i2c_universal_driver = {
     .name = "omap-i2c-universal-driver",
     .driver = &omap_i2c_driver.driver,
     .regacc = &omap_i2c_regacc,
-    .irq_config = &omap_i2c_irq_config,
+    .irq_config_num = &omap_i2c_irq_config_num,
     .local_probe = omap_i2c_universal_local_probe,
 };
 

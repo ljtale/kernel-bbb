@@ -95,7 +95,7 @@ static int universal_regacc_config(struct universal_device *uni_dev,
             ret = PTR_ERR(regacc->regmap);
             return ret;
         }
-     } else {
+     } else if(0) {
          /* first request a memory resource */
          struct resource *res;
          /* FIXME: Assume the memory-mapped I/O is a platform device feature */
@@ -115,7 +115,7 @@ static int universal_irq_config(struct universal_device *uni_dev,
     int ret;
     LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", uni_dev->name);
     /* first try to get irq number from device tree or whatever */
-    irq_config->irq = __universal_get_irq(uni_dev, 0);
+    irq_config->irq = __universal_get_irq(uni_dev, irq_config);
     if (irq_config->irq <= 0) {
         ret = irq_config->irq;
         dev_err(uni_dev->dev, "universal irq unavailable\n");
@@ -150,8 +150,9 @@ int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
     struct universal_driver *drv;
     struct register_accessor *regacc;
-    struct irq_config *irq_config;
+    struct irq_config_num *irq_config_num;
     struct dma_config *dma_config;
+    int i;
     
     if (!dev || !dev->drv) {
         LJTALE_MSG(KERN_WARNING, 
@@ -190,11 +191,13 @@ int __universal_drv_probe(struct universal_device *dev) {
             goto local_probe_err;
     }
 
-    irq_config = drv->irq_config;
-    if (irq_config) {
-        ret = universal_irq_config(dev, irq_config);
-        if (ret != 0)
-            goto irq_config_err;
+    irq_config_num = drv->irq_config_num;
+    if (irq_config_num) {
+        for (i = 0; i < irq_config_num->irq_num; i++) {
+            ret = universal_irq_config(dev, &irq_config_num->irq_config[i]);
+            if (ret != 0)
+                goto irq_config_err;
+        }
     }
     LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;

@@ -431,19 +431,18 @@ struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc) {
     }
 }
 
-int __universal_get_irq(struct universal_device *uni_dev, int index) {
-    struct irq_config *irq_config;
+int __universal_get_irq(struct universal_device *uni_dev,
+                        struct irq_config *irq_config) {
     struct device *dev = uni_dev->dev;
     struct of_phandle_args oirq;
     int ret = -EINVAL;
     /* supposedly the uni_dev has already been matched with a universal driver
      * instance */
     BUG_ON(!uni_dev->drv);
-    irq_config = uni_dev->drv->irq_config;
     BUG_ON(!irq_config);
     /* first try to get irq from device tree node if there is one */
     if (dev->of_node) {
-        ret = of_irq_parse_one(dev->of_node, index, &oirq);
+        ret = of_irq_parse_one(dev->of_node, irq_config->irq_index, &oirq);
         if (ret)
             /* of irq parse one should return 0 on success, otherwise it
              * should return error code */
@@ -469,7 +468,7 @@ no_device_node_irq:
          * otherwise there should be some problems */
         pdev = to_platform_device(dev);
         BUG_ON(!pdev);
-        r = platform_get_resource(pdev, IORESOURCE_IRQ, index);
+        r = platform_get_resource(pdev, IORESOURCE_IRQ, irq_config->irq_index);
         if (r && r->flags & IORESOURCE_BITS)
             irqd_set_trigger_type(irq_get_irq_data(r->start),
                     r->flags & IORESOURCE_BITS);

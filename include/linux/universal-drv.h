@@ -19,11 +19,15 @@ struct universal_device;
 
 enum universal_req_type {
     /* potential usage as array index */
-    /* REGMAP_INIT = 0, */
-    REGMAP_INIT,
-    DEVM_ALLOCATE,
-    OF_NODE_MATCH,
-    REQUEST_IRQ,
+    REGACC = 0,
+    IRQ_CONFIG,
+    DMA_CONFIG,
+    PM_CONFIG,
+    CLOCK_CONFIG,
+    /* call backs to call conventional drivers */
+    LOCAL_PROBE,
+    LOCAL_SUSPEND,
+    LOCAL_RESUME,
 };
 
 /* ====== activity based variables and data structures === */
@@ -100,6 +104,7 @@ struct irq_config {
      * from the universal driver code compiler that compiles the device
      * knowledge into universal driver data structures. */
     int irq;
+    int irq_index;
     irqreturn_t (*handler)(int irq, void *data);
     irqreturn_t (*thread_fn)(int irq, void *data);
     unsigned long irq_flags;
@@ -126,6 +131,11 @@ struct irq_config {
      * we put this as a call back to the conventional driver */
     int (*post_irq_config)(struct universal_device *uni_dev);
 
+};
+
+struct irq_config_num {
+    struct irq_config *irq_config;
+    int irq_num;
 };
 
 
@@ -188,7 +198,7 @@ struct universal_driver {
      * address bits and value bits */
     struct register_accessor *regacc;
     /* IRQ configuration */
-    struct irq_config *irq_config;
+    struct irq_config_num *irq_config_num;
     /* DMA configuration */
     struct dma_config *dma_config;
 
@@ -293,7 +303,8 @@ extern void _populate_regmap_config(struct register_accessor *regacc,
 extern struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc);
 
 /* IRQ configuration related functions */
-extern int __universal_get_irq(struct universal_device *uni_dev, int index);
+extern int __universal_get_irq(struct universal_device *uni_dev,
+        struct irq_config *irq_config);
 
 
 /* TODO: debugfs support for universal driver debugging */

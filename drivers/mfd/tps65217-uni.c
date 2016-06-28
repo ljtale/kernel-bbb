@@ -391,7 +391,8 @@ static int tps65217_probe(struct i2c_client *client,
      * implement will require population of the device knowledge at runtime */
     struct universal_device *uni_dev;
     struct register_accessor *regacc;
-    struct irq_config *irq_config;
+    struct irq_config_num *irq_config_num;
+    int i;
     LJTALE_MSG(KERN_INFO,"ljtale: tps65217 probe get called\n");
 
     uni_dev = check_universal_driver(&client->dev);
@@ -401,7 +402,7 @@ static int tps65217_probe(struct i2c_client *client,
         return -EINVAL;
     }
     regacc = uni_dev->drv->regacc;
-    irq_config = uni_dev->drv->irq_config;
+    irq_config_num = uni_dev->drv->irq_config_num;
     /* ljtale ends */
 
 	node = client->dev.of_node;
@@ -455,7 +456,8 @@ static int tps65217_probe(struct i2c_client *client,
 	tps->id = chip_id;
 
     /* ljtale starts */
-    irq_config->irq_context = tps;
+    for (i = 0; i < irq_config_num->irq_num; i++)
+        irq_config_num->irq_config[i].irq_context = tps;
     /* ljtale ends */
     // tps->regmap = regacc->regmap; 
 
@@ -541,15 +543,23 @@ static struct register_accessor tps65217_regacc = {
     .regmap_bus = I2C_REGMAP_BUS,
 };
 
-static struct irq_config tps65217_irq_config = {
-    .handler = NULL,
-    .thread_fn = tps65217_irq,
-    .irq_flags = IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-    .irq_sharing = false,
-    .platform_irq = false,
-    .defered_probe = false,
-    .get_gpio_irq = true,
-    .post_irq_config = tps65217_post_irq_config,
+static struct irq_config tps65217_irq_config[] = {
+    {
+        .irq_index = 0,
+        .handler = NULL,
+        .thread_fn = tps65217_irq,
+        .irq_flags = IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+        .irq_sharing = false,
+        .platform_irq = false,
+        .defered_probe = false,
+        .get_gpio_irq = true,
+        .post_irq_config = tps65217_post_irq_config,
+    },
+};
+
+static struct irq_config_num tps65217_irq_config_num = {
+    .irq_config = tps65217_irq_config,
+    .irq_num = 1,
 };
 
 static struct universal_driver tps65217_universal_driver = {
@@ -557,7 +567,7 @@ static struct universal_driver tps65217_universal_driver = {
     .name = "tps65217-universal-driver",
     .driver = &tps65217_driver.driver,
     .regacc = &tps65217_regacc,
-    .irq_config = &tps65217_irq_config,
+    .irq_config_num = &tps65217_irq_config_num,
     .local_probe = tps65217_universal_local_probe,
 };
 

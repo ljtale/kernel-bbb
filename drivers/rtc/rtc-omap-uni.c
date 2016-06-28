@@ -652,6 +652,9 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	if (rtc->irq_alarm <= 0)
 		return -ENOENT;
 
+    LJTALE_LEVEL_DEBUG(3,"irq_timer: %d, irq_alarm: %d\n", rtc->irq_timer,
+            rtc->irq_alarm);
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	rtc->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(rtc->base))
@@ -881,11 +884,43 @@ static int omap_rtc_universal_local_probe(struct universal_device *uni_dev) {
 
 static struct register_accessor omap_rtc_regacc = {
     .bus_name = "platform",
-    .reg_addr_bits = 8, /* It could support both 8 and 16 bits */
+    .reg_addr_bits = 8, /* It could support both 8 and 32 bits */
     .reg_val_bits = 32,
 
     /* MMIO specific information */
 };
+
+static struct irq_config omap_rtc_config[] = {
+    {
+        .irq_index = 0,
+        .handler = rtc_irq,
+        .thread_fn = NULL,
+        .irq_flags = 0,
+        .irq_sharing = false,
+        .platform_irq = true,
+        .defered_probe = true,
+        .get_gpio_irq = false,
+        .post_irq_config = NULL,
+    },
+    {
+        .irq_index = 1,
+        .handler = rtc_irq,
+        .thread_fn = NULL,
+        .irq_flags = 0,
+        .irq_sharing = false,
+        .platform_irq = true,
+        .defered_probe = true,
+        .get_gpio_irq = false,
+        .post_irq_config = NULL,
+    },
+
+};
+
+static struct irq_config_num omap_rtc_config_num = {
+    .irq_config = omap_rtc_config,
+    .irq_num = 2,
+};
+
 
 static struct universal_driver omap_rtc_universal_driver = {
     .name = "omap-rtc-universal-driver",
@@ -893,7 +928,8 @@ static struct universal_driver omap_rtc_universal_driver = {
     .regacc = &omap_rtc_regacc,
     /* FIXME: RTC has two interrupts, a single interrupt structure cannot
      * deal with this situation */
-    .irq_config = NULL,
+    .irq_config_num = NULL,
+    // .irq_config_num = &omap_rtc_config_num,
     .local_probe = omap_rtc_universal_local_probe,
 };
 

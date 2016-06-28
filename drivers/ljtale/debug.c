@@ -6,14 +6,18 @@
 
 char *universal_req_type_str(enum universal_req_type type) {
     switch (type) {
-        case REGMAP_INIT:
-            return "regmap init";
-        case DEVM_ALLOCATE:
-            return "devm allocation";
-        case OF_NODE_MATCH:
-            return "of node match";
+        case REGACC:
+            return "register accessor";
+        case IRQ_CONFIG:
+            return "irq config";
+        case DMA_CONFIG:
+            return "dma config";
+        case PM_CONFIG:
+            return "pm config";
+        case CLOCK_CONFIG:
+            return "clock config";
         default:
-            return "invalid type";
+            return "invalid type or TODO";
     }
 }
 EXPORT_SYMBOL(universal_req_type_str);
