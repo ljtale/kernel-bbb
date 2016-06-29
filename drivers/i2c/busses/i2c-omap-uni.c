@@ -1340,7 +1340,7 @@ omap_i2c_probe(struct platform_device *pdev)
 {
 	struct omap_i2c_dev	*dev;
 //	struct i2c_adapter	*adap;
-	struct resource		*mem;
+//	struct resource		*mem;
 	const struct omap_i2c_bus_platform_data *pdata =
 		dev_get_platdata(&pdev->dev);
 	struct device_node	*node = pdev->dev.of_node;
@@ -1378,12 +1378,13 @@ omap_i2c_probe(struct platform_device *pdev)
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct omap_i2c_dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
-
+#if 0
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	dev->base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(dev->base))
 		return PTR_ERR(dev->base);
-
+#endif
+    dev->base = regacc->base;
 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
 	if (match) {
 		u32 freq = 100000; /* default to 100000 Hz */

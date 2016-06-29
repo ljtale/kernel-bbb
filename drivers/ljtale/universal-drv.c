@@ -84,21 +84,22 @@ static int universal_regacc_config(struct universal_device *uni_dev,
     struct platform_device *pdev;
     int ret;
     if (regacc->regmap_support) {
-        LJTALE_LEVEL_DEBUG(1, "regmap config...%s\n", uni_dev->name);
+        LJTALE_LEVEL_DEBUG(2, "regmap config...%s\n", uni_dev->name);
         _populate_regmap_config(regacc, &universal_regmap_config);
         regmap_bus = _choose_regmap_bus(regacc);
         BUG_ON(!regmap_bus);
         regacc->regmap = devm_regmap_init(dev, regmap_bus, dev, 
                 &universal_regmap_config);
         if (IS_ERR(regacc->regmap)) {
-            LJTALE_LEVEL_DEBUG(1, "regmap init failed...%s\n",uni_dev->name);
+            LJTALE_LEVEL_DEBUG(2, "regmap init failed...%s\n",uni_dev->name);
             ret = PTR_ERR(regacc->regmap);
             return ret;
         }
-     } else if(0) {
+     } else {
          /* first request a memory resource */
          struct resource *res;
          /* FIXME: Assume the memory-mapped I/O is a platform device feature */
+         LJTALE_LEVEL_DEBUG(2, "mmio regacc config...%s\n", uni_dev->name);
          pdev = to_platform_device(dev);
          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
          regacc->base = devm_ioremap_resource(dev, res);
@@ -194,6 +195,9 @@ int __universal_drv_probe(struct universal_device *dev) {
     irq_config_num = drv->irq_config_num;
     if (irq_config_num) {
         for (i = 0; i < irq_config_num->irq_num; i++) {
+            /* It is the responsibility of the device knowledge provider to
+             * make sure that the provided IRQ numbers are unique, otherwise
+             * there will be an error when requesting an interrupt line */
             ret = universal_irq_config(dev, &irq_config_num->irq_config[i]);
             if (ret != 0)
                 goto irq_config_err;

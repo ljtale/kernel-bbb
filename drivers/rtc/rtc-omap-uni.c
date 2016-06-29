@@ -620,13 +620,28 @@ MODULE_DEVICE_TABLE(of, omap_rtc_of_match);
 static int omap_rtc_probe(struct platform_device *pdev)
 {
 	struct omap_rtc	*rtc;
-	struct resource	*res;
+//	struct resource	*res;
 	u8 reg, mask, new_ctrl;
 	const struct platform_device_id *id_entry;
 	const struct of_device_id *of_id;
 	int ret;
 
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    struct register_accessor *regacc;
+    struct irq_config_num *irq_config_num;
+    int i;
     LJTALE_LEVEL_DEBUG(2, "omap rtc probe...\n");
+    uni_dev = check_universal_driver(&pdev->dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
+                dev_name(&pdev->dev));
+        return -EINVAL;
+    }
+    regacc = uni_dev->drv->regacc;
+    irq_config_num = uni_dev->drv->irq_config_num;
+    /* ljtale ends */
+
 	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
 	if (!rtc)
 		return -ENOMEM;
@@ -643,7 +658,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
 		id_entry = platform_get_device_id(pdev);
 		rtc->type = (void *)id_entry->driver_data;
 	}
-
+#if 0
 	rtc->irq_timer = platform_get_irq(pdev, 0);
 	if (rtc->irq_timer <= 0)
 		return -ENOENT;
@@ -651,14 +666,20 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	rtc->irq_alarm = platform_get_irq(pdev, 1);
 	if (rtc->irq_alarm <= 0)
 		return -ENOENT;
+#endif 
 
-    LJTALE_LEVEL_DEBUG(3,"irq_timer: %d, irq_alarm: %d\n", rtc->irq_timer,
-            rtc->irq_alarm);
-
+#if 0
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	rtc->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(rtc->base))
 		return PTR_ERR(rtc->base);
+#endif
+
+    /* ljtale starts */
+    rtc->base = regacc->base;
+    for (i = 0; i < irq_config_num->irq_num; i++)
+        irq_config_num->irq_config[i].irq_context = rtc;
+    /* ljtale edns */
 
 	platform_set_drvdata(pdev, rtc);
 
@@ -747,7 +768,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
 		ret = PTR_ERR(rtc->rtc);
 		goto err;
 	}
-
+#if 0
 	/* handle periodic and alarm irqs */
 	ret = devm_request_irq(&pdev->dev, rtc->irq_timer, rtc_irq, 0,
 			dev_name(&rtc->rtc->dev), rtc);
@@ -760,7 +781,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
 		if (ret)
 			goto err;
 	}
-
+#endif
 	return 0;
 
 err:
@@ -928,8 +949,8 @@ static struct universal_driver omap_rtc_universal_driver = {
     .regacc = &omap_rtc_regacc,
     /* FIXME: RTC has two interrupts, a single interrupt structure cannot
      * deal with this situation */
-    .irq_config_num = NULL,
-    // .irq_config_num = &omap_rtc_config_num,
+    // .irq_config_num = NULL,
+    .irq_config_num = &omap_rtc_config_num,
     .local_probe = omap_rtc_universal_local_probe,
 };
 
