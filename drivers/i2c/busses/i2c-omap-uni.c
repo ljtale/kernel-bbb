@@ -42,6 +42,7 @@
 
 /* ljtale */
 #include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
@@ -88,6 +89,7 @@ enum {
 	OMAP_I2C_IP_V2_IRQENABLE_SET,
 	OMAP_I2C_IP_V2_IRQENABLE_CLR,
 };
+
 
 /* I2C Interrupt Enable Register (OMAP_I2C_IE): */
 #define OMAP_I2C_IE_XDR		(1 << 14)	/* TX Buffer drain int enable */
@@ -281,6 +283,16 @@ static const u8 reg_map_ip_v2[] = {
 	[OMAP_I2C_IP_V2_IRQENABLE_CLR] = 0x30,
 };
 
+/* ljtale starts */
+/* ad-hoc I2C controller V2 register offset */
+#define OMAP_I2C_V2_IE_REG 0x2c
+#define OMAP_I2C_V2_STAT_REG 0x28
+#define OMAP_I2C_V2_CON_REG 0xa4
+
+/* TODO: more register definitions */
+/* ljtale ends */
+
+
 static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
 				      int reg, u16 val)
 {
@@ -297,8 +309,12 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
 static void __omap_i2c_init(struct omap_i2c_dev *dev)
 {
 
+    struct universal_device *uni_dev;
+    uni_dev = check_universal_driver(dev->dev);
+    BUG_ON(!uni_dev);
     /* ljtale: reset everything, disable the i2c module */
-	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+	// omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+    universal_mmio_reg_write(uni_dev, OMAP_I2C_V2_CON_REG, 0);
 
 	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
 	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
@@ -1581,7 +1597,14 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
 
-	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    uni_dev = check_universal_driver(dev);
+    BUG_ON(!uni_dev);
+    /* ljtale ends */
+
+	// _dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+    universal_mmio_reg_read(uni_dev, OMAP_I2C_V2_IE_REG, &_dev->iestate);
 
 	if (_dev->scheme == OMAP_I2C_SCHEME_0)
 		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
@@ -1651,9 +1674,12 @@ static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
 
 static struct register_accessor omap_i2c_regacc = {
     .bus_name = "platform",
-    .reg_addr_bits = 16,
-    .reg_val_bits = 32,
+    .reg_addr_bits = 32,
+    .reg_val_bits = 16,
+
     /* MMIO specific information */
+    .regmap_support = false,
+    .mb = false,
 };
 
 /* FIXME: There could be something that can be extracted from the IRQ handlers*/

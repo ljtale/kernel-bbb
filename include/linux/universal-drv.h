@@ -76,11 +76,11 @@ struct register_accessor {
     /* 
      * regacc_read: read from register reg and put the value in val
      * return 0 on success, return error code on failure */
-    int (*regacc_read)(struct device *dev, unsigned int reg, unsigned int *val);
+    int (*regacc_read)(unsigned int reg, unsigned int *val);
     /* 
      * regacc_write: write value in val to register reg
      * return 0 on success, return error code on failure */
-    int (*regacc_write)(struct device *dev, unsigned int reg, unsigned int val); 
+    int (*regacc_write)(unsigned int reg, unsigned int val); 
     /* TODO: more accessors, like set bits */
 
     /* regmap ad-hoc fields */
@@ -90,6 +90,11 @@ struct register_accessor {
 
     /* MMIO fields */
     void __iomem *base;
+    /* indicate if the read/write needs memory barrier */
+    bool mb;
+    /* for memory mapped I/O, using the read/write instructions directly
+     * would be faster than using indirect universal read/write. But anyway
+     * we provide */
 };
 
 
@@ -202,13 +207,14 @@ struct universal_driver {
     /* DMA configuration */
     struct dma_config *dma_config;
 
-    /* local data structrue that is only known to the conventional drivers */
-    void *local_data;
     /* the universal driver provides a universal probe function for the 
      * device driver to call upon a device-driver binding, but there
      * are certain parts of the work that has to be done in the conventional
      * driver TODO: define a proper argument list */
     int (*local_probe)(struct universal_device *dev);
+
+    /* power management operations */
+
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;
@@ -305,6 +311,14 @@ extern struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc);
 /* IRQ configuration related functions */
 extern int __universal_get_irq(struct universal_device *uni_dev,
         struct irq_config *irq_config);
+
+
+struct universal_pm_ops {
+    int (*suspend)(struct universal_device *uni_dev);
+    int (*resume)(struct universal_device *uni_dev);
+    int (*runtime_suspend)(struct universal_device *uni_dev);
+    int (*runtime_resume)(struct universal_device *uni_dev);
+};
 
 
 /* TODO: debugfs support for universal driver debugging */

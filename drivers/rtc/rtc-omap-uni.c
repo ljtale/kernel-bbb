@@ -28,6 +28,7 @@
 #include <linux/regulator/machine.h>
 
 #include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 
 /*
  * The OMAP RTC is a year/month/day/hours/minutes/seconds BCD clock
@@ -694,10 +695,12 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	 *
 	 * NOTE: ALARM2 is not cleared on AM3352 if rtc_write (writeb) is used
 	 */
-	rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG, 0);
+	// rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG, 0);
+    universal_mmio_reg_write(uni_dev, OMAP_RTC_INTERRUPTS_REG, 0);
 
 	/* clear old status */
-	reg = rtc_read(rtc, OMAP_RTC_STATUS_REG);
+	// reg = rtc_read(rtc, OMAP_RTC_STATUS_REG);
+    universal_mmio_reg_read(uni_dev, OMAP_RTC_STATUS_REG, &reg);
 
 	mask = OMAP_RTC_STATUS_ALARM;
 
@@ -905,10 +908,16 @@ static int omap_rtc_universal_local_probe(struct universal_device *uni_dev) {
 
 static struct register_accessor omap_rtc_regacc = {
     .bus_name = "platform",
-    .reg_addr_bits = 8, /* It could support both 8 and 32 bits */
+    .reg_addr_bits = 32,
+    /* Most RTC registers are 8-bits with the remaining 24 bits being reserved.
+     * Some regsiters are 32-bit, such as KICK0/1R which is used to do 
+     * write protection. Thus here I used 32 to cover all the cases
+     * FIXME: there could be some potential performance issue */
     .reg_val_bits = 32,
 
     /* MMIO specific information */
+    .regmap_support = false,
+    .mb = true,
 };
 
 static struct irq_config omap_rtc_config[] = {

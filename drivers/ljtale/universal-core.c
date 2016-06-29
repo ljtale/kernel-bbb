@@ -369,12 +369,56 @@ int universal_reg_read(struct device *dev, unsigned int reg,
     if (regacc->regmap_support)
         return regmap_read(regacc->regmap, reg, val);
     else if (regacc->regacc_read)
-        return regacc->regacc_read(dev, reg, val);
+        return regacc->regacc_read(reg, val);
         
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg read method for device: %s\n",
                 dev_name(dev));
     return -EINVAL;
+}
+
+/* this function is used only when the device registers are memory mapped */
+int universal_mmio_reg_read(struct universal_device *uni_dev,
+        unsigned int reg, void *val) {
+    /* TODO: the register description should be part of the device model, which
+     * should come from the universal_device instance. */
+    struct register_accessor *regacc;
+    BUG_ON(!uni_dev->drv);
+    regacc = uni_dev->drv->regacc;
+    switch(regacc->reg_addr_bits) {
+        case 8:
+            return -EINVAL;
+        case 16:
+            return -EINVAL;
+        case 32:
+            switch(regacc->reg_val_bits) {
+                case 8:
+                    if (regacc->mb)
+                        *((u8 *) val) = readb(regacc->base + reg);
+                    else
+                        *((u8 *) val) = readb_relaxed(regacc->base + reg);
+                    break;
+                case 16:
+                    if (regacc->mb)
+                        *((u16 *) val) = readw(regacc->base + reg);
+                    else
+                        *((u16 *) val) = readw_relaxed(regacc->base + reg);
+                    break;
+                case 32:
+                    if (regacc->mb)
+                        *((u32 *) val) = readl(regacc->base + reg);
+                    else
+                        *((u32 *) val) = readl_relaxed(regacc->base + reg);
+                    break;
+                default:
+                    return -EINVAL;
+            }
+            break;
+        default:
+            return -EINVAL;
+    }
+    LJTALE_LEVEL_DEBUG(4, "universal mmio read: %s\n", uni_dev->name);
+    return 0;
 }
 
 
@@ -396,11 +440,54 @@ int universal_reg_write(struct device *dev, unsigned int reg,
     if (regacc->regmap_support)
         return regmap_write(regacc->regmap, reg, val);
     else if (regacc->regacc_write)
-        return regacc->regacc_write(dev, reg, val);
+        return regacc->regacc_write(reg, val);
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg write method for device: %s\n",
                 dev_name(dev));
     return -EINVAL;
+}
+
+int universal_mmio_reg_write(struct universal_device *uni_dev,
+        unsigned int reg, unsigned int val) {
+    /* TODO: the register description should be part of the device model, which
+     * should come from the universal_device instance. */
+    struct register_accessor *regacc;
+    BUG_ON(!uni_dev->drv);
+    regacc = uni_dev->drv->regacc;
+    switch(regacc->reg_addr_bits) {
+        case 8:
+            return -EINVAL;
+        case 16:
+            return -EINVAL;
+        case 32:
+            switch(regacc->reg_val_bits) {
+                case 8:
+                    if (regacc->mb)
+                        writeb((u8)val, regacc->base + reg);
+                    else
+                        writeb_relaxed((u8)val, regacc->base + reg);
+                    break;
+                case 16:
+                    if (regacc->mb)
+                        writew((u16)val, regacc->base + reg);
+                    else
+                        writew_relaxed((u16)val, regacc->base + reg);
+                    break;
+                case 32:
+                    if (regacc->mb)
+                        writel((u32)val, regacc->base + reg);
+                    else
+                        writel_relaxed((u32)val, regacc->base + reg);
+                    break;
+                default:
+                    return -EINVAL;
+            }
+            break;
+        default:
+            return -EINVAL;
+    }
+    LJTALE_LEVEL_DEBUG(4, "universal mmio write: %s\n", uni_dev->name);
+    return 0;
 }
 
 void _populate_regmap_config(struct register_accessor *regacc, 
