@@ -1519,7 +1519,7 @@ omap_i2c_probe(struct platform_device *pdev)
     /* ljtale starts */
     /* any runtime parameter population */
     for (i = 0; i < irq_config_num->irq_num; i++) 
-        irq_config_num->irq_config[1].irq_context = dev;
+        irq_config_num->irq_config[i].irq_context = dev;
     /* ljtale ends */
 #if 0
 	adap = &dev->adapter;
