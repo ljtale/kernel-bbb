@@ -390,7 +390,6 @@ static int tps65217_probe(struct i2c_client *client,
     /* FIXME: here is an assumption, any activity that needs a context to
      * implement will require population of the device knowledge at runtime */
     struct universal_device *uni_dev;
-    struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     int i;
     LJTALE_MSG(KERN_INFO,"ljtale: tps65217 probe get called\n");
@@ -401,7 +400,6 @@ static int tps65217_probe(struct i2c_client *client,
                 client->name);
         return -EINVAL;
     }
-    regacc = uni_dev->drv->regacc;
     irq_config_num = uni_dev->drv->irq_config_num;
     /* ljtale ends */
 
@@ -459,7 +457,6 @@ static int tps65217_probe(struct i2c_client *client,
     for (i = 0; i < irq_config_num->irq_num; i++)
         irq_config_num->irq_config[i].irq_context = tps;
     /* ljtale ends */
-    // tps->regmap = regacc->regmap; 
 
 	ret = mfd_add_devices(tps->dev, -1, tps65217s,
 			      ARRAY_SIZE(tps65217s), NULL, 0, NULL);

@@ -82,17 +82,18 @@ static int universal_regacc_config(struct universal_device *uni_dev,
     const struct regmap_bus *regmap_bus;
     struct device *dev = uni_dev->dev;
     struct platform_device *pdev;
+    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
     int ret;
     if (regacc->regmap_support) {
         LJTALE_LEVEL_DEBUG(2, "regmap config...%s\n", uni_dev->name);
         _populate_regmap_config(regacc, &universal_regmap_config);
         regmap_bus = _choose_regmap_bus(regacc);
         BUG_ON(!regmap_bus);
-        regacc->regmap = devm_regmap_init(dev, regmap_bus, dev, 
+        regacc_dev->regmap = devm_regmap_init(dev, regmap_bus, dev, 
                 &universal_regmap_config);
-        if (IS_ERR(regacc->regmap)) {
+        if (IS_ERR(regacc_dev->regmap)) {
             LJTALE_LEVEL_DEBUG(2, "regmap init failed...%s\n",uni_dev->name);
-            ret = PTR_ERR(regacc->regmap);
+            ret = PTR_ERR(regacc_dev->regmap);
             return ret;
         }
      } else {
@@ -102,9 +103,9 @@ static int universal_regacc_config(struct universal_device *uni_dev,
          LJTALE_LEVEL_DEBUG(2, "mmio regacc config...%s\n", uni_dev->name);
          pdev = to_platform_device(dev);
          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-         regacc->base = devm_ioremap_resource(dev, res);
-         if (IS_ERR(regacc->base))
-             return PTR_ERR(regacc->base);
+         regacc_dev->base = devm_ioremap_resource(dev, res);
+         if (IS_ERR(regacc_dev->base))
+             return PTR_ERR(regacc_dev->base);
          /* universal read/write will need to use this base address */
      }
     return 0;

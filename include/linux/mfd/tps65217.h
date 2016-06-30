@@ -260,7 +260,7 @@ struct tps65217 {
 
 	/* Power button and IRQ handling */
 	int irq_gpio;	/* might not be set */
-	int irq;
+//	int irq;
 	struct input_dev *pwr_but;
 };
 

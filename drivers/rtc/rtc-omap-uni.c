@@ -629,7 +629,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
 
     /* ljtale starts */
     struct universal_device *uni_dev;
-    struct register_accessor *regacc;
+    struct regacc_dev *regacc_dev;
     struct irq_config_num *irq_config_num;
     int i;
     LJTALE_LEVEL_DEBUG(2, "omap rtc probe...\n");
@@ -639,7 +639,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
                 dev_name(&pdev->dev));
         return -EINVAL;
     }
-    regacc = uni_dev->drv->regacc;
+    regacc_dev = &uni_dev->regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
     /* ljtale ends */
 
@@ -677,7 +677,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
 #endif
 
     /* ljtale starts */
-    rtc->base = regacc->base;
+    rtc->base = regacc_dev->base;
     for (i = 0; i < irq_config_num->irq_num; i++)
         irq_config_num->irq_config[i].irq_context = rtc;
     /* ljtale edns */

@@ -306,7 +306,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
     regacc = uni_drv->regacc;
     /* nvmem is based on regmap, so regmap support must be ture here */
     BUG_ON(!regacc->regmap_support);
-    rm = regacc->regmap;
+    rm = uni_dev->regacc_dev.regmap;
     if (!rm) {
         dev_err(config->dev, "Regmap not found\n");
         return ERR_PTR(-EINVAL);

@@ -355,6 +355,7 @@ int universal_reg_read(struct device *dev, unsigned int reg,
         unsigned int *val) {
     struct universal_device *uni_dev;
     struct register_accessor *regacc = NULL;
+    struct regacc_dev *regacc_dev;
     
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
@@ -362,12 +363,13 @@ int universal_reg_read(struct device *dev, unsigned int reg,
                 dev_name(dev));
         return -EINVAL;
     }
+    regacc_dev = &uni_dev->regacc_dev;
     /* check_universal_driver already make sure the drv pointer for uni_dev
      * is not NULL */
     regacc = uni_dev->drv->regacc;
     BUG_ON(!regacc);
     if (regacc->regmap_support)
-        return regmap_read(regacc->regmap, reg, val);
+        return regmap_read(regacc_dev->regmap, reg, val);
     else if (regacc->regacc_read)
         return regacc->regacc_read(reg, val);
         
@@ -383,6 +385,7 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
     /* TODO: the register description should be part of the device model, which
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
+    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
     BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {
@@ -394,21 +397,21 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
             switch(regacc->reg_val_bits) {
                 case 8:
                     if (regacc->mb)
-                        *((u8 *) val) = readb(regacc->base + reg);
+                        *((u8 *) val) = readb(regacc_dev->base + reg);
                     else
-                        *((u8 *) val) = readb_relaxed(regacc->base + reg);
+                        *((u8 *) val) = readb_relaxed(regacc_dev->base + reg);
                     break;
                 case 16:
                     if (regacc->mb)
-                        *((u16 *) val) = readw(regacc->base + reg);
+                        *((u16 *) val) = readw(regacc_dev->base + reg);
                     else
-                        *((u16 *) val) = readw_relaxed(regacc->base + reg);
+                        *((u16 *) val) = readw_relaxed(regacc_dev->base + reg);
                     break;
                 case 32:
                     if (regacc->mb)
-                        *((u32 *) val) = readl(regacc->base + reg);
+                        *((u32 *) val) = readl(regacc_dev->base + reg);
                     else
-                        *((u32 *) val) = readl_relaxed(regacc->base + reg);
+                        *((u32 *) val) = readl_relaxed(regacc_dev->base + reg);
                     break;
                 default:
                     return -EINVAL;
@@ -426,6 +429,7 @@ int universal_reg_write(struct device *dev, unsigned int reg,
         unsigned int val) {
     struct universal_device *uni_dev;
     struct register_accessor *regacc = NULL;
+    struct regacc_dev *regacc_dev;
     
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
@@ -433,12 +437,13 @@ int universal_reg_write(struct device *dev, unsigned int reg,
                 dev_name(dev));
         return -EINVAL;
     }
+    regacc_dev = &uni_dev->regacc_dev; 
     /* check_universal_driver already make sure the drv pointer for uni_dev
      * is not NULL */
     regacc = uni_dev->drv->regacc;
     BUG_ON(!regacc);
     if (regacc->regmap_support)
-        return regmap_write(regacc->regmap, reg, val);
+        return regmap_write(regacc_dev->regmap, reg, val);
     else if (regacc->regacc_write)
         return regacc->regacc_write(reg, val);
     else 
@@ -452,6 +457,7 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
     /* TODO: the register description should be part of the device model, which
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
+    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
     BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {
@@ -463,21 +469,21 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
             switch(regacc->reg_val_bits) {
                 case 8:
                     if (regacc->mb)
-                        writeb((u8)val, regacc->base + reg);
+                        writeb((u8)val, regacc_dev->base + reg);
                     else
-                        writeb_relaxed((u8)val, regacc->base + reg);
+                        writeb_relaxed((u8)val, regacc_dev->base + reg);
                     break;
                 case 16:
                     if (regacc->mb)
-                        writew((u16)val, regacc->base + reg);
+                        writew((u16)val, regacc_dev->base + reg);
                     else
-                        writew_relaxed((u16)val, regacc->base + reg);
+                        writew_relaxed((u16)val, regacc_dev->base + reg);
                     break;
                 case 32:
                     if (regacc->mb)
-                        writel((u32)val, regacc->base + reg);
+                        writel((u32)val, regacc_dev->base + reg);
                     else
-                        writel_relaxed((u32)val, regacc->base + reg);
+                        writel_relaxed((u32)val, regacc_dev->base + reg);
                     break;
                 default:
                     return -EINVAL;

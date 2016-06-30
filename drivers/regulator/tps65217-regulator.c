@@ -237,13 +237,12 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
 
     /* ljtale starts */
     struct universal_device *uni_dev;
-    struct register_accessor *regacc;
+    struct regacc_dev *regacc_dev;
     uni_dev = check_universal_driver(pdev->dev.parent);
     if (uni_dev)
         LJTALE_LEVEL_DEBUG(2,"no universal driver for device: %s\n",
                 dev_name(pdev->dev.parent));
-    regacc = uni_dev->drv->regacc;
-    BUG_ON(!regacc);
+    regacc_dev = &uni_dev->regacc_dev;
     /* ljtale ends */
 	if (tps65217_chip_id(tps) != TPS65217) {
 		dev_err(&pdev->dev, "Invalid tps chip version\n");
@@ -260,7 +259,7 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
 		config.driver_data = tps;
         /* FIXME: not critical to use regmap here? */
 		// config.regmap = tps->regmap;
-        config.regmap = regacc->regmap;
+        config.regmap = regacc_dev->regmap;
 
 		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
 					       &config);

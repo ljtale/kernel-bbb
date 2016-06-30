@@ -86,10 +86,10 @@ struct register_accessor {
     /* regmap ad-hoc fields */
     bool regmap_support;
     enum regmap_buses regmap_bus;
-    struct regmap *regmap;
+//    struct regmap *regmap;
 
     /* MMIO fields */
-    void __iomem *base;
+//    void __iomem *base;
     /* indicate if the read/write needs memory barrier */
     bool mb;
     /* for memory mapped I/O, using the read/write instructions directly
@@ -97,6 +97,13 @@ struct register_accessor {
      * we provide */
 };
 
+/* per-device states */
+struct regacc_dev {
+    union {
+        struct regmap *regmap;
+        void __iomem *base;
+    };
+};
 
 /*
  * irq configuration data structure and auxiliary types
@@ -141,22 +148,6 @@ struct irq_config {
 struct irq_config_num {
     struct irq_config *irq_config;
     int irq_num;
-};
-
-
-/*
- * iomap configuration data structure and auxiliary types
- */
-
-struct iomap_config {
-    /* legacy support for port IO or memory-mapped IO, default is MMIO */
-    bool pio;
-    /* depending on pio or mmio, the memory range could be got from platform
-     * data or device tree, which we can get at runtime */
-    /* if succeeds, iomap should return a virtual address
-     * FIXME: the returned address should be used somehow within the unviersal
-     * driver by the same data structure set for that device */
-    void *virt_addr;
 };
 
 /*
@@ -252,6 +243,10 @@ struct universal_device {
         spinlock_t  spinlock;
         unsigned long spinlock_flags;
     };
+
+    /* per-device states in universal device model */
+    struct regacc_dev regacc_dev;
+
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
 };

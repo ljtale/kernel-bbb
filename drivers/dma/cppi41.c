@@ -916,6 +916,7 @@ static int cppi41_dma_probe(struct platform_device *pdev)
 	int irq;
 	int ret;
 
+    printk(KERN_INFO "cppi41 dma probe...\n");
 	glue_info = get_glue_info(dev);
 	if (!glue_info)
 		return -EINVAL;

@@ -195,7 +195,7 @@ struct omap_i2c_dev {
 	spinlock_t		lock;		/* IRQ synchronization */
 	struct device		*dev;
 	void __iomem		*base;		/* virtual */
-	int			irq;
+//	int			irq;
 	int			reg_shift;      /* bit shift for I2C register addresses */
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
@@ -1369,7 +1369,7 @@ omap_i2c_probe(struct platform_device *pdev)
     /* ljtale starts */
     int i;
     struct universal_device *uni_dev;
-    struct register_accessor  *regacc;
+    struct regacc_dev  *regacc_dev;
     struct irq_config_num *irq_config_num;
     LJTALE_LEVEL_DEBUG(3, "omap i2c local probe get called\n");
 
@@ -1379,7 +1379,7 @@ omap_i2c_probe(struct platform_device *pdev)
                 pdev->name);
         return -EINVAL;
     }
-    regacc = uni_dev->drv->regacc;
+    regacc_dev = &uni_dev->regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
     /* ljtale ends */
 
@@ -1400,7 +1400,10 @@ omap_i2c_probe(struct platform_device *pdev)
 	if (IS_ERR(dev->base))
 		return PTR_ERR(dev->base);
 #endif
-    dev->base = regacc->base;
+    /* FIXME: currently we cannot manually replace all the register read/write
+     * in this driver, thus we still needs to maintain a base in the device
+     * private data structure */
+    dev->base = regacc_dev->base;
 	match = of_match_device(of_match_ptr(omap_i2c_of_match), &pdev->dev);
 	if (match) {
 		u32 freq = 100000; /* default to 100000 Hz */
