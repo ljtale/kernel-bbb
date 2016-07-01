@@ -128,7 +128,7 @@ static int universal_irq_config(struct universal_device *uni_dev,
     /* if the irq is good, config the irq with interrupt handlers */
     ret = devm_request_threaded_irq(uni_dev->dev,
             irq_config->irq, irq_config->handler, irq_config->thread_fn,
-            irq_config->irq_flags, uni_dev->name, irq_config->irq_context);
+            irq_config->irq_flags, uni_dev->name, uni_dev->dev);
     if (ret != 0) {
         dev_err(uni_dev->dev, "universal probe failed to request IRQ %d\n",
                 irq_config->irq);

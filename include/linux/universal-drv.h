@@ -123,9 +123,10 @@ struct irq_config {
     irqreturn_t (*thread_fn)(int irq, void *data);
     unsigned long irq_flags;
     /* usually the irq context is device specific, because the handling
-     * of the interrupt is device specific. Therefore the irq_context must
-     * be provided through the conventional device driveris */
-    void *irq_context;
+     * of the interrupt is device specific. To avoid the universal driver
+     * getting knowledge from conventional drivers at runtime, we pass
+     * struct device *dev in the universal irq configuration as context */
+    // void *irq_context;
     bool irq_sharing;
     /* indicate if we need to get gpio irq in case the normal irq is
      * not available */

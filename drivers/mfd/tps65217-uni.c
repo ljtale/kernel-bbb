@@ -298,7 +298,8 @@ static irqreturn_t tps65217_irq(int irq, void *irq_data)
 /* ljtale starts */
 static irqreturn_t tps65217_irq(int irq, void *irq_data)
 {
-	struct tps65217 *tps = irq_data;
+    struct device *dev = irq_data;
+	struct tps65217 *tps = dev_get_drvdata(dev);
 	unsigned int int_reg = 0, status_reg = 0;
 
 	tps65217_reg_read(tps->dev, TPS65217_REG_INT, &int_reg);
@@ -391,7 +392,6 @@ static int tps65217_probe(struct i2c_client *client,
      * implement will require population of the device knowledge at runtime */
     struct universal_device *uni_dev;
     struct irq_config_num *irq_config_num;
-    int i;
     LJTALE_MSG(KERN_INFO,"ljtale: tps65217 probe get called\n");
 
     uni_dev = check_universal_driver(&client->dev);
@@ -452,11 +452,6 @@ static int tps65217_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, tps);
 	tps->dev = &client->dev;
 	tps->id = chip_id;
-
-    /* ljtale starts */
-    for (i = 0; i < irq_config_num->irq_num; i++)
-        irq_config_num->irq_config[i].irq_context = tps;
-    /* ljtale ends */
 
 	ret = mfd_add_devices(tps->dev, -1, tps65217s,
 			      ARRAY_SIZE(tps65217s), NULL, 0, NULL);

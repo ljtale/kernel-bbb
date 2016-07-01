@@ -215,7 +215,8 @@ static void rtc_wait_not_busy(struct omap_rtc *rtc)
 
 static irqreturn_t rtc_irq(int irq, void *dev_id)
 {
-	struct omap_rtc	*rtc = dev_id;
+    struct device *dev = dev_id;
+	struct omap_rtc	*rtc = dev_get_drvdata(dev);
 	unsigned long events = 0;
 	u8 irq_data;
 
@@ -631,7 +632,6 @@ static int omap_rtc_probe(struct platform_device *pdev)
     struct universal_device *uni_dev;
     struct regacc_dev *regacc_dev;
     struct irq_config_num *irq_config_num;
-    int i;
     LJTALE_LEVEL_DEBUG(2, "omap rtc probe...\n");
     uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev) {
@@ -678,8 +678,6 @@ static int omap_rtc_probe(struct platform_device *pdev)
 
     /* ljtale starts */
     rtc->base = regacc_dev->base;
-    for (i = 0; i < irq_config_num->irq_num; i++)
-        irq_config_num->irq_config[i].irq_context = rtc;
     /* ljtale edns */
 
 	platform_set_drvdata(pdev, rtc);

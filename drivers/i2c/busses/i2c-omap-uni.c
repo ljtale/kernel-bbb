@@ -1023,7 +1023,8 @@ static int omap_i2c_transmit_data(struct omap_i2c_dev *dev, u8 num_bytes,
 static irqreturn_t
 omap_i2c_isr(int irq, void *dev_id)
 {
-	struct omap_i2c_dev *dev = dev_id;
+    struct device *con_dev = dev_id;
+	struct omap_i2c_dev *dev = dev_get_drvdata(con_dev);
 	irqreturn_t ret = IRQ_HANDLED;
 	u16 mask;
 	u16 stat;
@@ -1043,7 +1044,8 @@ omap_i2c_isr(int irq, void *dev_id)
 static irqreturn_t
 omap_i2c_isr_thread(int this_irq, void *dev_id)
 {
-	struct omap_i2c_dev *dev = dev_id;
+    struct device *con_dev = dev_id;
+	struct omap_i2c_dev *dev = dev_get_drvdata(con_dev);
 	unsigned long flags;
 	u16 bits;
 	u16 stat;
@@ -1367,7 +1369,6 @@ omap_i2c_probe(struct platform_device *pdev)
 	u16 minor, major;
 
     /* ljtale starts */
-    int i;
     struct universal_device *uni_dev;
     struct regacc_dev  *regacc_dev;
     struct irq_config_num *irq_config_num;
@@ -1536,11 +1537,7 @@ omap_i2c_probe(struct platform_device *pdev)
 		goto err_unuse_clocks;
 	}
 #endif
-    /* ljtale starts */
-    /* any runtime parameter population */
-    for (i = 0; i < irq_config_num->irq_num; i++) 
-        irq_config_num->irq_config[i].irq_context = dev;
-    /* ljtale ends */
+
 #if 0
 	adap = &dev->adapter;
 	i2c_set_adapdata(adap, dev);
