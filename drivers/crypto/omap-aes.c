@@ -39,6 +39,8 @@
 #include <crypto/internal/aead.h>
 #include "omap-aes.h"
 
+#include <linux/universal-drv.h>
+
 /* keep registered devices data here */
 static LIST_HEAD(dev_list);
 static DEFINE_SPINLOCK(list_lock);
@@ -1253,6 +1255,32 @@ static struct platform_driver omap_aes_driver = {
 };
 
 module_platform_driver(omap_aes_driver);
+
+/* ljtale starts */
+static int omap_aes_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    return omap_aes_probe(pdev);
+}
+
+static struct universal_driver omap_aes_universal_driver = {
+    .name = "omap-aes-universal-driver",
+    .driver = &omap_aes_driver.driver,
+    .regacc =NULL,
+    .irq_config_num = NULL,
+    .dma_config = NULL,
+    .local_probe = omap_aes_universal_local_probe,
+};
+
+static int __init universal_omap_aes_init(void) {
+    int ret = universal_driver_register(&omap_aes_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver register failed: %d\n", ret);
+    return ret;
+}
+arch_initcall(universal_omap_aes_init);
+/* ljtale ends */
 
 MODULE_DESCRIPTION("OMAP AES hw acceleration support.");
 MODULE_LICENSE("GPL v2");

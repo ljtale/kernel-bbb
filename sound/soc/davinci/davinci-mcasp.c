@@ -41,6 +41,8 @@
 #include "edma-pcm.h"
 #include "davinci-mcasp.h"
 
+#include <linux/universal-drv.h>
+
 #define MCASP_MAX_AFIFO_DEPTH	64
 
 static u32 context_regs[] = {
@@ -2101,7 +2103,41 @@ static struct platform_driver davinci_mcasp_driver = {
 	},
 };
 
-module_platform_driver(davinci_mcasp_driver);
+
+/* ljtale starts */
+static int davinci_mcasp_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    return davinci_mcasp_probe(pdev);
+}
+
+static struct universal_driver davinci_mcasp_universal_driver = {
+    .name = "davinci_mcasp-universal-driver",
+    .driver = &davinci_mcasp_driver.driver,
+    .regacc =NULL,
+    .irq_config_num = NULL,
+    .dma_config = NULL,
+    .local_probe = davinci_mcasp_universal_local_probe,
+};
+
+// module_platform_driver(davinci_mcasp_driver);
+
+static int __init davinci_mcasp_driver_init(void) {
+    int ret;
+    ret = universal_driver_register(&davinci_mcasp_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver registration fail: %s -- %d\n", 
+                davinci_mcasp_universal_driver.name, ret);
+    return platform_driver_register(&davinci_mcasp_driver);
+}
+module_init(davinci_mcasp_driver_init);
+static void __exit davinci_mcasp_driver_exit(void) {
+    platform_driver_unregister(&davinci_mcasp_driver);
+}
+module_exit(davinci_mcasp_driver_exit);
+
+/* ljtale ends */
 
 MODULE_AUTHOR("Steve Chen");
 MODULE_DESCRIPTION("TI DAVINCI McASP SoC Interface");

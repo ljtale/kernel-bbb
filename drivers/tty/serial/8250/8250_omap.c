@@ -29,6 +29,8 @@
 
 #include "8250.h"
 
+#include <linux/universal-drv.h>
+
 #define DEFAULT_CLK_SPEED	48000000
 
 #define UART_ERRATA_i202_MDR1_ACCESS	(1 << 0)
@@ -1088,9 +1090,6 @@ MODULE_DEVICE_TABLE(of, omap8250_dt_ids);
 
 static int omap8250_probe(struct platform_device *pdev)
 {
-    /* ljtale starts */
-    printk(KERN_INFO "ljtale: omap8250 probe get called %s\n", __FUNCTION__);
-    /* ljtale ends */
 	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	struct omap8250_priv *priv;
@@ -1108,6 +1107,7 @@ static int omap8250_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
+    /* ljtale: ioremap_nocache is the same as ioremap on arm arhc */
 	membase = devm_ioremap_nocache(&pdev->dev, regs->start,
 				       resource_size(regs));
 	if (!membase)
@@ -1207,6 +1207,7 @@ static int omap8250_probe(struct platform_device *pdev)
 
 	omap_serial_fill_features_erratas(&up, priv);
 	up.port.handle_irq = omap8250_no_handle_irq;
+    /* ljtale: not set DMA config flag */
 #ifdef CONFIG_SERIAL_8250_DMA
 	if (pdev->dev.of_node) {
 		/*
@@ -1502,6 +1503,35 @@ static struct platform_driver omap8250_platform_driver = {
 	.remove			= omap8250_remove,
 };
 module_platform_driver(omap8250_platform_driver);
+
+/* ljtale starts */
+static int omap8250_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    return omap8250_probe(pdev);
+}
+
+
+static struct universal_driver omap8250_universal_driver = {
+    .name = "omap8250-universal-driver",
+    .driver = &omap8250_platform_driver.driver,
+    .regacc = NULL,
+    .irq_config_num = NULL,
+    .dma_config = NULL,
+    .local_probe = omap8250_universal_local_probe,
+};
+
+static int __init universal_omap8250_init(void) {
+    int ret;
+    ret = universal_driver_register(&omap8250_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver register failed: %d\n", ret);
+    return ret;
+}
+arch_initcall(universal_omap8250_init);
+
+/* ljtale ends */
 
 MODULE_AUTHOR("Sebastian Andrzej Siewior");
 MODULE_DESCRIPTION("OMAP 8250 Driver");

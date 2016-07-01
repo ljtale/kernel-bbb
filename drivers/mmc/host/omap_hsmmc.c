@@ -47,6 +47,8 @@
 #include <linux/pm_wakeirq.h>
 #include <linux/platform_data/hsmmc-omap.h>
 
+#include <linux/universal-drv.h>
+
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSSTATUS	0x0014
 #define OMAP_HSMMC_CON		0x002C
@@ -2632,6 +2634,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	pm_runtime_set_autosuspend_delay(host->dev, MMC_AUTOSUSPEND_DELAY);
 	pm_runtime_use_autosuspend(host->dev);
 
+    /* ljtale: wierd implementation */
 	omap_hsmmc_context_save(host);
 
 	host->dbclk = devm_clk_get(&pdev->dev, "mmchsdb_fck");
@@ -2959,6 +2962,33 @@ static struct platform_driver omap_hsmmc_driver = {
 };
 
 module_platform_driver(omap_hsmmc_driver);
+
+/* ljtale starts */
+static int omap_hsmmc_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    return omap_hsmmc_probe(pdev);
+}
+
+static struct universal_driver omap_hsmmc_universal_driver = {
+    .name = "omap-hsmmc-universal-driver",
+    .driver = &omap_hsmmc_driver.driver,
+    .regacc = NULL,
+    .irq_config_num = NULL,
+    .dma_config = NULL,
+    .local_probe = omap_hsmmc_universal_local_probe,
+};
+
+static int __init universal_omap_hsmmc_init(void) {
+    int ret = universal_driver_register(&omap_hsmmc_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver register failed: %d\n", ret);
+    return ret;
+}
+arch_initcall(universal_omap_hsmmc_init);
+/* ljtale ends */
+
 MODULE_DESCRIPTION("OMAP High Speed Multimedia Card driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" DRIVER_NAME);
