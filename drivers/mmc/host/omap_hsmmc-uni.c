@@ -2971,6 +2971,26 @@ static int omap_hsmmc_universal_local_probe(struct universal_device *uni_dev) {
     return omap_hsmmc_probe(pdev);
 }
 
+static struct dma_config omap_hsmmc_dma_config[] = {
+    {
+        .dma_name = "tx",
+        .dma_filter_fn = omap_dma_filter_fn,
+        /* .fn_param is determined in the universal driver */
+        .tx_type = DMA_SLAVE,
+    },
+    {
+        .dma_name = "rx",
+        .dma_filter_fn = omap_dma_filter_fn,
+        /* .fn_param is determined in the universal driver */
+        .tx_type = DMA_SLAVE,
+    },
+};
+
+static struct dma_config_num omap_hsmmc_dma_config_num = {
+    .dma_config = omap_hsmmc_dma_config,
+    .dma_num = 2,
+};
+
 static struct universal_driver omap_hsmmc_universal_driver = {
     .name = "omap-hsmmc-universal-driver",
     .driver = &omap_hsmmc_driver.driver,

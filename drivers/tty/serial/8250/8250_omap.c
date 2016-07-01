@@ -1518,7 +1518,7 @@ static struct universal_driver omap8250_universal_driver = {
     .driver = &omap8250_platform_driver.driver,
     .regacc = NULL,
     .irq_config_num = NULL,
-    .dma_config = NULL,
+    .dma_config_num = NULL,
     .local_probe = omap8250_universal_local_probe,
 };
 

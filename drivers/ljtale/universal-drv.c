@@ -113,9 +113,9 @@ static int universal_regacc_config(struct universal_device *uni_dev,
 
 
 static int universal_irq_config(struct universal_device *uni_dev,
-        struct irq_config *irq_config) {
+        struct irq_config *irq_config, int index) {
     int ret;
-    LJTALE_LEVEL_DEBUG(2, "IRQ config...%s\n", uni_dev->name);
+    LJTALE_LEVEL_DEBUG(2, "IRQ config...%s -- %d\n", uni_dev->name, index);
     /* first try to get irq number from device tree or whatever */
     irq_config->irq = __universal_get_irq(uni_dev, irq_config);
     if (irq_config->irq <= 0) {
@@ -144,7 +144,41 @@ static int universal_irq_config(struct universal_device *uni_dev,
 }
 
 static int universal_dma_config(struct universal_device *uni_dev,
-        struct dma_config *dma_config) {
+        struct dma_config *dma_config, int index) {
+    dma_cap_mask_t mask;
+    unsigned fn_param;
+    struct device_node *nd = uni_dev->dev->of_node;
+    struct resource *res;
+    struct dma_chan *chan;
+    LJTALE_LEVEL_DEBUG(2, "DMA config...%s -- %d\n", uni_dev->name, index);
+    if (nd) 
+        fn_param = -1;
+    else {
+        /* get the platform resource by name */
+        struct platform_device *pdev = to_platform_device(uni_dev->dev);
+        BUG_ON(!pdev);
+        res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
+                dma_config->dma_name);
+        if (!res) {
+            dev_err(uni_dev->dev, "cannot get DMA %s channel\n",
+                    dma_config->dma_name);
+            return -EINVAL;
+        }
+        fn_param = res->start;
+    }
+
+    dma_cap_zero(mask);
+    dma_cap_set(dma_config->tx_type, mask);
+
+    chan = dma_request_slave_channel_compat_reason(mask,
+                dma_config->dma_filter_fn, &fn_param, uni_dev->dev,
+                dma_config->dma_name);
+    if (IS_ERR(chan)) {
+        dev_err(uni_dev->dev, "unable to obtain DMA %s channel %u\n",
+                dma_config->dma_name, fn_param);
+        return PTR_ERR(chan);
+    }
+    uni_dev->dma_config_dev[index].channel = chan;
     return 0;
 }
 
@@ -153,7 +187,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     struct universal_driver *drv;
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
-    struct dma_config *dma_config;
+    struct dma_config_num *dma_config_num;
     int i;
     
     if (!dev || !dev->drv) {
@@ -179,11 +213,20 @@ int __universal_drv_probe(struct universal_device *dev) {
             goto regacc_err;
     }
 
-    dma_config = drv->dma_config;
-    if (dma_config) {
-        ret = universal_dma_config(dev, dma_config);
-        if (ret < 0)
-            goto err;
+    dma_config_num = drv->dma_config_num;
+    if (dma_config_num) {
+        dev->dma_config_dev = devm_kzalloc(dev->dev,
+                sizeof(struct dma_config_dev) * dma_config_num->dma_num, 
+                GFP_KERNEL);
+        if (!dev->dma_config_dev) {
+            LJTALE_MSG(KERN_ERR, "dma config dev allocation failed\n");
+            return -ENOMEM;
+        }
+        for (i = 0; i < dma_config_num->dma_num; i++) {
+            ret = universal_dma_config(dev, &dma_config_num->dma_config[i], i);
+            if (ret < 0)
+                goto err;
+        }
     }
     /* ... */
     /* do a local probe */
@@ -199,7 +242,7 @@ int __universal_drv_probe(struct universal_device *dev) {
             /* It is the responsibility of the device knowledge provider to
              * make sure that the provided IRQ numbers are unique, otherwise
              * there will be an error when requesting an interrupt line */
-            ret = universal_irq_config(dev, &irq_config_num->irq_config[i]);
+            ret = universal_irq_config(dev, &irq_config_num->irq_config[i], i);
             if (ret != 0)
                 goto irq_config_err;
         }

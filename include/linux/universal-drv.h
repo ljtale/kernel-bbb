@@ -6,6 +6,8 @@
 #include <linux/regmap.h>
 #include <linux/of_device.h>
 #include <linux/interrupt.h>
+#include <linux/dmaengine.h>
+#include <linux/omap-dmaengine.h>
 
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
@@ -155,7 +157,23 @@ struct irq_config_num {
  * */
 
 struct dma_config {
-    /* TODO: what is needed for DMA configuration? */
+    /* this name must match with the device tree node dma-names property */
+    char *dma_name;
+    bool (*dma_filter_fn)(struct dma_chan *chan, void *filter_param);
+    /* for omap, the fn_param is a pointer of unsigned */
+    void *fn_param;
+    enum dma_transaction_type tx_type;
+};
+
+/* per-device states */
+struct dma_config_dev {
+    int dma_len;
+    struct dma_chan *channel;
+};
+
+struct dma_config_num {
+    struct dma_config *dma_config;
+    int dma_num;
 };
 
 
@@ -196,7 +214,7 @@ struct universal_driver {
     /* IRQ configuration */
     struct irq_config_num *irq_config_num;
     /* DMA configuration */
-    struct dma_config *dma_config;
+    struct dma_config_num *dma_config_num;
 
     /* the universal driver provides a universal probe function for the 
      * device driver to call upon a device-driver binding, but there
@@ -246,6 +264,8 @@ struct universal_device {
 
     /* per-device states in universal device model */
     struct regacc_dev regacc_dev;
+
+    struct dma_config_dev *dma_config_dev;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;
