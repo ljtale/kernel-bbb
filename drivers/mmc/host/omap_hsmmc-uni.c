@@ -2533,6 +2533,23 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	const struct omap_mmc_of_data *data;
 	void __iomem *base;
 
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    struct regacc_dev *regacc_dev;
+    struct dma_config_dev *dma_config_dev;
+    int dma_num;
+    uni_dev = check_universal_driver(&pdev->dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver not available for: %s\n",
+                pdev->name);
+        return -EINVAL;
+    }
+    regacc_dev = &uni_dev->regacc_dev;
+    dma_config_dev = uni_dev->dma_config_dev_num.dma_config_dev;
+    dma_num = uni_dev->dma_config_dev_num.dma_num;
+    /* ljtale ends */
+
+    
 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
 	if (match) {
 		pdata = of_get_hsmmc_pdata(&pdev->dev);
@@ -2674,7 +2691,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	ret = omap_hsmmc_get_iodelay_pinctrl_state(host);
 	if (ret)
 		goto err_pinctrl;
-
+#if 0
 	if (!pdev->dev.of_node) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_DMA, "tx");
 		if (!res) {
@@ -2692,7 +2709,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		}
 		rx_req = res->start;
 	}
-
 	dma_cap_zero(mask);
 	dma_cap_set(DMA_SLAVE, mask);
 
@@ -2713,7 +2729,14 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		ret = PTR_ERR(host->tx_chan);
 		goto err_irq;
 	}
-
+#endif 
+    /* ljtale starts */
+    /* FIXME: the conventional driver will never use dma channel directly,
+     * instead DMA transfer functions needs to change the API to use
+     * universal driver */
+    host->tx_chan = dma_config_dev[0].channel;
+    host->rx_chan = dma_config_dev[1].channel;
+    /* ljtale ends */
 	/* Request IRQ for MMC operations */
 	ret = devm_request_irq(&pdev->dev, host->irq, omap_hsmmc_irq, 0,
 			mmc_hostname(mmc), host);
@@ -2996,7 +3019,7 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .driver = &omap_hsmmc_driver.driver,
     .regacc = NULL,
     .irq_config_num = NULL,
-    .dma_config_num = NULL,
+    .dma_config_num = &omap_hsmmc_dma_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
 };
 

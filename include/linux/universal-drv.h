@@ -161,7 +161,7 @@ struct dma_config {
     char *dma_name;
     bool (*dma_filter_fn)(struct dma_chan *chan, void *filter_param);
     /* for omap, the fn_param is a pointer of unsigned */
-    void *fn_param;
+    // void *fn_param;
     enum dma_transaction_type tx_type;
 };
 
@@ -176,6 +176,10 @@ struct dma_config_num {
     int dma_num;
 };
 
+struct dma_config_dev_num {
+    struct dma_config_dev *dma_config_dev;
+    int dma_num;
+};
 
 /*
  * communication interfaces between the driver and the kernel
@@ -265,7 +269,7 @@ struct universal_device {
     /* per-device states in universal device model */
     struct regacc_dev regacc_dev;
 
-    struct dma_config_dev *dma_config_dev;
+    struct dma_config_dev_num dma_config_dev_num;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;

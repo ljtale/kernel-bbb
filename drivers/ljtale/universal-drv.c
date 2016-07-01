@@ -145,6 +145,8 @@ static int universal_irq_config(struct universal_device *uni_dev,
 
 static int universal_dma_config(struct universal_device *uni_dev,
         struct dma_config *dma_config, int index) {
+    struct dma_config_dev_num *dma_config_dev_num = 
+        &uni_dev->dma_config_dev_num;
     dma_cap_mask_t mask;
     unsigned fn_param;
     struct device_node *nd = uni_dev->dev->of_node;
@@ -178,7 +180,7 @@ static int universal_dma_config(struct universal_device *uni_dev,
                 dma_config->dma_name, fn_param);
         return PTR_ERR(chan);
     }
-    uni_dev->dma_config_dev[index].channel = chan;
+    dma_config_dev_num->dma_config_dev[index].channel = chan;
     return 0;
 }
 
@@ -215,17 +217,20 @@ int __universal_drv_probe(struct universal_device *dev) {
 
     dma_config_num = drv->dma_config_num;
     if (dma_config_num) {
-        dev->dma_config_dev = devm_kzalloc(dev->dev,
+        struct dma_config_dev_num *dma_config_dev_num = 
+            &dev->dma_config_dev_num;
+        dma_config_dev_num->dma_config_dev = devm_kzalloc(dev->dev,
                 sizeof(struct dma_config_dev) * dma_config_num->dma_num, 
                 GFP_KERNEL);
-        if (!dev->dma_config_dev) {
+        if (!dma_config_dev_num->dma_config_dev) {
             LJTALE_MSG(KERN_ERR, "dma config dev allocation failed\n");
             return -ENOMEM;
         }
+        dma_config_dev_num->dma_num = dma_config_num->dma_num;
         for (i = 0; i < dma_config_num->dma_num; i++) {
             ret = universal_dma_config(dev, &dma_config_num->dma_config[i], i);
             if (ret < 0)
-                goto err;
+                goto dma_config_err;
         }
     }
     /* ... */
@@ -249,11 +254,13 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
     LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
+    
+    /* TODO: error handling */
 regacc_err:
+dma_config_err:
 local_probe_err:
 irq_config_err:
 err:
-    /* TODO: error handling */
     return ret;
 }
 EXPORT_SYMBOL(__universal_drv_probe);

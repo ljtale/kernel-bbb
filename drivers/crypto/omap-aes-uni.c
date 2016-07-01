@@ -1095,6 +1095,19 @@ static int omap_aes_probe(struct platform_device *pdev)
 	int err = -ENOMEM, i, j, irq = -1;
 	u32 reg;
 
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    struct regacc_dev *regacc_dev;
+    struct dma_config_dev *dma_config_dev;
+    int dma_num;    /* may not be used */
+    uni_dev = check_universal_driver(&pdev->dev);
+    if (!uni_dev)
+        return -EINVAL;
+    regacc_dev = &uni_dev->regacc_dev;
+    dma_config_dev = uni_dev->dma_config_dev_num.dma_config_dev;
+    dma_num = uni_dev->dma_config_dev_num.dma_num;
+    /* ljtale ends */
+
 	dd = devm_kzalloc(dev, sizeof(struct omap_aes_dev), GFP_KERNEL);
 	if (dd == NULL) {
 		dev_err(dev, "unable to alloc data struct.\n");
@@ -1139,7 +1152,7 @@ static int omap_aes_probe(struct platform_device *pdev)
 
 	tasklet_init(&dd->done_task, omap_aes_done_task, (unsigned long)dd);
 	tasklet_init(&dd->queue_task, omap_aes_queue_task, (unsigned long)dd);
-
+#if 0
 	err = omap_aes_dma_init(dd);
 	if (err == -EPROBE_DEFER) {
 		goto err_irq;
@@ -1159,7 +1172,10 @@ static int omap_aes_probe(struct platform_device *pdev)
 			goto err_irq;
 		}
 	}
-
+#endif
+    /* FIXME: potential bugs if the above code is commented out */
+   	dd->dma_lch_out = dma_config_dev[0].channel;
+	dd->dma_lch_in = dma_config_dev[1].channel;
 
 	INIT_LIST_HEAD(&dd->list);
 	spin_lock(&list_lock);
@@ -1264,12 +1280,30 @@ static int omap_aes_universal_local_probe(struct universal_device *uni_dev) {
     return omap_aes_probe(pdev);
 }
 
+static struct dma_config omap_aes_dma_config[] = {
+    {
+        .dma_name = "tx",
+        .dma_filter_fn = omap_dma_filter_fn,
+        .tx_type = DMA_SLAVE,
+    },
+    {
+        .dma_name = "rx",
+        .dma_filter_fn = omap_dma_filter_fn,
+        .tx_type = DMA_SLAVE,
+    },
+};
+
+static struct dma_config_num omap_aes_dma_config_num = {
+    .dma_config = omap_aes_dma_config,
+    .dma_num = 2,
+};
+
 static struct universal_driver omap_aes_universal_driver = {
     .name = "omap-aes-universal-driver",
     .driver = &omap_aes_driver.driver,
     .regacc =NULL,
     .irq_config_num = NULL,
-    .dma_config_num = NULL,
+    .dma_config_num = &omap_aes_dma_config_num,
     .local_probe = omap_aes_universal_local_probe,
 };
 
