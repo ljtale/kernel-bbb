@@ -2549,7 +2549,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     dma_num = uni_dev->dma_config_dev_num.dma_num;
     /* ljtale ends */
 
-    
 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
 	if (match) {
 		pdata = of_get_hsmmc_pdata(&pdev->dev);
@@ -2568,16 +2567,21 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Platform Data is missing\n");
 		return -ENXIO;
 	}
-
+#if 0
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	irq = platform_get_irq(pdev, 0);
 	if (res == NULL || irq < 0)
 		return -ENXIO;
 
+#endif
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0)
+		return -ENXIO;
+#if 0
 	base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(base))
 		return PTR_ERR(base);
-
+#endif
 	mmc = mmc_alloc_host(sizeof(struct omap_hsmmc_host), &pdev->dev);
 	if (!mmc) {
 		ret = -ENOMEM;
@@ -2595,8 +2599,12 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	host->use_dma	= 1;
 	host->dma_ch	= -1;
 	host->irq	= irq;
-	host->mapbase	= res->start + pdata->reg_offset;
-	host->base	= base + pdata->reg_offset;
+    /* ljtale starts */
+	// host->mapbase	= res->start + pdata->reg_offset;
+	// host->base	= base + pdata->reg_offset;
+    host->mapbase = regacc_dev->phys_base;
+    host->base = regacc_dev->base;
+    /* ljtale ends */
 	host->power_mode = MMC_POWER_OFF;
 	host->timing	= 0;
 	host->next_data.cookie = 1;
@@ -2994,6 +3002,17 @@ static int omap_hsmmc_universal_local_probe(struct universal_device *uni_dev) {
     return omap_hsmmc_probe(pdev);
 }
 
+static struct register_accessor omap_hsmmc_regacc = {
+    .bus_name = "platform",
+    .reg_addr_bits = 32,
+    .reg_val_bits = 32,
+
+    /* MMIO specs */
+    .regmap_support = false,
+    .mb = false,
+    .reg_offset = 0x100,
+};
+
 static struct dma_config omap_hsmmc_dma_config[] = {
     {
         .dma_name = "tx",
@@ -3017,7 +3036,7 @@ static struct dma_config_num omap_hsmmc_dma_config_num = {
 static struct universal_driver omap_hsmmc_universal_driver = {
     .name = "omap-hsmmc-universal-driver",
     .driver = &omap_hsmmc_driver.driver,
-    .regacc = NULL,
+    .regacc = &omap_hsmmc_regacc,
     .irq_config_num = NULL,
     .dma_config_num = &omap_hsmmc_dma_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,

@@ -94,6 +94,10 @@ struct register_accessor {
 //    void __iomem *base;
     /* indicate if the read/write needs memory barrier */
     bool mb;
+    /* some devices have registers only available from an offset to the base
+     * This wierd issue is caused by driver developers to have one
+     * set  of register offsets suitable for various devices */
+    u32 reg_offset;
     /* for memory mapped I/O, using the read/write instructions directly
      * would be faster than using indirect universal read/write. But anyway
      * we provide */
@@ -105,6 +109,8 @@ struct regacc_dev {
         struct regmap *regmap;
         void __iomem *base;
     };
+    /* physical address base */
+    phys_addr_t phys_base;
 };
 
 /*

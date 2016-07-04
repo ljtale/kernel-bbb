@@ -15,4 +15,12 @@ int universal_mmio_reg_read(struct universal_device *uni_dev, unsigned int reg,
 int universal_mmio_reg_write(struct universal_device *uni_dev,
         unsigned int reg, unsigned int val);
 
+int universal_runtime_suspend(struct device *dev);
+int universal_runtime_resume(struct device *dev);
+int universal_suspend(struct device *dev);
+int universal_resume(struct device *dev);
+
+
+/* universal runtime power management data structures */
+
 #endif /* _LINUX_UNIVERSAL_UTILS_H */
