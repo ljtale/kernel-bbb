@@ -2588,6 +2588,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+    /* ljtale: this function populate the host->mmc->caps */
 	ret = mmc_of_parse(mmc);
 	if (ret)
 		goto err1;

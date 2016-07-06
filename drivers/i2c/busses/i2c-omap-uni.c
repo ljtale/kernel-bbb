@@ -288,6 +288,7 @@ static const u8 reg_map_ip_v2[] = {
 #define OMAP_I2C_V2_IE_REG 0x2c
 #define OMAP_I2C_V2_STAT_REG 0x28
 #define OMAP_I2C_V2_CON_REG 0xa4
+#define OMAP_I2C_IP_V2_IRQENABLE_CLR 0x30
 
 /* TODO: more register definitions */
 /* ljtale ends */
@@ -1512,11 +1513,14 @@ omap_i2c_probe(struct platform_device *pdev)
 	omap_i2c_init(dev);
 
     /* ljtale starts */
-    printk(KERN_INFO "ljtale-i2c: base: 0x%lx, shift: 0x%x\n",
+    LJTALE_LEVEL_DEBUG(2, "rev: 0x%x, scheme: 0x%x\n",
+            dev->rev, dev->scheme); 
+    LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: base: 0x%lx, shift: 0x%x\n",
             (unsigned long)dev->base, dev->reg_shift);
-    printk(KERN_INFO "ljtale-i2c: psc: 0x%x, scll: 0x%x, sclh: 0x%x\n",
-            dev->pscstate, dev->scllstate, dev->sclhstate); 
-    printk(KERN_INFO "ljtale-i2c: westate: 0x%x\n", dev->westate); 
+    LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: psc: 0x%x, scll: 0x%x, sclh: 0x%x\n",
+            (unsigned int)dev->pscstate, (unsigned int)dev->scllstate, 
+            (unsigned int)dev->sclhstate); 
+    LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: westate: 0x%x\n", dev->westate); 
     /* ljtale ends */
 
 #if 0

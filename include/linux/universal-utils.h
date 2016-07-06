@@ -21,6 +21,5 @@ int universal_suspend(struct device *dev);
 int universal_resume(struct device *dev);
 
 
-/* universal runtime power management data structures */
 
 #endif /* _LINUX_UNIVERSAL_UTILS_H */

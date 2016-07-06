@@ -15,6 +15,7 @@
 #include <linux/platform_data/at24.h>
 
 #include <linux/ljtale-utils.h>
+#include <linux/universal-rpm.h>
 
 struct universal_driver;
 struct universal_device;
@@ -337,14 +338,6 @@ extern struct regmap_bus *_choose_regmap_bus(struct register_accessor *regacc);
 /* IRQ configuration related functions */
 extern int __universal_get_irq(struct universal_device *uni_dev,
         struct irq_config *irq_config);
-
-
-struct universal_pm_ops {
-    int (*suspend)(struct universal_device *uni_dev);
-    int (*resume)(struct universal_device *uni_dev);
-    int (*runtime_suspend)(struct universal_device *uni_dev);
-    int (*runtime_resume)(struct universal_device *uni_dev);
-};
 
 
 /* TODO: debugfs support for universal driver debugging */
