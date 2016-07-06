@@ -257,6 +257,10 @@ int __universal_drv_probe(struct universal_device *dev) {
                 goto irq_config_err;
         }
     }
+
+    if (drv->rpm_graph_build)
+        drv->rpm_graph_build(dev);
+
     LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
     

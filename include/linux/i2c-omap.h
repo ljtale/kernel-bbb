@@ -35,4 +35,13 @@ struct omap_i2c_bus_platform_data {
 	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
 };
 
+/* ljtale starts */
+struct omap_i2c_rpm_reg_value {
+        u16 iestate;
+        u16 westate;
+        u16 pscstate;
+        u16 scllstate;
+        u16 sclhstate;
+};
+/* ljtale ends */
 #endif

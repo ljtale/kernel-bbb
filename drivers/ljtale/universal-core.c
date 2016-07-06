@@ -386,6 +386,11 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
     struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
+    /* in case val is NULL, such as when read is used to flush the register
+     * written value, we should avoid that */
+    u32 temp_val;
+    if (!val)
+       val = &temp_val; 
     BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {

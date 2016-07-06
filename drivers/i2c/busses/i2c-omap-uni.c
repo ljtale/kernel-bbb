@@ -1373,6 +1373,7 @@ omap_i2c_probe(struct platform_device *pdev)
     struct universal_device *uni_dev;
     struct regacc_dev  *regacc_dev;
     struct irq_config_num *irq_config_num;
+    struct omap_i2c_rpm_reg_value *omap_i2c_rpm_reg_values;
     LJTALE_LEVEL_DEBUG(3, "omap i2c local probe get called\n");
 
     uni_dev = check_universal_driver(&pdev->dev);
@@ -1383,6 +1384,10 @@ omap_i2c_probe(struct platform_device *pdev)
     }
     regacc_dev = &uni_dev->regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
+    omap_i2c_rpm_reg_values = devm_kzalloc(uni_dev->dev, 
+            sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
+    if (!omap_i2c_rpm_reg_values)
+        return -ENOMEM;
     /* ljtale ends */
 
 #if 0
@@ -1509,18 +1514,27 @@ omap_i2c_probe(struct platform_device *pdev)
 				       (1000 * dev->speed / 8);
 	}
 
+
+    LJTALE_LEVEL_DEBUG(4, "rev: 0x%x, scheme: 0x%x, flags: 0x%x\n",
+            dev->rev, dev->scheme, dev->flags); 
 	/* reset ASAP, clearing any IRQs */
 	omap_i2c_init(dev);
 
     /* ljtale starts */
-    LJTALE_LEVEL_DEBUG(2, "rev: 0x%x, scheme: 0x%x\n",
-            dev->rev, dev->scheme); 
     LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: base: 0x%lx, shift: 0x%x\n",
             (unsigned long)dev->base, dev->reg_shift);
     LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: psc: 0x%x, scll: 0x%x, sclh: 0x%x\n",
             (unsigned int)dev->pscstate, (unsigned int)dev->scllstate, 
             (unsigned int)dev->sclhstate); 
     LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: westate: 0x%x\n", dev->westate); 
+
+    omap_i2c_rpm_reg_values->iestate = dev->iestate;
+    omap_i2c_rpm_reg_values->westate = dev->westate;
+    omap_i2c_rpm_reg_values->pscstate = dev->pscstate;
+    omap_i2c_rpm_reg_values->scllstate = dev->scllstate;
+    omap_i2c_rpm_reg_values->sclhstate = dev->sclhstate;
+
+    uni_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
     /* ljtale ends */
 
 #if 0
@@ -1668,6 +1682,9 @@ static struct platform_driver omap_i2c_driver = {
 };
 
 /* ljtale starts */
+
+extern void omap_i2c_rpm_graph_build(struct universal_device *uni_dev);
+
 static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
     struct platform_device *pdev;
     LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s -- device: %s\n",
@@ -1713,6 +1730,7 @@ static struct universal_driver omap_i2c_universal_driver = {
     .regacc = &omap_i2c_regacc,
     .irq_config_num = &omap_i2c_irq_config_num,
     .local_probe = omap_i2c_universal_local_probe,
+    .rpm_graph_build = omap_i2c_rpm_graph_build,
 };
 
 static int __init universal_omap_i2c_init(void)

@@ -56,6 +56,16 @@ struct rpm_reg_node {
     u32 *reg_value;
 };
 
+struct rpm_reg_read_node {
+    unsigned int reg_addr;
+    u32 *reg_value;
+};
+
+struct rpm_reg_write_node {
+    unsigned int reg_addr;
+    u32 reg_value;
+};
+
 struct rpm_pinctrl_node {
     enum rpm_pinctrl_state pinctrl_state;
 };
@@ -68,6 +78,7 @@ struct rpm_spinlock_node {
 struct rpm_node {
     enum rpm_op op;
     void *op_args;
+    struct rpm_node *next;
 };
 
 #define RPM_REG_READ_NODE(name, addr, value); \
@@ -75,7 +86,7 @@ struct rpm_node {
         .reg_addr = addr,   \
         .reg_value = value, \
     }; \
-    static struct rpm_node rpm_reg_read_node_##name = { \
+    static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_READ, \
         .op_args = &reg_node_##name, \
     };
@@ -85,7 +96,7 @@ struct rpm_node {
         .reg_addr = addr,   \
         .reg_value = value, \
     }; \
-    static struct rpm_node rpm_reg_read_node_##name = { \
+    static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_WRITE, \
         .op_args = &reg_node_##name, \
     };
@@ -94,12 +105,13 @@ struct rpm_node {
     static struct rpm_pinctrl_node rpm_pinctrl_##name = { \
         .pinctrl_state = state,   \
     }; \
-    static struct rpm_node rpm_reg_read_node_##name = { \
+    static struct rpm_node rpm_node_##name = { \
         .op = RPM_PIN_STATE_SELECT, \
         .op_args = &rpm_pinctrl_##name, \
     };
 
-
+#define RPM_NODE_NAME(name) rpm_node_##name
+#define RPM_REG_NODE_NAME(name) reg_node_##name
 enum rpm_condition_type {
     RPM_CONDITION_NONE,
     RPM_CONDITION_SIMPLE,
@@ -133,5 +145,33 @@ struct rpm_condition_node {
     struct rpm_node *true_path;
     struct rpm_node *false_path;
 };
+
+#define RPM_CONDITION_OP(name, type); \
+    static struct rpm_condition_op rpm_con_op_##name = { \
+        .type = type, \
+    };
+
+#define RPM_CONDITION_OP_NAME(name) rpm_con_op_##name
+
+#define RPM_CONDITION_NODE(name, op_name); \
+    static struct rpm_condition_node rpm_condition_##name = { \
+        .op = &rpm_con_op_##op_name, \
+    };  \
+    static struct rpm_noe rpm_node_##name = { \
+       .op = RPM_CONDITION, \
+       .op_args = &rpm_condition_##name, \
+    };
+
+#define RPM_NODE_CONTROL(name1, name2) \
+    do { \
+        rpm_node_##name1.next = &rpm_node_##name2; \
+    } while (0)
+
+#define RPM_CONDITION_CONTROL(condition_node, true_node, false_node) \
+    do { \
+        struct rpm_condition_node *node = &rpm_node_##condition_node; \
+        node->true_path = &rpm_node_##true_node; \
+        node->false_path = &rpm_node_##false_node; \
+    } while(0)
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */
