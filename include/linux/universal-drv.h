@@ -92,7 +92,7 @@ struct register_accessor {
 //    struct regmap *regmap;
 
     /* MMIO fields */
-//    void __iomem *base;
+    bool mmio_support;
     /* indicate if the read/write needs memory barrier */
     bool mb;
     /* some devices have registers only available from an offset to the base

@@ -1699,7 +1699,7 @@ static struct register_accessor omap_i2c_regacc = {
     .reg_val_bits = 16,
 
     /* MMIO specific information */
-    .regmap_support = false,
+    .mmio_support = true,
     .mb = false,
     .reg_offset = 0,
 };

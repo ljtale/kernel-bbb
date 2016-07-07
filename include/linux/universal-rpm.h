@@ -88,7 +88,7 @@ struct rpm_node {
     }; \
     static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_READ, \
-        .op_args = &reg_node_##name, \
+        .op_args = (u32 *)&reg_node_##name, \
     };
 
 #define RPM_REG_WRITE_NODE(name, addr, value); \
@@ -98,7 +98,7 @@ struct rpm_node {
     }; \
     static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_WRITE, \
-        .op_args = &reg_node_##name, \
+        .op_args = (u32 *)&reg_node_##name, \
     };
 
 #define RPM_PIN_STATE_SELECT_NODE(name, state); \

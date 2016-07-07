@@ -210,6 +210,7 @@ static void omap_aes_dma_out_callback(void *data)
 	tasklet_schedule(&dd->done_task);
 }
 
+#if 0
 static int omap_aes_dma_init(struct omap_aes_dev *dd)
 {
 	int err;
@@ -245,6 +246,7 @@ err_dma_out:
 
 	return err;
 }
+#endif
 
 static void omap_aes_dma_cleanup(struct omap_aes_dev *dd)
 {
@@ -1092,7 +1094,8 @@ static int omap_aes_probe(struct platform_device *pdev)
 	struct omap_aes_dev *dd;
 	struct crypto_alg *algp;
 	struct resource res;
-	int err = -ENOMEM, i, j, irq = -1;
+	int err = -ENOMEM, i, j;
+//    int irq = -1;
 	u32 reg;
 
     /* ljtale starts */
@@ -1207,7 +1210,7 @@ err_algs:
 					&dd->pdata->algs_info[i].algs_list[j]);
 
 	omap_aes_dma_cleanup(dd);
-err_irq:
+// err_irq:
 	tasklet_kill(&dd->done_task);
 	tasklet_kill(&dd->queue_task);
 	pm_runtime_disable(dev);

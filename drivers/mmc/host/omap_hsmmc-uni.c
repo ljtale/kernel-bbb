@@ -2525,13 +2525,13 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	struct omap_hsmmc_platform_data *pdata = pdev->dev.platform_data;
 	struct mmc_host *mmc;
 	struct omap_hsmmc_host *host = NULL;
-	struct resource *res;
+//	struct resource *res;
 	int ret, irq, len;
 	const struct of_device_id *match;
-	dma_cap_mask_t mask;
-	unsigned tx_req, rx_req;
+//	dma_cap_mask_t mask;
+//	unsigned tx_req, rx_req;
 	const struct omap_mmc_of_data *data;
-	void __iomem *base;
+//	void __iomem *base;
 
     /* ljtale starts */
     struct universal_device *uni_dev;
@@ -3009,7 +3009,7 @@ static struct register_accessor omap_hsmmc_regacc = {
     .reg_val_bits = 32,
 
     /* MMIO specs */
-    .regmap_support = false,
+    .mmio_support = true,
     .mb = false,
     .reg_offset = 0x100,
 };

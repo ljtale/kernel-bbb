@@ -70,7 +70,11 @@ EXPORT_SYMBOL_GPL(tps65217_reg_read);
 /* ljtale starts */
 int tps65217_reg_read(struct device *dev, unsigned int reg,
         unsigned int *val) {
-    return universal_reg_read(dev, reg, val);
+    struct universal_device *uni_dev;
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev)
+            return -EINVAL;
+    return universal_reg_read(uni_dev, reg, val);
 }
 EXPORT_SYMBOL_GPL(tps65217_reg_read);
 
@@ -127,29 +131,33 @@ int tps65217_reg_write(struct device *dev, unsigned int reg,
 {
 	int ret;
 	unsigned int xor_reg_val;
+    struct universal_device *uni_dev;
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev)
+        return -EINVAL;
 
 	switch (level) {
 	case TPS65217_PROTECT_NONE:
-        return universal_reg_write(dev, reg, val);
+        return universal_reg_write(uni_dev, reg, val);
 	case TPS65217_PROTECT_L1:
 		xor_reg_val = reg ^ TPS65217_PASSWORD_REGS_UNLOCK;
-        ret = universal_reg_write(dev, TPS65217_REG_PASSWORD, xor_reg_val);
+        ret = universal_reg_write(uni_dev, TPS65217_REG_PASSWORD, xor_reg_val);
 		if (ret < 0)
 			return ret;
 
-        ret = universal_reg_write(dev, reg, val);
+        ret = universal_reg_write(uni_dev, reg, val);
 	case TPS65217_PROTECT_L2:
 		xor_reg_val = reg ^ TPS65217_PASSWORD_REGS_UNLOCK;
-        ret = universal_reg_write(dev, TPS65217_REG_PASSWORD, xor_reg_val);
+        ret = universal_reg_write(uni_dev, TPS65217_REG_PASSWORD, xor_reg_val);
 		if (ret < 0)
 			return ret;
-        ret = universal_reg_write(dev, reg, val);
+        ret = universal_reg_write(uni_dev, reg, val);
 		if (ret < 0)
 			return ret;
-        ret = universal_reg_write(dev, TPS65217_REG_PASSWORD, xor_reg_val);
+        ret = universal_reg_write(uni_dev, TPS65217_REG_PASSWORD, xor_reg_val);
 		if (ret < 0)
 			return ret;
-        return universal_reg_write(dev, reg, val);
+        return universal_reg_write(uni_dev, reg, val);
 	default:
 		return -EINVAL;
 	}

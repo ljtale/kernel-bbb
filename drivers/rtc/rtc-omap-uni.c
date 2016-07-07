@@ -694,11 +694,11 @@ static int omap_rtc_probe(struct platform_device *pdev)
 	 * NOTE: ALARM2 is not cleared on AM3352 if rtc_write (writeb) is used
 	 */
 	// rtc_writel(rtc, OMAP_RTC_INTERRUPTS_REG, 0);
-    universal_mmio_reg_write(uni_dev, OMAP_RTC_INTERRUPTS_REG, 0);
+    universal_reg_write(uni_dev, OMAP_RTC_INTERRUPTS_REG, 0);
 
 	/* clear old status */
 	// reg = rtc_read(rtc, OMAP_RTC_STATUS_REG);
-    universal_mmio_reg_read(uni_dev, OMAP_RTC_STATUS_REG, &reg);
+    universal_reg_read(uni_dev, OMAP_RTC_STATUS_REG, &reg);
 
 	mask = OMAP_RTC_STATUS_ALARM;
 
@@ -914,8 +914,9 @@ static struct register_accessor omap_rtc_regacc = {
     .reg_val_bits = 32,
 
     /* MMIO specific information */
-    .regmap_support = false,
+    .mmio_support = true,
     .mb = true,
+    .reg_offset = 0,
 };
 
 static struct irq_config omap_rtc_config[] = {
