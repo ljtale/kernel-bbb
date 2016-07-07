@@ -112,6 +112,7 @@ struct rpm_node {
 
 #define RPM_NODE_NAME(name) rpm_node_##name
 #define RPM_REG_NODE_NAME(name) reg_node_##name
+
 enum rpm_condition_type {
     RPM_CONDITION_NONE,
     RPM_CONDITION_SIMPLE,
@@ -124,18 +125,15 @@ enum rpm_condition_type {
     RPM_CONDITION_OR,
 };
 
-struct rpm_condition_value {
-    unsigned value;
-};
 struct rpm_condition_op {
     enum rpm_condition_type type;
-    /* for simple condition type, only left if valid */
+    /* for simple condition type, only left if valid, right is ignored */
     union {
-        struct rpm_condition_value left_value;
+        u32 *left_value;
         struct rpm_condition_op *left_op;
     };
     union {
-        struct rpm_condition_value right_value;
+        u32 *right_value;
         struct rpm_condition_op *right_op;
     };
 };
@@ -146,18 +144,19 @@ struct rpm_condition_node {
     struct rpm_node *false_path;
 };
 
-#define RPM_CONDITION_OP(name, type); \
+#define RPM_CONDITION_OP(name, con_type); \
     static struct rpm_condition_op rpm_con_op_##name = { \
-        .type = type, \
+        .type = con_type, \
     };
 
 #define RPM_CONDITION_OP_NAME(name) rpm_con_op_##name
+#define RPM_CONDITION_NODE_NAME(name) rpm_condition_##name
 
 #define RPM_CONDITION_NODE(name, op_name); \
     static struct rpm_condition_node rpm_condition_##name = { \
         .op = &rpm_con_op_##op_name, \
     };  \
-    static struct rpm_noe rpm_node_##name = { \
+    static struct rpm_node rpm_node_##name = { \
        .op = RPM_CONDITION, \
        .op_args = &rpm_condition_##name, \
     };
@@ -170,8 +169,8 @@ struct rpm_condition_node {
 #define RPM_CONDITION_CONTROL(condition_node, true_node, false_node) \
     do { \
         struct rpm_condition_node *node = &rpm_node_##condition_node; \
-        node->true_path = &rpm_node_##true_node; \
-        node->false_path = &rpm_node_##false_node; \
+        node->true_path = &RPM_NODE_NAME(true_node); \
+        node->false_path = &RPM_NODE_NAME(false_node); \
     } while(0)
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */
