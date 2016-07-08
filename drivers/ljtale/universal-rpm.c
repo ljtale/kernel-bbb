@@ -161,6 +161,6 @@ int universal_runtime_resume(struct device *dev) {
         return 0;
     }
     LJTALE_LEVEL_DEBUG(3, "universal rpm resume...%s\n", uni_dev->name);
-    return universal_rpm_process_graph(uni_dev, uni_dev->rpm_suspend_graph);
+    return universal_rpm_process_graph(uni_dev, uni_dev->rpm_resume_graph);
 }
 

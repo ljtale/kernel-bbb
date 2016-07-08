@@ -238,6 +238,13 @@ int __universal_drv_probe(struct universal_device *dev) {
                 goto dma_config_err;
         }
     }
+
+    /* rpm graph building should be before any call to the runtime framework */
+    if (drv->rpm_graph_build)
+        drv->rpm_graph_build(dev);
+
+    /* TODO: runtime pm configuration and clock configuration */
+
     /* ... */
     /* do a local probe */
     if (drv->local_probe) {
@@ -257,9 +264,6 @@ int __universal_drv_probe(struct universal_device *dev) {
                 goto irq_config_err;
         }
     }
-
-    if (drv->rpm_graph_build)
-        drv->rpm_graph_build(dev);
 
     LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
