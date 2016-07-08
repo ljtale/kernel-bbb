@@ -92,8 +92,7 @@ static inline struct rpm_node *rpm_condition(struct universal_device *uni_dev,
         condition_path = con_node->true_path;
     else
         condition_path = con_node->false_path;
-    /* there must be a path after the condition node */
-    BUG_ON(!condition_path);
+    /* condition_path could terminate the graph process if its last and NULL*/
     return condition_path;
 }
 
@@ -149,6 +148,9 @@ int universal_runtime_suspend(struct device *dev) {
         return 0;
     }
     LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
+    if (uni_dev->drv->rpm_populate_suspend_graph)
+        uni_dev->drv->rpm_populate_suspend_graph(uni_dev);
+    /* Or the suspend graph is not populated or does not need to be */
     return universal_rpm_process_graph(uni_dev, uni_dev->rpm_suspend_graph);
 }
 
@@ -161,6 +163,8 @@ int universal_runtime_resume(struct device *dev) {
         return 0;
     }
     LJTALE_LEVEL_DEBUG(3, "universal rpm resume...%s\n", uni_dev->name);
+    if (uni_dev->drv->rpm_populate_resume_graph)
+        uni_dev->drv->rpm_populate_resume_graph(uni_dev);
     return universal_rpm_process_graph(uni_dev, uni_dev->rpm_resume_graph);
 }
 

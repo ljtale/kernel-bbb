@@ -1387,6 +1387,8 @@ omap_i2c_probe(struct platform_device *pdev)
             sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
     if (!omap_i2c_rpm_reg_values)
         return -ENOMEM;
+    else
+        uni_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
     /* ljtale ends */
 
 #if 0
@@ -1533,7 +1535,6 @@ omap_i2c_probe(struct platform_device *pdev)
     omap_i2c_rpm_reg_values->scllstate = dev->scllstate;
     omap_i2c_rpm_reg_values->sclhstate = dev->sclhstate;
 
-    uni_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
     /* ljtale ends */
 
 #if 0
@@ -1696,7 +1697,11 @@ static struct platform_driver omap_i2c_driver = {
 
 /* ljtale starts */
 
-extern void omap_i2c_rpm_graph_build(struct universal_device *uni_dev);
+extern void omap_i2c_rpm_graph_build(void);
+extern void omap_i2c_rpm_populate_suspend_graph(
+        struct universal_device *uni_dev);
+extern void omap_i2c_rpm_populate_resume_graph(
+        struct universal_device *uni_dev);
 
 static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
     struct platform_device *pdev;
@@ -1743,7 +1748,8 @@ static struct universal_driver omap_i2c_universal_driver = {
     .regacc = &omap_i2c_regacc,
     .irq_config_num = &omap_i2c_irq_config_num,
     .local_probe = omap_i2c_universal_local_probe,
-    .rpm_graph_build = omap_i2c_rpm_graph_build,
+    .rpm_populate_suspend_graph = omap_i2c_rpm_populate_suspend_graph,
+    .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
 };
 
 static int __init universal_omap_i2c_init(void)
@@ -1764,6 +1770,7 @@ arch_initcall(universal_omap_i2c_init);
 static int __init
 omap_i2c_init_driver(void)
 {
+    omap_i2c_rpm_graph_build();
     return platform_driver_register(&omap_i2c_driver);
 }
 subsys_initcall(omap_i2c_init_driver);

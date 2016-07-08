@@ -235,7 +235,9 @@ struct universal_driver {
     int (*local_probe)(struct universal_device *dev);
 
     /* power management operations */
-    void (*rpm_graph_build)(struct universal_device *uni_dev);
+    /* TODO: wrap them into a separate data structure */
+    void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
+    void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;

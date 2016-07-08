@@ -51,39 +51,19 @@ RPM_CONDITION_NODE(if_iestate, ie_check);
 
 RPM_REG_WRITE_NODE(ie_reg_2, OMAP_I2C_V2_IE_REG, NULL);
 
-
 /* This function that is called in the conventional driver init.
- * It builds the suspend/resume graph */
-
-void omap_i2c_rpm_graph_build(struct universal_device *uni_dev) {
-    /* FIXME: reg values should replace intermediate reg values in the
-     * device state constainer, i.e., the device-specific date */
-    struct omap_i2c_rpm_reg_value *reg_values = uni_dev->rpm_data_dev;
-    BUG_ON(!reg_values);
-    LJTALE_LEVEL_DEBUG(3, "build rpm graph for: %s\n", uni_dev->name);
-    /* omap i2c suspend graph */
-    /* fill reg value dependencies */
-    RPM_REG_NODE_NAME(ie_reg_1).reg_value = (u32 *)&reg_values->iestate;
-    RPM_REG_NODE_NAME(stat_reg_1).reg_value = (u32 *)&reg_values->iestate;
-    /* set up the control flow */
-    uni_dev->rpm_suspend_graph = &RPM_NODE_NAME(ie_reg_1);
+ * It builds the suspend/resume graph, graph is the same across different
+ * devices of the same type, thus on device argument is taken */
+void omap_i2c_rpm_graph_build(void) {
+    LJTALE_LEVEL_DEBUG(3, "build rpm graph for: %s\n", __func__);
+    /* set up the suspend control flow */
     RPM_NODE_CONTROL(ie_reg_1, irqenable_clr);
     RPM_NODE_CONTROL(irqenable_clr, stat_reg_1);
     RPM_NODE_CONTROL(stat_reg_1, stat_reg_2);
     RPM_NODE_CONTROL(stat_reg_2, sleep_state);
     RPM_NODE_NAME(sleep_state).next = NULL;
 
-    /* TODO: omap i2c resume graph */
-    /* fill reg value dependencies */
-    RPM_REG_NODE_NAME(psc_reg_1).reg_value = (u32 *)&reg_values->pscstate;
-    RPM_REG_NODE_NAME(scll_reg_1).reg_value = (u32 *)&reg_values->scllstate;
-    RPM_REG_NODE_NAME(sclh_reg_1).reg_value = (u32 *)&reg_values->sclhstate;
-    RPM_REG_NODE_NAME(we_reg_1).reg_value = (u32 *)&reg_values->westate;
-    RPM_CONDITION_OP_NAME(ie_check).left_value = (u32 *)&reg_values->iestate;
-    RPM_CONDITION_OP_NAME(ie_check).is_left_value = true;
-    RPM_REG_NODE_NAME(ie_reg_2).reg_value = (u32 *)&reg_values->iestate;
-    /* set up the control flow */
-    uni_dev->rpm_resume_graph = &RPM_NODE_NAME(default_state);
+    /* set up the resume control flow */
     RPM_NODE_CONTROL(default_state, con_reg_1);
     RPM_NODE_CONTROL(con_reg_1, psc_reg_1);
     RPM_NODE_CONTROL(psc_reg_1, scll_reg_1);
@@ -96,3 +76,32 @@ void omap_i2c_rpm_graph_build(struct universal_device *uni_dev) {
     RPM_NODE_NAME(ie_reg_2).next = NULL;
 }
 EXPORT_SYMBOL(omap_i2c_rpm_graph_build);
+
+/* called every time before doing runtime power managment */
+void omap_i2c_rpm_populate_suspend_graph(struct universal_device *uni_dev) {
+    /* FIXME: reg values should replace intermediate reg values in the
+     * device state constainer, i.e., the device-specific date */
+    struct omap_i2c_rpm_reg_value *reg_values = uni_dev->rpm_data_dev;
+    BUG_ON(!reg_values);
+    /* fill reg value dependencies */
+    RPM_REG_NODE_NAME(ie_reg_1).reg_value = (u32 *)&reg_values->iestate;
+    RPM_REG_NODE_NAME(stat_reg_1).reg_value = (u32 *)&reg_values->iestate;
+    uni_dev->rpm_suspend_graph = &RPM_NODE_NAME(ie_reg_1);
+}
+EXPORT_SYMBOL(omap_i2c_rpm_populate_suspend_graph);
+
+void omap_i2c_rpm_populate_resume_graph(struct universal_device *uni_dev) {
+    struct omap_i2c_rpm_reg_value *reg_values = uni_dev->rpm_data_dev;
+    BUG_ON(!reg_values);
+    /* fill reg value dependencies */
+    RPM_REG_NODE_NAME(psc_reg_1).reg_value = (u32 *)&reg_values->pscstate;
+    RPM_REG_NODE_NAME(scll_reg_1).reg_value = (u32 *)&reg_values->scllstate;
+    RPM_REG_NODE_NAME(sclh_reg_1).reg_value = (u32 *)&reg_values->sclhstate;
+    RPM_REG_NODE_NAME(we_reg_1).reg_value = (u32 *)&reg_values->westate;
+    RPM_CONDITION_OP_NAME(ie_check).left_value = (u32 *)&reg_values->iestate;
+    RPM_CONDITION_OP_NAME(ie_check).is_left_value = true;
+    RPM_REG_NODE_NAME(ie_reg_2).reg_value = (u32 *)&reg_values->iestate;
+    uni_dev->rpm_resume_graph = &RPM_NODE_NAME(default_state);
+}
+EXPORT_SYMBOL(omap_i2c_rpm_populate_resume_graph);
+

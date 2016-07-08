@@ -239,10 +239,6 @@ int __universal_drv_probe(struct universal_device *dev) {
         }
     }
 
-    /* rpm graph building should be before any call to the runtime framework */
-    if (drv->rpm_graph_build)
-        drv->rpm_graph_build(dev);
-
     /* TODO: runtime pm configuration and clock configuration */
 
     /* ... */
