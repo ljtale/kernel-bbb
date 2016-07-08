@@ -41,7 +41,7 @@ enum rpm_op {
 enum rpm_pinctrl_state {
     RPM_PINCTRL_DEFAULT,
     RPM_PINCTRL_SLEEP,
-    RPM_PINCTRL_IDEL,
+    RPM_PINCTRL_IDLE,
 };
 
 /* start and stop nodes could be only dummy nodes */
@@ -84,21 +84,21 @@ struct rpm_node {
 #define RPM_REG_READ_NODE(name, addr, value); \
     static struct rpm_reg_node reg_node_##name = { \
         .reg_addr = addr,   \
-        .reg_value = value, \
+        .reg_value = (u32 *)value, \
     }; \
     static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_READ, \
-        .op_args = (u32 *)&reg_node_##name, \
+        .op_args = &reg_node_##name, \
     };
 
 #define RPM_REG_WRITE_NODE(name, addr, value); \
     static struct rpm_reg_node reg_node_##name = { \
         .reg_addr = addr,   \
-        .reg_value = value, \
+        .reg_value = (u32 *)value, \
     }; \
     static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_WRITE, \
-        .op_args = (u32 *)&reg_node_##name, \
+        .op_args = &reg_node_##name, \
     };
 
 #define RPM_PIN_STATE_SELECT_NODE(name, state); \
@@ -114,10 +114,11 @@ struct rpm_node {
 #define RPM_REG_NODE_NAME(name) reg_node_##name
 
 enum rpm_condition_type {
-    RPM_CONDITION_NONE,
     RPM_CONDITION_SIMPLE,
     RPM_CONDITION_LT,
     RPM_CONDITION_GT,
+    RPM_CONDITION_LTEQ,
+    RPM_CONDITION_GTEQ,
     RPM_CONDITION_EQ,
     RPM_CONDITION_BIT_AND,
     RPM_CONDITION_BIT_OR,
@@ -128,10 +129,12 @@ enum rpm_condition_type {
 struct rpm_condition_op {
     enum rpm_condition_type type;
     /* for simple condition type, only left if valid, right is ignored */
+    bool is_left_value;
     union {
         u32 *left_value;
         struct rpm_condition_op *left_op;
     };
+    bool is_right_value;
     union {
         u32 *right_value;
         struct rpm_condition_op *right_op;

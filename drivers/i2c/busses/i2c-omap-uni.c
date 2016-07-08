@@ -41,7 +41,6 @@
 #include <linux/pinctrl/consumer.h>
 
 /* ljtale */
-#include <linux/universal-drv.h>
 #include <linux/universal-utils.h>
 
 /* I2C controller revisions */
@@ -1610,6 +1609,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
+#if 0
 static int omap_i2c_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1661,11 +1661,20 @@ static int omap_i2c_runtime_resume(struct device *dev)
 
 	return 0;
 }
+#endif
+
+static int omap_i2c_runtime_suspend(struct device *dev) {
+    return universal_runtime_suspend(dev);
+}
+static int omap_i2c_runtime_resume(struct device *dev) {
+    return universal_runtime_resume(dev);
+}
 
 static struct dev_pm_ops omap_i2c_pm_ops = {
 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
 			   omap_i2c_runtime_resume, NULL)
 };
+
 #define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
 #else
 #define OMAP_I2C_PM_OPS NULL

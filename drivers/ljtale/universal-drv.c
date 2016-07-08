@@ -269,7 +269,6 @@ regacc_err:
 dma_config_err:
 local_probe_err:
 irq_config_err:
-err:
     return ret;
 }
 EXPORT_SYMBOL(__universal_drv_probe);
