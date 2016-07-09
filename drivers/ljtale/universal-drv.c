@@ -66,6 +66,11 @@ int __universal_drv_register(struct universal_driver *drv) {
             }
     }
     /* if there is no match for this universal driver, fine, just exit */
+    /* power management setup */
+    spin_lock_init(&drv->rpm_graph_lock);
+    if (drv->rpm_graph_build)
+        drv->rpm_graph_build();
+
     return 0;
 }
 EXPORT_SYMBOL(__universal_drv_register);

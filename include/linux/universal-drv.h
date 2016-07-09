@@ -236,6 +236,9 @@ struct universal_driver {
 
     /* power management operations */
     /* TODO: wrap them into a separate data structure */
+    /**/
+    spinlock_t rpm_graph_lock;
+    void (*rpm_graph_build)(void);
     void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
     void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
 

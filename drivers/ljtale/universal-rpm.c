@@ -141,6 +141,8 @@ int universal_rpm_process_graph(struct universal_device *uni_dev,
 
 int universal_runtime_suspend(struct device *dev) {
     struct universal_device *uni_dev;
+    unsigned long flags;
+    int ret;
     /* first find universal device */
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
@@ -148,14 +150,19 @@ int universal_runtime_suspend(struct device *dev) {
         return 0;
     }
     LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
+    spin_lock_irqsave(&uni_dev->drv->rpm_graph_lock, flags);
     if (uni_dev->drv->rpm_populate_suspend_graph)
         uni_dev->drv->rpm_populate_suspend_graph(uni_dev);
     /* Or the suspend graph is not populated or does not need to be */
-    return universal_rpm_process_graph(uni_dev, uni_dev->rpm_suspend_graph);
+    ret = universal_rpm_process_graph(uni_dev, uni_dev->rpm_suspend_graph);
+    spin_unlock_irqrestore(&uni_dev->drv->rpm_graph_lock, flags);
+    return ret;
 }
 
 int universal_runtime_resume(struct device *dev) {
     struct universal_device *uni_dev;
+    unsigned long flags;
+    int ret;
     /* first find universal device */
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
@@ -163,8 +170,11 @@ int universal_runtime_resume(struct device *dev) {
         return 0;
     }
     LJTALE_LEVEL_DEBUG(3, "universal rpm resume...%s\n", uni_dev->name);
+    spin_lock_irqsave(&uni_dev->drv->rpm_graph_lock, flags);
     if (uni_dev->drv->rpm_populate_resume_graph)
         uni_dev->drv->rpm_populate_resume_graph(uni_dev);
-    return universal_rpm_process_graph(uni_dev, uni_dev->rpm_resume_graph);
+    ret = universal_rpm_process_graph(uni_dev, uni_dev->rpm_resume_graph);
+    spin_unlock_irqrestore(&uni_dev->drv->rpm_graph_lock, flags);
+    return ret;
 }
 

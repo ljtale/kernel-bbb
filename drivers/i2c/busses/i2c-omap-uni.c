@@ -1750,6 +1750,7 @@ static struct universal_driver omap_i2c_universal_driver = {
     .local_probe = omap_i2c_universal_local_probe,
     .rpm_populate_suspend_graph = omap_i2c_rpm_populate_suspend_graph,
     .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
+    .rpm_graph_build = omap_i2c_rpm_graph_build,
 };
 
 static int __init universal_omap_i2c_init(void)
@@ -1770,7 +1771,6 @@ arch_initcall(universal_omap_i2c_init);
 static int __init
 omap_i2c_init_driver(void)
 {
-    omap_i2c_rpm_graph_build();
     return platform_driver_register(&omap_i2c_driver);
 }
 subsys_initcall(omap_i2c_init_driver);
