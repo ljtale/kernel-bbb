@@ -91,6 +91,33 @@ struct rpm_node {
         .op_args = &reg_node_##name, \
     };
 
+#define RPM_DECLARE_REG_NODE(name); \
+    struct rpm_reg_node *reg_node_##name; \
+    struct rpm_node *rpm_node_##name;
+
+#define RPM_ALLOCATE_REG_NODE(dev, reg_type, name, addr, value)  \
+    do {                                                            \
+        reg_node_##name = devm_kzalloc(dev,    \
+                sizeof(struct rpm_reg_node), GFP_KERNEL);           \
+        if (!reg_node_##name) {                                     \
+            reg_node_##name->reg_addr = addr;                           \
+            reg_node_##name->reg_value = (u32 *)value;                  \
+        } else                                                        \
+            BUG_ON(1); \
+        rpm_node_##name = devm_kzalloc(dev,        \
+               sizeof(struct rpm_node), GFP_KERNEL);                \
+       if (!rpm_node_##name) {                                      \
+           if (reg_type == RPM_REG_READ) \
+               rpm_node_##name->op = RPM_REG_READ;                  \
+           else if (reg_type == RPM_REG_WRITE) \
+               rpm_node_##name->op = RPM_REG_WRITE; \
+           else     \
+                BUG_ON(1); \
+           rpm_node_##name->op_args = reg_node_##name;              \
+       } else                                                       \
+           BUG_ON(1);                                               \
+    } while(0)
+
 #define RPM_REG_WRITE_NODE(name, addr, value); \
     static struct rpm_reg_node reg_node_##name = { \
         .reg_addr = addr,   \
@@ -100,6 +127,28 @@ struct rpm_node {
         .op = RPM_REG_WRITE, \
         .op_args = &reg_node_##name, \
     };
+
+#define RPM_DECLARE_PIN_STATE_SELECT_NODE(name); \
+    struct rpm_pinctrl_node *rpm_pinctrl_##name; \
+    struct rpm_node *rpm_node_##name;
+
+#define RPM_ALLOCATE_PIN_STATE_SELECT_NODE(dev, name, state)  \
+    do {                                                            \
+        rpm_pinctrl_##name = devm_kzalloc(dev,    \
+                sizeof(struct rpm_pinctrl_node), GFP_KERNEL);           \
+        if (!rpm_pinctrl_##name)                                     \
+            rpm_pinctrl_##name->pinctrl_state = state;                  \
+        else  \
+            BUG_ON(1); \
+        rpm_node_##name = devm_kzalloc(dev,        \
+               sizeof(struct rpm_node), GFP_KERNEL);                \
+       if (!rpm_node_##name) {                                      \
+           rpm_node_##name->op = RPM_PIN_STATE_SELECT;  \
+           rpm_node_##name->op_args = rpm_pinctrl_##name;              \
+       } else                                                       \
+           BUG_ON(1);                                               \
+    } while(0)
+
 
 #define RPM_PIN_STATE_SELECT_NODE(name, state); \
     static struct rpm_pinctrl_node rpm_pinctrl_##name = { \
@@ -147,6 +196,7 @@ struct rpm_condition_node {
     struct rpm_node *false_path;
 };
 
+
 #define RPM_CONDITION_OP(name, con_type); \
     static struct rpm_condition_op rpm_con_op_##name = { \
         .type = con_type, \
@@ -164,16 +214,60 @@ struct rpm_condition_node {
        .op_args = &rpm_condition_##name, \
     };
 
+
+#define RPM_DECLARE_CONDITION_OP(name); \
+    struct rpm_condition_op *rpm_con_op_##name;
+
+#define RPM_ALLOCATE_CONDITION_OP(dev, name, con_type)  \
+do {                                                            \
+    rpm_con_op_##name = devm_kzalloc(dev,    \
+            sizeof(struct rpm_condition_op), GFP_KERNEL);           \
+    if (!rpm_con_op_##name)                                     \
+        rpm_con_op_##name->type = con_type;                  \
+    else  \
+        BUG_ON(1); \
+} while(0)
+
+#define RPM_DECLARE_CONDITION_NODE(name); \
+    struct rpm_condition_node *rpm_condition_##name; \
+    struct rpm_node *rpm_node_##name;
+
+#define RPM_ALLOCATE_CONDITION_NODE(dev, name, op_name)  \
+do {                                                            \
+    rpm_condition_##name = devm_kzalloc(dev,    \
+            sizeof(struct rpm_condition_node), GFP_KERNEL);           \
+    if (!rpm_condition_##name)                                     \
+        rpm_condition_##name->op = rpm_con_op_##op_name;                  \
+    else  \
+        BUG_ON(1); \
+    rpm_node_##name = devm_kzalloc(dev,        \
+           sizeof(struct rpm_node), GFP_KERNEL);                \
+   if (!rpm_node_##name) {                                      \
+       rpm_node_##name->op = RPM_CONDITION;  \
+       rpm_node_##name->op_args = rpm_condition_##name;              \
+   } else                                                       \
+       BUG_ON(1);                                               \
+} while(0)
+
+
+
 #define RPM_NODE_CONTROL(name1, name2) \
     do { \
-        rpm_node_##name1.next = &rpm_node_##name2; \
+        rpm_node_##name1->next = rpm_node_##name2; \
     } while (0)
+
+/* the following macros are used only when all the arguments are valid */
+#define RPM_CONDITION_OP_CONTROL(op_name, left, right) \
+    do { \
+        rpm_con_op_##op_name->left_op = rpm_con_op_left; \
+        rpm_con_op_##op_name->right_op = rpm_con_op_right; \
+    } while(0)
 
 #define RPM_CONDITION_CONTROL(condition_node, true_node, false_node) \
     do { \
-        struct rpm_condition_node *node = &rpm_node_##condition_node; \
-        node->true_path = &RPM_NODE_NAME(true_node); \
-        node->false_path = &RPM_NODE_NAME(false_node); \
+        struct rpm_condition_node *node = rpm_node_##condition_node; \
+        node->true_path = RPM_NODE_NAME(true_node); \
+        node->false_path = RPM_NODE_NAME(false_node); \
     } while(0)
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */
