@@ -26,6 +26,7 @@ struct universal_pm_ops {
 
 /* operation type of each step of runtime pm doing */
 enum rpm_op {
+    RPM_NONE = 0,
     RPM_START,
     RPM_STOP,
     RPM_REG_WRITE,
@@ -95,28 +96,42 @@ struct rpm_node {
     struct rpm_reg_node *reg_node_##name; \
     struct rpm_node *rpm_node_##name;
 
-#define RPM_ALLOCATE_REG_NODE(dev, reg_type, name, addr, value)  \
+#define RPM_ALLOCATE_REG_READ_NODE(dev, name, addr, value)  \
     do {                                                            \
         reg_node_##name = devm_kzalloc(dev,    \
                 sizeof(struct rpm_reg_node), GFP_KERNEL);           \
-        if (!reg_node_##name) {                                     \
+        if (reg_node_##name) {                                     \
             reg_node_##name->reg_addr = addr;                           \
             reg_node_##name->reg_value = (u32 *)value;                  \
         } else                                                        \
             BUG_ON(1); \
         rpm_node_##name = devm_kzalloc(dev,        \
                sizeof(struct rpm_node), GFP_KERNEL);                \
-       if (!rpm_node_##name) {                                      \
-           if (reg_type == RPM_REG_READ) \
-               rpm_node_##name->op = RPM_REG_READ;                  \
-           else if (reg_type == RPM_REG_WRITE) \
-               rpm_node_##name->op = RPM_REG_WRITE; \
-           else     \
-                BUG_ON(1); \
+       if (rpm_node_##name) {                                      \
+           rpm_node_##name->op = RPM_REG_READ;                  \
            rpm_node_##name->op_args = reg_node_##name;              \
        } else                                                       \
            BUG_ON(1);                                               \
     } while(0)
+
+#define RPM_ALLOCATE_REG_WRITE_NODE(dev, name, addr, value)  \
+    do {                                                            \
+        reg_node_##name = devm_kzalloc(dev,    \
+                sizeof(struct rpm_reg_node), GFP_KERNEL);           \
+        if (reg_node_##name) {                                     \
+            reg_node_##name->reg_addr = addr;                           \
+            reg_node_##name->reg_value = (u32 *)value;                  \
+        } else                                                        \
+            BUG_ON(1); \
+        rpm_node_##name = devm_kzalloc(dev,        \
+               sizeof(struct rpm_node), GFP_KERNEL);                \
+       if (rpm_node_##name) {                                      \
+           rpm_node_##name->op = RPM_REG_WRITE;                     \
+           rpm_node_##name->op_args = reg_node_##name;              \
+       } else                                                       \
+           BUG_ON(1);                                               \
+    } while(0)
+
 
 #define RPM_REG_WRITE_NODE(name, addr, value); \
     static struct rpm_reg_node reg_node_##name = { \
@@ -136,13 +151,13 @@ struct rpm_node {
     do {                                                            \
         rpm_pinctrl_##name = devm_kzalloc(dev,    \
                 sizeof(struct rpm_pinctrl_node), GFP_KERNEL);           \
-        if (!rpm_pinctrl_##name)                                     \
+        if (rpm_pinctrl_##name)                                     \
             rpm_pinctrl_##name->pinctrl_state = state;                  \
         else  \
             BUG_ON(1); \
         rpm_node_##name = devm_kzalloc(dev,        \
                sizeof(struct rpm_node), GFP_KERNEL);                \
-       if (!rpm_node_##name) {                                      \
+       if (rpm_node_##name) {                                      \
            rpm_node_##name->op = RPM_PIN_STATE_SELECT;  \
            rpm_node_##name->op_args = rpm_pinctrl_##name;              \
        } else                                                       \
@@ -222,7 +237,7 @@ struct rpm_condition_node {
 do {                                                            \
     rpm_con_op_##name = devm_kzalloc(dev,    \
             sizeof(struct rpm_condition_op), GFP_KERNEL);           \
-    if (!rpm_con_op_##name)                                     \
+    if (rpm_con_op_##name)                                     \
         rpm_con_op_##name->type = con_type;                  \
     else  \
         BUG_ON(1); \
@@ -236,13 +251,13 @@ do {                                                            \
 do {                                                            \
     rpm_condition_##name = devm_kzalloc(dev,    \
             sizeof(struct rpm_condition_node), GFP_KERNEL);           \
-    if (!rpm_condition_##name)                                     \
+    if (rpm_condition_##name)                                     \
         rpm_condition_##name->op = rpm_con_op_##op_name;                  \
     else  \
         BUG_ON(1); \
     rpm_node_##name = devm_kzalloc(dev,        \
            sizeof(struct rpm_node), GFP_KERNEL);                \
-   if (!rpm_node_##name) {                                      \
+   if (rpm_node_##name) {                                      \
        rpm_node_##name->op = RPM_CONDITION;  \
        rpm_node_##name->op_args = rpm_condition_##name;              \
    } else                                                       \

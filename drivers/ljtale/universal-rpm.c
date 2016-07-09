@@ -92,8 +92,7 @@ static inline struct rpm_node *rpm_condition(struct universal_device *uni_dev,
         condition_path = con_node->true_path;
     else
         condition_path = con_node->false_path;
-    /* there must be a path after the condition node */
-    BUG_ON(!condition_path);
+    /* condition path could be NULL */
     return condition_path;
 }
 
