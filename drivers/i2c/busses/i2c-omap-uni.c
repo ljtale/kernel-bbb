@@ -1383,12 +1383,14 @@ omap_i2c_probe(struct platform_device *pdev)
     }
     regacc_dev = &uni_dev->regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
-    omap_i2c_rpm_reg_values = devm_kzalloc(uni_dev->dev, 
-            sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
-    if (!omap_i2c_rpm_reg_values)
-        return -ENOMEM;
-    else
+    if (!uni_dev->rpm_data_dev) {
+        omap_i2c_rpm_reg_values = devm_kzalloc(uni_dev->dev, 
+                sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
+        if (!omap_i2c_rpm_reg_values)
+            return -ENOMEM;
         uni_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
+    } else 
+        omap_i2c_rpm_reg_values = uni_dev->rpm_data_dev;
     /* ljtale ends */
 
 #if 0

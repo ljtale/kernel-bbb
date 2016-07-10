@@ -55,7 +55,7 @@ RPM_REG_WRITE_NODE(ie_reg_2, OMAP_I2C_V2_IE_REG, NULL);
  * It builds the suspend/resume graph, graph is the same across different
  * devices of the same type, thus on device argument is taken */
 void omap_i2c_rpm_graph_build(void) {
-    LJTALE_LEVEL_DEBUG(3, "build rpm graph for: %s\n", __func__);
+    LJTALE_LEVEL_DEBUG(3, "build rpm graph at: %s\n", __func__);
     /* set up the suspend control flow */
     RPM_NODE_CONTROL(ie_reg_1, irqenable_clr);
     RPM_NODE_CONTROL(irqenable_clr, stat_reg_1);
@@ -82,7 +82,13 @@ void omap_i2c_rpm_populate_suspend_graph(struct universal_device *uni_dev) {
     /* FIXME: reg values should replace intermediate reg values in the
      * device state constainer, i.e., the device-specific date */
     struct omap_i2c_rpm_reg_value *reg_values = uni_dev->rpm_data_dev;
-    BUG_ON(!reg_values);
+    if (!reg_values) {
+        reg_values = devm_kzalloc(uni_dev->dev, 
+                sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
+        if (!reg_values)
+            return;
+        uni_dev->rpm_data_dev = reg_values;
+    }
     /* fill reg value dependencies */
     RPM_REG_NODE_NAME(ie_reg_1).reg_value = (u32 *)&reg_values->iestate;
     RPM_REG_NODE_NAME(stat_reg_1).reg_value = (u32 *)&reg_values->iestate;
@@ -92,6 +98,13 @@ EXPORT_SYMBOL(omap_i2c_rpm_populate_suspend_graph);
 
 void omap_i2c_rpm_populate_resume_graph(struct universal_device *uni_dev) {
     struct omap_i2c_rpm_reg_value *reg_values = uni_dev->rpm_data_dev;
+    if (!reg_values) {
+        reg_values = devm_kzalloc(uni_dev->dev,
+                sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
+        if (!reg_values)
+            return;
+        uni_dev->rpm_data_dev = reg_values;
+    }
     BUG_ON(!reg_values);
     /* fill reg value dependencies */
     RPM_REG_NODE_NAME(psc_reg_1).reg_value = (u32 *)&reg_values->pscstate;
