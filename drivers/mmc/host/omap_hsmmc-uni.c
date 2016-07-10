@@ -1326,7 +1326,8 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
  */
 static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
 {
-	struct omap_hsmmc_host *host = dev_id;
+    struct device *dev = dev_id;
+    struct omap_hsmmc_host *host = dev_get_drvdata(dev);
 	int status;
 
 	status = OMAP_HSMMC_READ(host->base, STAT);
@@ -2573,10 +2574,11 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	if (res == NULL || irq < 0)
 		return -ENXIO;
 
-#endif
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return -ENXIO;
+
+#endif
 #if 0
 	base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(base))
@@ -2599,7 +2601,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	host->dev	= &pdev->dev;
 	host->use_dma	= 1;
 	host->dma_ch	= -1;
-	host->irq	= irq;
+//	host->irq	= irq;
     /* ljtale starts */
 	// host->mapbase	= res->start + pdata->reg_offset;
 	// host->base	= base + pdata->reg_offset;
@@ -2747,12 +2749,12 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     host->rx_chan = dma_config_dev[1].channel;
     /* ljtale ends */
 	/* Request IRQ for MMC operations */
-	ret = devm_request_irq(&pdev->dev, host->irq, omap_hsmmc_irq, 0,
-			mmc_hostname(mmc), host);
-	if (ret) {
-		dev_err(mmc_dev(host->mmc), "Unable to grab HSMMC IRQ\n");
-		goto err_irq;
-	}
+//	ret = devm_request_irq(&pdev->dev, host->irq, omap_hsmmc_irq, 0,
+//			mmc_hostname(mmc), host);
+//	if (ret) {
+//		dev_err(mmc_dev(host->mmc), "Unable to grab HSMMC IRQ\n");
+//		goto err_irq;
+//	}
 
 	if (!mmc_pdata(host)->set_power) {
 		ret = omap_hsmmc_reg_get(host);
@@ -2768,7 +2770,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
 	}
 
-	omap_hsmmc_disable_irq(host);
+//	omap_hsmmc_disable_irq(host);
 
 	/*
 	 * For now, only support SDIO interrupt if we have a separate
@@ -2778,9 +2780,9 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	 * legacy mux platform init code callbacks any longer as we
 	 * are moving to DT based booting anyways.
 	 */
-	ret = omap_hsmmc_configure_wake_irq(host);
-	if (!ret)
-		mmc->caps |= MMC_CAP_SDIO_IRQ;
+//	ret = omap_hsmmc_configure_wake_irq(host);
+//	if (!ret)
+//		mmc->caps |= MMC_CAP_SDIO_IRQ;
 
 	omap_hsmmc_protect_card(host);
 
@@ -3003,6 +3005,21 @@ static int omap_hsmmc_universal_local_probe(struct universal_device *uni_dev) {
     return omap_hsmmc_probe(pdev);
 }
 
+static int omap_hsmmc_post_irq_config_0(struct universal_device *uni_dev) {
+    struct omap_hsmmc_host *host = dev_get_drvdata(uni_dev->dev); 
+    omap_hsmmc_disable_irq(host);
+    return 0;
+}
+
+static int omap_hsmmc_post_irq_config_1(struct universal_device *uni_dev) {
+    struct omap_hsmmc_host *host = dev_get_drvdata(uni_dev->dev);
+    int ret;
+    ret = omap_hsmmc_configure_wake_irq(host);
+    if (!ret)
+        host->mmc->caps |= MMC_CAP_SDIO_IRQ;
+    return 0;
+}
+
 static struct register_accessor omap_hsmmc_regacc = {
     .bus_name = "platform",
     .reg_addr_bits = 32,
@@ -3012,6 +3029,36 @@ static struct register_accessor omap_hsmmc_regacc = {
     .mmio_support = true,
     .mb = false,
     .reg_offset = 0x100,
+};
+
+static struct irq_config omap_hsmmc_irq_config[] = {
+    {
+        .irq_index = 0,
+        .handler = omap_hsmmc_irq,
+        .thread_fn = NULL,
+        .irq_flags = 0,
+        .irq_sharing = false,
+        .platform_irq = true,
+        .defered_probe = true,
+        .get_gpio_irq = false,
+        .post_irq_config = omap_hsmmc_post_irq_config_0,
+    },
+    {
+        .irq_index = 1,
+        .handler = NULL,
+        .thread_fn = NULL,
+        .irq_flags = 0,
+        .irq_sharing = false,
+        .platform_irq = false,
+        .defered_probe = false,
+        .get_gpio_irq = false,
+        .post_irq_config = omap_hsmmc_post_irq_config_1,
+    },
+};
+
+static struct irq_config_num omap_hsmmc_irq_config_num = {
+    .irq_config = omap_hsmmc_irq_config,
+    .irq_num = 2,
 };
 
 static struct dma_config omap_hsmmc_dma_config[] = {
@@ -3038,7 +3085,7 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .name = "omap-hsmmc-universal-driver",
     .driver = &omap_hsmmc_driver.driver,
     .regacc = &omap_hsmmc_regacc,
-    .irq_config_num = NULL,
+    .irq_config_num = &omap_hsmmc_irq_config_num,
     .dma_config_num = &omap_hsmmc_dma_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
 };

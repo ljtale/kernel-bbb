@@ -136,6 +136,10 @@ static int universal_irq_config(struct universal_device *uni_dev,
     LJTALE_LEVEL_DEBUG(2, "device %s gets IRQ: %d\n", 
             uni_dev->name, irq_config->irq);
     /* if the irq is good, config the irq with interrupt handlers */
+    /* if both handler and thread_fn are NULL, then the handler is registered
+     * in the post_irq_config function, just skip irq request */
+    if (!irq_config->handler && !irq_config->thread_fn)
+        goto no_device_handler;
     ret = devm_request_threaded_irq(uni_dev->dev,
             irq_config->irq, irq_config->handler, irq_config->thread_fn,
             irq_config->irq_flags, uni_dev->name, uni_dev->dev);
@@ -144,6 +148,7 @@ static int universal_irq_config(struct universal_device *uni_dev,
                 irq_config->irq);
         return ret;
     }
+no_device_handler:
     /* any post irq configuration things to do */
     if (irq_config->post_irq_config) {
         ret = irq_config->post_irq_config(uni_dev);

@@ -919,7 +919,7 @@ static struct register_accessor omap_rtc_regacc = {
     .reg_offset = 0,
 };
 
-static struct irq_config omap_rtc_config[] = {
+static struct irq_config omap_rtc_irq_config[] = {
     {
         .irq_index = 0,
         .handler = rtc_irq,
@@ -945,8 +945,8 @@ static struct irq_config omap_rtc_config[] = {
 
 };
 
-static struct irq_config_num omap_rtc_config_num = {
-    .irq_config = omap_rtc_config,
+static struct irq_config_num omap_rtc_irq_config_num = {
+    .irq_config = omap_rtc_irq_config,
     .irq_num = 2,
 };
 
@@ -958,7 +958,7 @@ static struct universal_driver omap_rtc_universal_driver = {
     /* FIXME: RTC has two interrupts, a single interrupt structure cannot
      * deal with this situation */
     // .irq_config_num = NULL,
-    .irq_config_num = &omap_rtc_config_num,
+    .irq_config_num = &omap_rtc_irq_config_num,
     .local_probe = omap_rtc_universal_local_probe,
 };
 

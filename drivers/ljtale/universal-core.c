@@ -567,5 +567,5 @@ no_device_node_irq:
              * at present, will add later */
         }
     } 
-    return ret;
+    return 0;
 }
