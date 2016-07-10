@@ -17,6 +17,27 @@
 struct universal_driver;
 struct universal_device;
 
+/* device-specific structs that should be provided by each device */
+struct omap_i2c_rpm_reg_value {
+    u16 iestate;
+    u16 westate;
+    u16 pscstate;
+    u16 scllstate;
+    u16 sclhstate;
+};
+
+struct omap_hsmmc_rpm_reg_values {
+    u32 con;
+    u32 hctl;
+    u32 sysctl;
+    u32 capa;
+    spinlock_t irq_lock;
+    u32 mmc_caps;
+    u32 host_caps;
+    u32 pstate;
+    u32 lock_flags;
+};
+
 struct universal_pm_ops {
     int (*suspend)(struct universal_device *uni_dev);
     int (*resume)(struct universal_device *uni_dev);
@@ -30,11 +51,12 @@ enum rpm_op {
     RPM_STOP,
     RPM_REG_WRITE,
     RPM_REG_READ,
-    RPM_PIN_STATE_SELECT,
+    RPM_PIN_STATE_SELECT, /* could be merged to DEVICE_CALL op */
     RPM_SPIN_LOCK,
     RPM_SPIN_UNLOCK,
     RPM_CONDITION,
     RPM_RETURN,
+    RPM_DEVICE_CALL,
     /* TODO: more rpm ops */
 };
 
@@ -42,6 +64,15 @@ enum rpm_pinctrl_state {
     RPM_PINCTRL_DEFAULT,
     RPM_PINCTRL_SLEEP,
     RPM_PINCTRL_IDLE,
+};
+
+enum rpm_device_call {
+    RPM_MARK_LAST_BUSY,
+#if 0
+    RPM_PINCTRL_DEFAULT,
+    RPM_PINCTRL_SLEEP,
+    RPM_PINCTRL_IDEL,
+#endif 
 };
 
 /* start and stop nodes could be only dummy nodes */
@@ -56,23 +87,21 @@ struct rpm_reg_node {
     u32 *reg_value;
 };
 
-struct rpm_reg_read_node {
-    unsigned int reg_addr;
-    u32 *reg_value;
-};
-
-struct rpm_reg_write_node {
-    unsigned int reg_addr;
-    u32 reg_value;
-};
-
 struct rpm_pinctrl_node {
     enum rpm_pinctrl_state pinctrl_state;
 };
 
 struct rpm_spinlock_node {
     spinlock_t *lock;
-    unsigned long flags;
+    unsigned long *flags;
+};
+
+struct rpm_return_node {
+    int ret_value;
+};
+
+struct rpm_device_call_node {
+    enum rpm_device_call call;
 };
 
 struct rpm_node {
@@ -109,6 +138,25 @@ struct rpm_node {
         .op = RPM_PIN_STATE_SELECT, \
         .op_args = &rpm_pinctrl_##name, \
     };
+
+#define RPM_RETURN_NODE(name, value); \
+    static struct rpm_return_node rpm_return_##name = { \
+        .ret_value = value, \
+    }; \
+    static struct rpm_node rpm_node_##name = { \
+        .op = RPM_RETURN, \
+        .op_args = &rpm_return_##name, \
+    };
+
+#define RPM_DEVICE_CALL_NODE(name, fun); \
+    static struct rpm_device_call_node rpm_device_call_##name = { \
+        .call = fun, \
+    }; \
+    static struct rpm_node rpm_node_##name = { \
+        .op = RPM_DEVICE_CALL, \
+        .op_args = &rpm_device_call_##name, \
+    };
+
 
 #define RPM_NODE_NAME(name) rpm_node_##name
 #define RPM_REG_NODE_NAME(name) reg_node_##name

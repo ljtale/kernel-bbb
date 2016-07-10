@@ -14,6 +14,8 @@
 #define OMAP_I2C_IP_V2_IRQENABLE_CLR 0x30
 #define OMAP_I2C_IP_V2_INTERRUPTS_MASK 0x6FFF
 
+struct omap_i2c_rpm_reg_value;
+
 const static u16 omap_i2c_interrupts_mask = 0x6fff;
 const static u16 zero = 0;
 const static u16 omap_i2c_con_enable = 0x1 << 15;
