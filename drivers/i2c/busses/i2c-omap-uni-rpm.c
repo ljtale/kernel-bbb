@@ -31,10 +31,10 @@ RPM_REG_WRITE_NODE(stat_reg_1, OMAP_I2C_V2_STAT_REG, NULL);
 
 RPM_REG_READ_NODE(stat_reg_2, OMAP_I2C_V2_STAT_REG, NULL);
 
-RPM_PIN_STATE_SELECT_NODE(sleep_state, RPM_PINCTRL_SLEEP);
+RPM_DEVICE_CALL_NODE(pinctrl_sleep_state, RPM_PINCTRL_SLEEP);
 
 /* resume */
-RPM_PIN_STATE_SELECT_NODE(default_state, RPM_PINCTRL_DEFAULT);
+RPM_DEVICE_CALL_NODE(pinctrl_default_state, RPM_PINCTRL_DEFAULT);
 
 RPM_REG_WRITE_NODE(con_reg_1, OMAP_I2C_V2_CON_REG, &zero);
 
@@ -62,11 +62,11 @@ void omap_i2c_rpm_graph_build(void) {
     RPM_NODE_CONTROL(ie_reg_1, irqenable_clr);
     RPM_NODE_CONTROL(irqenable_clr, stat_reg_1);
     RPM_NODE_CONTROL(stat_reg_1, stat_reg_2);
-    RPM_NODE_CONTROL(stat_reg_2, sleep_state);
-    RPM_NODE_NAME(sleep_state).next = NULL;
+    RPM_NODE_CONTROL(stat_reg_2, pinctrl_sleep_state);
+    RPM_NODE_NAME(pinctrl_sleep_state).next = NULL;
 
     /* set up the resume control flow */
-    RPM_NODE_CONTROL(default_state, con_reg_1);
+    RPM_NODE_CONTROL(pinctrl_default_state, con_reg_1);
     RPM_NODE_CONTROL(con_reg_1, psc_reg_1);
     RPM_NODE_CONTROL(psc_reg_1, scll_reg_1);
     RPM_NODE_CONTROL(scll_reg_1, sclh_reg_1);
@@ -116,7 +116,7 @@ void omap_i2c_rpm_populate_resume_graph(struct universal_device *uni_dev) {
     RPM_CONDITION_OP_NAME(ie_check).left_value = (u32 *)&reg_values->iestate;
     RPM_CONDITION_OP_NAME(ie_check).is_left_value = true;
     RPM_REG_NODE_NAME(ie_reg_2).reg_value = (u32 *)&reg_values->iestate;
-    uni_dev->rpm_resume_graph = &RPM_NODE_NAME(default_state);
+    uni_dev->rpm_resume_graph = &RPM_NODE_NAME(pinctrl_default_state);
 }
 EXPORT_SYMBOL(omap_i2c_rpm_populate_resume_graph);
 

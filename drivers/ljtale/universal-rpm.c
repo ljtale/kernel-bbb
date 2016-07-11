@@ -20,10 +20,11 @@ static inline int rpm_reg_write(struct universal_device *uni_dev,
             *(reg_node->reg_value)); 
 }
 
-static inline int rpm_pin_state_select(struct universal_device *uni_dev,
+static inline int rpm_device_call(struct universal_device *uni_dev,
         struct rpm_node *node) {
-    struct rpm_pinctrl_node *pinctrl_node = node->op_args;
-    switch (pinctrl_node->pinctrl_state) {
+    int ret = 0;
+    struct rpm_device_call_node *device_call_node = node->op_args;
+    switch (device_call_node->call) {
         case RPM_PINCTRL_DEFAULT:
             pinctrl_pm_select_default_state(uni_dev->dev);
             break;
@@ -33,14 +34,15 @@ static inline int rpm_pin_state_select(struct universal_device *uni_dev,
         case RPM_PINCTRL_IDLE:
             pinctrl_pm_select_idle_state(uni_dev->dev);
             break;
+        case RPM_MARK_LAST_BUSY:
+            pm_runtime_mark_last_busy(uni_dev->dev);
+            break;
         default:
             return -EINVAL;
     }
-    return 0;
+    return ret;
     /* we don't care about pin select return value */
 }
-
-
 
 /* return boolean value of a condition operation */
 /* FIXME: recursive calls could have some hazards sometimes ???*/
@@ -117,8 +119,8 @@ int universal_rpm_process_graph(struct universal_device *uni_dev,
                     return -EINVAL;
                 cursor = cursor->next;
                 break;
-            case RPM_PIN_STATE_SELECT:
-                if (rpm_pin_state_select(uni_dev, cursor) < 0)
+            case RPM_DEVICE_CALL:
+                if (rpm_device_call(uni_dev, cursor) < 0)
                     return -EINVAL;
                 cursor = cursor->next;
                 break;

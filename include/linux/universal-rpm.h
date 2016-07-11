@@ -8,6 +8,7 @@
 #include <linux/interrupt.h>
 #include <linux/dmaengine.h>
 #include <linux/omap-dmaengine.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
@@ -26,15 +27,15 @@ struct omap_i2c_rpm_reg_value {
     u16 sclhstate;
 };
 
-struct omap_hsmmc_rpm_reg_values {
+struct omap_hsmmc_rpm_context {
     u32 con;
     u32 hctl;
     u32 sysctl;
     u32 capa;
-    spinlock_t irq_lock;
     u32 mmc_caps;
     u32 host_caps;
     u32 pstate;
+    spinlock_t irq_lock;
     u32 lock_flags;
 };
 
@@ -57,22 +58,21 @@ enum rpm_op {
     RPM_CONDITION,
     RPM_RETURN,
     RPM_DEVICE_CALL,
+    RPM_BASIC_BLOCK,
     /* TODO: more rpm ops */
 };
-
+#if 0
 enum rpm_pinctrl_state {
     RPM_PINCTRL_DEFAULT,
     RPM_PINCTRL_SLEEP,
     RPM_PINCTRL_IDLE,
 };
-
+#endif
 enum rpm_device_call {
     RPM_MARK_LAST_BUSY,
-#if 0
     RPM_PINCTRL_DEFAULT,
     RPM_PINCTRL_SLEEP,
-    RPM_PINCTRL_IDEL,
-#endif 
+    RPM_PINCTRL_IDLE,
 };
 
 /* start and stop nodes could be only dummy nodes */
@@ -87,9 +87,11 @@ struct rpm_reg_node {
     u32 *reg_value;
 };
 
+#if 0
 struct rpm_pinctrl_node {
     enum rpm_pinctrl_state pinctrl_state;
 };
+#endif
 
 struct rpm_spinlock_node {
     spinlock_t *lock;
@@ -110,26 +112,35 @@ struct rpm_node {
     struct rpm_node *next;
 };
 
+/* this node represent a basic block, which is a sequence of nodes without
+ * branches. By this node,we don't need to redundantly build the node's next
+ * pointers for each element of the basic block. */
+struct rpm_basic_block {
+    struct rpm_node *start; /* this should be an array start address */
+    int node_num;
+    struct rpm_node *end;
+};
+
 #define RPM_REG_READ_NODE(name, addr, value); \
-    static struct rpm_reg_node reg_node_##name = { \
+    static struct rpm_reg_node rpm_reg_##name = { \
         .reg_addr = addr,   \
         .reg_value = (u32 *)value, \
     }; \
     static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_READ, \
-        .op_args = &reg_node_##name, \
+        .op_args = &rpm_reg_##name, \
     };
 
 #define RPM_REG_WRITE_NODE(name, addr, value); \
-    static struct rpm_reg_node reg_node_##name = { \
+    static struct rpm_reg_node rpm_reg_##name = { \
         .reg_addr = addr,   \
         .reg_value = (u32 *)value, \
     }; \
     static struct rpm_node rpm_node_##name = { \
         .op = RPM_REG_WRITE, \
-        .op_args = &reg_node_##name, \
+        .op_args = &rpm_reg_##name, \
     };
-
+#if 0
 #define RPM_PIN_STATE_SELECT_NODE(name, state); \
     static struct rpm_pinctrl_node rpm_pinctrl_##name = { \
         .pinctrl_state = state,   \
@@ -138,6 +149,7 @@ struct rpm_node {
         .op = RPM_PIN_STATE_SELECT, \
         .op_args = &rpm_pinctrl_##name, \
     };
+#endif
 
 #define RPM_RETURN_NODE(name, value); \
     static struct rpm_return_node rpm_return_##name = { \
@@ -158,8 +170,29 @@ struct rpm_node {
     };
 
 
+#define RPM_SPINLOCK_NODE(name, lock); \
+    static struct rpm_spinlock_node rpm_spinlock_##name = { \
+    }; \
+    static struct rpm_node rpm_node_##name = { \
+        .op = lock, \
+        .op_args = &rpm_spinlock_##name, \
+    };
+
+#define RPM_BASIC_BLOCK_NODE(name, node_start, num, node_end); \
+    static struct rpm_basic_block rpm_basic_block_##name = { \
+        .start = &RPM_NODE_NAME(node_start),    \
+        .node_num = num,    \
+        .end = &NAME_NODE_NAME(node_end), \
+    };  \
+    static struct rpm_node rpm_node_##name = { \
+        .op = RPM_BASIC_BLOCK, \
+        .op_args = &rpm_basic_block_##name, \
+    };
+
 #define RPM_NODE_NAME(name) rpm_node_##name
-#define RPM_REG_NODE_NAME(name) reg_node_##name
+#define RPM_REG_NODE_NAME(name) rpm_reg_##name
+#define RPM_SPINLOCK_NODE_NAME(name) rpm_spinlock_##name
+#define RPM_BASIC_BLOCK_ARRAY(name) rpm_array_##name
 
 enum rpm_condition_type {
     RPM_CONDITION_SIMPLE,
@@ -170,8 +203,10 @@ enum rpm_condition_type {
     RPM_CONDITION_EQ,
     RPM_CONDITION_BIT_AND,
     RPM_CONDITION_BIT_OR,
+    RPM_CONDITION_BIT_NOT,
     RPM_CONDITION_AND,
     RPM_CONDITION_OR,
+    RPM_CONDITION_NOT,
 };
 
 struct rpm_condition_op {

@@ -39,4 +39,44 @@
 const static u32 stat_clear = 0xffffffff;
 const static u32 cirq_en = 0x1 << 8;
 const static u32 zero = 0;
+const static u32 dlev_dat_1 = DLEV_DAT(1);
+
+
+struct omap_hsmmc_rpm_context;
+
+/* rpm suspend nodes */
+
+RPM_REG_READ_NODE(con_reg_1, OMAP_HSMMC_CON, NULL);
+RPM_REG_READ_NODE(hctl_reg_1, OMAP_HSMMC_HCTL, NULL);
+RPM_REG_READ_NODE(sysctl_reg_1, OMAP_HSMMC_SYSCTL, NULL);
+RPM_REG_READ_NODE(capa_reg_1, OMAP_HSMMC_CAPA, NULL);
+#if 0
+/* we can either define the register read nodes separately, or we can define
+ * a basic block for the above four nodes */
+#endif 
+
+RPM_SPINLOCK_NODE(spinlock_1, RPM_SPIN_LOCK);
+
+/* first condition op */
+RPM_CONDITION_OP(mmc_caps_1, RPM_CONDITION_BIT_AND);
+RPM_CONDITION_OP(host_flag_1, RPM_CONDITION_BIT_AND);
+RPM_CONDITION_OP(and_con_1, RPM_CONDITION_AND);
+RPM_CONDITION_NODE(condition_1, and_con_1);
+
+RPM_REG_WRITE_NODE(ise_reg_1, OMAP_HSMMC_ISE, NULL);
+RPM_REG_WRITE_NODE(ie_reg_1, OMAP_HSMMC_IE, NULL);
+
+RPM_REG_READ_NODE(pstate_reg_1, OMAP_HSMMC_PSTATE, NULL);
+RPM_CONDITION_OP(pstate_con_1, RPM_CONDITION_BIT_AND);
+RPM_CONDITION_OP(not_con_1, RPM_CONDITION_NOT);
+RPM_CONDITION_NODE(condition_2, not_con_1);
+
+RPM_REG_WRITE_NODE(stat_reg_1, OMAP_HSMMC_STAT, NULL);
+RPM_REG_WRITE_NODE(ise_reg_2, OMAP_HSMMC_ISE, NULL);
+RPM_REG_WRITE_NODE(ie_reg_2, OMAP_HSMMC_IE, NULL);
+RPM_DEVICE_CALL_NODE(rpm_mark_last_busy, RPM_MARK_LAST_BUSY);
+
+
+
+
 
