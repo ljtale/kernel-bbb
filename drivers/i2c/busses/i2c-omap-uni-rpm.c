@@ -107,7 +107,6 @@ void omap_i2c_rpm_populate_resume_graph(struct universal_device *uni_dev) {
             return;
         uni_dev->rpm_data_dev = reg_values;
     }
-    BUG_ON(!reg_values);
     /* fill reg value dependencies */
     RPM_REG_NODE_NAME(psc_reg_1).reg_value = (u32 *)&reg_values->pscstate;
     RPM_REG_NODE_NAME(scll_reg_1).reg_value = (u32 *)&reg_values->scllstate;

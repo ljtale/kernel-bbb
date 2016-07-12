@@ -33,8 +33,7 @@ struct omap_hsmmc_rpm_context {
     u32 sysctl;
     u32 capa;
     u32 mmc_caps;
-    u32 host_caps;
-    u32 pstate;
+    u32 host_flags;
     spinlock_t irq_lock;
     u32 lock_flags;
 };
@@ -59,6 +58,7 @@ enum rpm_op {
     RPM_RETURN,
     RPM_DEVICE_CALL,
     RPM_BASIC_BLOCK,
+    RPM_ASSIGNMENT,
     /* TODO: more rpm ops */
 };
 #if 0
@@ -99,11 +99,17 @@ struct rpm_spinlock_node {
 };
 
 struct rpm_return_node {
-    int ret_value;
+    int *ret_value;
 };
 
 struct rpm_device_call_node {
     enum rpm_device_call call;
+};
+
+/* assignment node */
+struct rpm_assignment_node {
+    int *source;
+    int value;
 };
 
 struct rpm_node {
@@ -189,6 +195,15 @@ struct rpm_basic_block {
         .op_args = &rpm_basic_block_##name, \
     };
 
+#define RPM_ASSIGNMENT_NODE(name, assign_value); \
+    static struct rpm_assignment_node rpm_assignment_##name = { \
+        .value = assign_value, \
+    }; \
+    static struct rpm_node rpm_node_##name = { \
+        .op = RPM_ASSIGNMENT, \
+        .op_args = &rpm_assignment_##name, \
+    };
+
 #define RPM_NODE_NAME(name) rpm_node_##name
 #define RPM_REG_NODE_NAME(name) rpm_reg_##name
 #define RPM_SPINLOCK_NODE_NAME(name) rpm_spinlock_##name
@@ -254,9 +269,17 @@ struct rpm_condition_node {
 
 #define RPM_CONDITION_CONTROL(condition_node, true_node, false_node) \
     do { \
-        struct rpm_condition_node *node = &rpm_node_##condition_node; \
+        struct rpm_condition_node *node = \
+            rpm_node_##condition_node.op_args; \
         node->true_path = &RPM_NODE_NAME(true_node); \
         node->false_path = &RPM_NODE_NAME(false_node); \
     } while(0)
+
+#define RPM_CONDITION_OP_CONTROL(con_op, left, right) \
+    do { \
+        struct rpm_condition_op *op = &RPM_CONDITION_OP_NAME(con_op); \
+        op->left_op = &RPM_CONDITION_OP_NAME(left); \
+        op->right_op = &RPM_CONDITION_OP_NAME(right); \
+    } while (0)
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */
