@@ -284,14 +284,13 @@ static const u8 reg_map_ip_v2[] = {
 
 /* ljtale starts */
 /* ad-hoc I2C controller V2 register offset */
-#define OMAP_I2C_V2_IE_REG 0x2c
-#define OMAP_I2C_V2_STAT_REG 0x28
-#define OMAP_I2C_V2_CON_REG 0xa4
-#define OMAP_I2C_IP_V2_IRQENABLE_CLR 0x30
+#define OMAP_I2C_UNI_IE_REG 0x2c
+#define OMAP_I2C_UNI_STAT_REG 0x28
+#define OMAP_I2C_UNI_CON_REG 0xa4
+#define OMAP_I2C_UNI_IRQENABLE_CLR_REG 0x30
 
 /* TODO: more register definitions */
 /* ljtale ends */
-
 
 static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
 				      int reg, u16 val)
@@ -314,7 +313,7 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
     BUG_ON(!uni_dev);
     /* ljtale: reset everything, disable the i2c module */
 	// omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-    universal_mmio_reg_write(uni_dev, OMAP_I2C_V2_CON_REG, 0);
+    universal_mmio_reg_write(uni_dev, OMAP_I2C_UNI_CON_REG, 0);
 
 	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
 	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
@@ -1335,8 +1334,8 @@ static int omap_i2c_post_irq_config(struct universal_device *uni_dev) {
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
 	adap->bus_recovery_info = &omap_i2c_bus_recovery_info;
-
 	/* i2c device drivers may be active on return from add_adapter() */
+
 	adap->nr = pdev->id;
 	r = i2c_add_numbered_adapter(adap);
 	if (r) {
@@ -1497,6 +1496,7 @@ omap_i2c_probe(struct platform_device *pdev)
 		u16 s;
 
 		/* Set up the fifo size - Get total size */
+        /* ljtale: bufstat register is read-only, fifo determined by hardware */
 		s = (omap_i2c_read_reg(dev, OMAP_I2C_BUFSTAT_REG) >> 14) & 0x3;
 		dev->fifo_size = 0x8 << s;
 
@@ -1612,7 +1612,53 @@ static int omap_i2c_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-#if 0
+/* ljtale starts */
+/* TODO: the following code needs to be put in a separate file */
+enum {
+    OMAP_I2C_IE = 0,
+    OMAP_I2C_PSC,
+    OMAP_I2C_SCLL,
+    OMAP_I2C_SCLH,
+    OMAP_I2C_IRQENABLE_CLR,
+};
+static u32 omap_i2c_reg_context[] = {
+    [OMAP_I2C_IE] = 0, 
+    [OMAP_I2C_PSC] = 0,
+    [OMAP_I2C_SCLL] = 0,
+    [OMAP_I2C_SCLH] = 0,
+    [OMAP_I2C_IRQENABLE_CLR] = 0x6fff,
+};
+static struct universal_disable_irq_entry omap_i2c_disable_irq_tbl[] = {
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_I2C_UNI_IE_REG,
+        .ctx_index = OMAP_I2C_IE,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_IP_V2_IRQENABLE_CLR,
+        .ctx_index = OMAP_I2C_IRQENABLE_CLR,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_STAT_REG,
+        .ctx_index = OMAP_I2C_IE,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_I2C_UNI_STAT_REG,
+        .flushing = true,
+    },
+};
+
+static struct universal_disable_irq omap_i2c_disable_irq = {
+    .table = {
+        .disable_tbl = omap_i2c_disable_irq_tbl,
+        .table_size = 4,
+    },
+    .check_pending = false,
+};
+/* ljtale ends */
 static int omap_i2c_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -1625,7 +1671,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
     /* ljtale ends */
 
 	// _dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
-    universal_mmio_reg_read(uni_dev, OMAP_I2C_V2_IE_REG, &_dev->iestate);
+    universal_mmio_reg_read(uni_dev, OMAP_I2C_UNI_IE_REG, &_dev->iestate);
 
 	if (_dev->scheme == OMAP_I2C_SCHEME_0)
 		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
@@ -1664,7 +1710,6 @@ static int omap_i2c_runtime_resume(struct device *dev)
 
 	return 0;
 }
-#endif
 #if 0
 static int omap_i2c_runtime_suspend(struct device *dev) {
     return universal_runtime_suspend(dev);
@@ -1672,15 +1717,14 @@ static int omap_i2c_runtime_suspend(struct device *dev) {
 static int omap_i2c_runtime_resume(struct device *dev) {
     return universal_runtime_resume(dev);
 }
-
-static struct dev_pm_ops omap_i2c_pm_ops = {
-	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
-			   omap_i2c_runtime_resume, NULL)
-};
-#endif
 static struct dev_pm_ops omap_i2c_pm_ops = {
     SET_RUNTIME_PM_OPS(universal_runtime_suspend,
             universal_runtime_resume, NULL)
+};
+#endif
+static struct dev_pm_ops omap_i2c_pm_ops = {
+	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+			   omap_i2c_runtime_resume, NULL)
 };
 #define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
 #else
@@ -1704,6 +1748,7 @@ extern void omap_i2c_rpm_populate_suspend_graph(
         struct universal_device *uni_dev);
 extern void omap_i2c_rpm_populate_resume_graph(
         struct universal_device *uni_dev);
+extern int omap_i2c_rpm_create_reg_context(struct universal_device *uni_dev);
 
 static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
     struct platform_device *pdev;
@@ -1750,9 +1795,15 @@ static struct universal_driver omap_i2c_universal_driver = {
     .regacc = &omap_i2c_regacc,
     .irq_config_num = &omap_i2c_irq_config_num,
     .local_probe = omap_i2c_universal_local_probe,
-    .rpm_populate_suspend_graph = omap_i2c_rpm_populate_suspend_graph,
-    .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
-    .rpm_graph_build = omap_i2c_rpm_graph_build,
+//    .rpm_populate_suspend_graph = omap_i2c_rpm_populate_suspend_graph,
+//    .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
+//    .rpm_graph_build = omap_i2c_rpm_graph_build,
+    .disable_irq = &omap_i2c_disable_irq,
+    .ref_ctx = {
+        .array = omap_i2c_reg_context,
+        .size = ARRAY_SIZE(omap_i2c_reg_context),
+    },
+    .rpm_create_reg_context = omap_i2c_rpm_create_reg_context,
 };
 
 static int __init universal_omap_i2c_init(void)

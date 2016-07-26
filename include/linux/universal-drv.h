@@ -236,11 +236,16 @@ struct universal_driver {
 
     /* power management operations */
     /* TODO: wrap them into a separate data structure */
-    /**/
     spinlock_t rpm_graph_lock;
     void (*rpm_graph_build)(void);
     void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
     void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
+    /* rpm generic logic data structures */
+    struct universal_disable_irq *disable_irq;
+    struct universal_rpm_ctx ref_ctx;
+    /* TODO: for better organization, define a rpm ops struct to organize
+     * all the call backs */
+    int (*rpm_create_reg_context)(struct universal_device *uni_dev);
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;
@@ -287,6 +292,8 @@ struct universal_device {
     void *rpm_data_dev;
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
+
+    struct universal_rpm_ctx rpm_context;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;

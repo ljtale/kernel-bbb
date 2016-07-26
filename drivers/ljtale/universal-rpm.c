@@ -180,3 +180,18 @@ int universal_runtime_resume(struct device *dev) {
     return ret;
 }
 
+
+/*============== generic logic =====================*/
+
+/* Disable IRQ for runtime suspend, the logic is:
+ * Disable IRQ =>
+ * Check if there are pending IRQ handling =>
+ *      If there is IRQ handling => reconfigure IRQ and abort 
+ *      If there is no IRQ handling => succeed*/
+int universal_disable_irq(struct universal_device *uni_dev) {
+    struct universal_disable_irq *disable_irq = 
+        uni_dev->drv->disable_irq;
+    /* assume when calling this function, the reg context has been created */
+    struct universal_reg_ctx *reg_ctx = &uni_dev->reg_context;
+    return 0;
+}

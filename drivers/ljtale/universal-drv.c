@@ -245,6 +245,11 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
 
     /* TODO: runtime pm configuration and clock configuration */
+    if (drv->rpm_create_reg_context) {
+        ret = drv->rpm_create_reg_context(dev);
+        if (ret < 0)
+            goto rpm_error;
+    }
 
     /* ... */
     /* do a local probe */
@@ -270,10 +275,11 @@ int __universal_drv_probe(struct universal_device *dev) {
     return ret;
     
     /* TODO: error handling */
-regacc_err:
-dma_config_err:
-local_probe_err:
 irq_config_err:
+local_probe_err:
+rpm_error:
+dma_config_err:
+regacc_err:
     return ret;
 }
 EXPORT_SYMBOL(__universal_drv_probe);

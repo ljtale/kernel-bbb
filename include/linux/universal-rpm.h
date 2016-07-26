@@ -282,4 +282,52 @@ struct rpm_condition_node {
         op->right_op = &RPM_CONDITION_OP_NAME(right); \
     } while (0)
 
+
+/* ====== data structure for generic logic ====== */
+
+/* a reference array for register context, individual device needs
+ * to create a per-device context based on this reference */
+struct universal_rpm_ctx {
+    u32 *array;
+    int size;
+};
+
+
+struct universal_disable_irq_entry {
+    enum rpm_op reg_op;
+    u32 reg_offset;
+    union {
+        int ctx_index;
+        // some register reading is only for flushing the previous write, so
+        // the reading does not affect the register context
+        bool flushing;
+    };
+};
+struct universal_disable_irq_tbl {
+    struct universal_disable_irq_entry *disable_tbl;
+    /* table size must be hard coded */
+    int table_size;
+};
+
+/* Pending IRQ handling could be checked at runtime, just like Chao's work
+ * to check device using by memory monitor. To check pending IRQ at runtime,
+ * we can rely on the IRQ table to intercept any registered interrupt handlers.
+ * On a per-device manner, checking ending IRQ could also be done by reading 
+ * a specific register and compare the register value with a certain value.*/
+struct universal_check_pending_irq {
+    /* reg_op by default is register read */
+    enum rpm_op reg_op;
+    u32 reg_offset;
+    u32 compare_value;
+    bool pending;
+};
+
+struct universal_disable_irq {
+    struct universal_disable_irq_tbl table;
+    bool check_pending;
+    struct universal_check_pending_irq pending;
+    /* only when pending.pending is true should we run reconf table */
+    struct universal_disable_irq_entry *reconf_tbl;
+};
+
 #endif /* _LINUX_UNIVERSAL_RPM_H */

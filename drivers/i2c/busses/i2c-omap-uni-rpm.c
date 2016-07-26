@@ -119,3 +119,21 @@ void omap_i2c_rpm_populate_resume_graph(struct universal_device *uni_dev) {
 }
 EXPORT_SYMBOL(omap_i2c_rpm_populate_resume_graph);
 
+/* ============ rpm generic logic part ===========*/
+int omap_i2c_rpm_create_reg_context(struct universal_device *uni_dev) {
+    u32 *array = uni_dev->drv->ref_ctx.array;
+    int size = uni_dev->drv->ref_ctx.size;
+    int i;
+    u32 *dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
+    if (!dev_array)
+        return -ENOMEM;
+    /* copy everything including the constant values */
+    for (i = 0; i < size; i++)
+        dev_array[i] = array[i];
+
+    uni_dev->rpm_context.array = dev_array;
+    uni_dev->rpm_context.size = size;
+    return 0;
+}
+EXPORT_SYMBOL(omap_i2c_rpm_create_reg_context);
+
