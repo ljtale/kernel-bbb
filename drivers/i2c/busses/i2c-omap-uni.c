@@ -286,7 +286,11 @@ static const u8 reg_map_ip_v2[] = {
 /* ad-hoc I2C controller V2 register offset */
 #define OMAP_I2C_UNI_IE_REG 0x2c
 #define OMAP_I2C_UNI_STAT_REG 0x28
+#define OMAP_I2C_UNI_WE_REG 0x34
 #define OMAP_I2C_UNI_CON_REG 0xa4
+#define OMAP_I2C_UNI_PSC_REG 0xb0
+#define OMAP_I2C_UNI_SCLL_REG 0xb4
+#define OMAP_I2C_UNI_SCLH_REG 0xb8
 #define OMAP_I2C_UNI_IRQENABLE_CLR_REG 0x30
 
 /* TODO: more register definitions */
@@ -1615,25 +1619,26 @@ static int omap_i2c_remove(struct platform_device *pdev)
 /* ljtale starts */
 /* TODO: the following code needs to be put in a separate file */
 enum {
-    OMAP_I2C_IE = 0,
+    OMAP_I2C_ZERO = 0,
+    OMAP_I2C_IE,
+    OMAP_I2C_CON,
     OMAP_I2C_PSC,
     OMAP_I2C_SCLL,
     OMAP_I2C_SCLH,
     OMAP_I2C_IRQENABLE_CLR,
+    OMAP_I2C_WE,
 };
 static u32 omap_i2c_reg_context[] = {
+    [OMAP_I2C_ZERO] = 0,
     [OMAP_I2C_IE] = 0, 
+    [OMAP_I2C_CON] = OMAP_I2C_CON_EN,
     [OMAP_I2C_PSC] = 0,
     [OMAP_I2C_SCLL] = 0,
     [OMAP_I2C_SCLH] = 0,
-    [OMAP_I2C_IRQENABLE_CLR] = 0x6fff,
+    [OMAP_I2C_IRQENABLE_CLR] = OMAP_I2C_IP_V2_INTERRUPTS_MASK,
+    [OMAP_I2C_WE] = OMAP_I2C_WE_ALL,
 };
 static struct universal_reg_entry omap_i2c_disable_irq_tbl[] = {
-    {
-        .reg_op = RPM_REG_READ,
-        .reg_offset = OMAP_I2C_UNI_IE_REG,
-        .ctx_index = OMAP_I2C_IE,
-    },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_IP_V2_IRQENABLE_CLR,
@@ -1659,6 +1664,92 @@ static struct universal_disable_irq omap_i2c_disable_irq = {
     },
     .check_pending = false,
 };
+
+/* save context table are supposed to be readings */
+static struct universal_reg_entry omap_i2c_save_context_tbl[] = {
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_I2C_UNI_PSC_REG,
+        .ctx_index = OMAP_I2C_PSC,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_I2C_UNI_SCLL_REG,
+        .ctx_index = OMAP_I2C_SCLL,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_I2C_UNI_SCLH_REG,
+        .ctx_index = OMAP_I2C_SCLH,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_I2C_UNI_IE_REG,
+        .ctx_index = OMAP_I2C_IE,
+    },
+};
+
+static struct universal_save_context_tbl omap_i2C_save_context = {
+    .table = omap_i2c_save_context_tbl,
+    .table_size = 4,
+};
+
+/* restoring context table could be both reading (flushing) and writings */
+static struct universal_reg_entry omap_i2c_restore_context_tbl[] = {
+    /* FIXME: context restore requires the device to be in certain states,
+     * so we'd better configure the device to the states before restoring */
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_CON_REG,
+        .ctx_index = OMAP_I2C_ZERO,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_PSC_REG,
+        .ctx_index = OMAP_I2C_PSC,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_SCLL_REG,
+        .ctx_index = OMAP_I2C_SCLL,
+
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_SCLH_REG,
+        .ctx_index = OMAP_I2C_SCLH,
+
+    },
+};
+static struct universal_restore_context_tbl omap_i2c_restore_context = {
+    .table = omap_i2c_restore_context_tbl,
+    .table_size = 4,
+};
+
+/* reconfigure table could be further divided into separate actions */
+static struct universal_reg_entry omap_i2c_configure_state_tbl[] = {
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_WE_REG,
+        .ctx_index = OMAP_I2C_WE,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_CON_REG,
+        .ctx_index = OMAP_I2C_CON,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_I2C_UNI_IE_REG,
+        .ctx_index = OMAP_I2C_IE,
+    },
+};
+
+static struct universal_configure_state_tbl omap_i2c_configure_state = {
+    .table = omap_i2c_configure_state_tbl,
+    .table_size = 3,
+};
+
 static struct universal_pin_control omap_i2c_pinctrl = {
     .suspend_state = RPM_PINCTRL_SLEEP,
     .resume_state = RPM_PINCTRL_DEFAULT,
@@ -1747,12 +1838,13 @@ static struct platform_driver omap_i2c_driver = {
 };
 
 /* ljtale starts */
-
+#if 0
 extern void omap_i2c_rpm_graph_build(void);
 extern void omap_i2c_rpm_populate_suspend_graph(
         struct universal_device *uni_dev);
 extern void omap_i2c_rpm_populate_resume_graph(
         struct universal_device *uni_dev);
+#endif
 extern int omap_i2c_rpm_create_reg_context(struct universal_device *uni_dev);
 
 static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {

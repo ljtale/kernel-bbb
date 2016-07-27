@@ -5,6 +5,8 @@
 #include <linux/universal-utils.h>
 #include <linux/universal-rpm.h>
 
+#if 0
+
 static inline int rpm_reg_read(struct universal_device *uni_dev,
         struct rpm_node *node) {
     struct rpm_reg_node *reg_node = node->op_args;
@@ -179,7 +181,7 @@ int universal_runtime_resume(struct device *dev) {
     spin_unlock_irqrestore(&uni_dev->drv->rpm_graph_lock, flags);
     return ret;
 }
-
+#endif
 
 /*============== generic logic =====================*/
 
@@ -272,7 +274,7 @@ int universal_enable_irq(struct universal_device *uni_dev) {
 int universal_pin_contrl(struct universal_device *uni_dev,
         enum rpm_action action) {
     struct universal_pin_control *pin_control = uni_dev->drv->pin_control;
-    enum rpm_device_call pin_state;
+    enum rpm_device_call pin_state = RPM_PINCTRL_DEFAULT;
     if (action == SUSPEND)
         pin_state = pin_control->suspend_state;
     else if (action == RESUME)

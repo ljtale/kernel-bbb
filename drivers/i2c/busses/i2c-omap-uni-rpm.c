@@ -14,6 +14,7 @@
 #define OMAP_I2C_IP_V2_IRQENABLE_CLR 0x30
 #define OMAP_I2C_IP_V2_INTERRUPTS_MASK 0x6FFF
 
+#if 0
 struct omap_i2c_rpm_reg_value;
 
 const static u16 omap_i2c_interrupts_mask = 0x6fff;
@@ -118,11 +119,14 @@ void omap_i2c_rpm_populate_resume_graph(struct universal_device *uni_dev) {
     uni_dev->rpm_resume_graph = &RPM_NODE_NAME(pinctrl_default_state);
 }
 EXPORT_SYMBOL(omap_i2c_rpm_populate_resume_graph);
+#endif
 
 /* ============ rpm generic logic part ===========*/
 int omap_i2c_rpm_create_reg_context(struct universal_device *uni_dev) {
     u32 *array = uni_dev->drv->ref_ctx.array;
     int size = uni_dev->drv->ref_ctx.size;
+    if (!array)
+        return 0;
     int i;
     u32 *dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
     if (!dev_array)

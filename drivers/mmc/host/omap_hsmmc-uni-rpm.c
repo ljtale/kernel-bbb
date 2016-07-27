@@ -36,6 +36,7 @@
 
 #define DLEV_DAT(x) (1 << (20 + (x))) /* present state beginning from 20th bit*/
 
+#if 0
 const static u32 stat_clear = 0xffffffff;
 const static u32 cirq_en = (1 << 8);
 const static u32 zero = 0;
@@ -149,8 +150,22 @@ void omap_hsmmc_rpm_populate_suspend_graph(struct universal_device *uni_dev) {
     RPM_SPINLOCK_NODE_NAME(spinlock_1).lock = &rpm_context->irq_lock;
     RPM_SPINLOCK_NODE_NAME(spinlock_2).lock = &rpm_context->irq_lock;
 }
+#endif
 
 
-
-
-
+/* =============== rpm generic logic part ===== */
+int omap_hsmmc_rpm_create_reg_context (struct universal_device *uni_dev) {
+    u32 *array = uni_dev->drv->ref_ctx.array;
+    int size = uni_dev->drv->ref_ctx.size;
+    if (!array)
+        return 0;
+    int i;
+    u32 *dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
+    if (!dev_array)
+        return -ENOMEM;
+    for (i = 0; i < size; i++)
+        dev_array[i] = array[i];
+    uni_dev->rpm_context.array = dev_array;
+    uni_dev->rpm_context.size = size;
+    return 0;
+}

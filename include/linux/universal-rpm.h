@@ -308,6 +308,22 @@ struct universal_reg_entry {
     // the reading does not affect the register context
     bool flushing;
 };
+
+struct universal_save_context_tbl {
+    struct universal_reg_entry *table;
+    int table_size;
+};
+
+struct universal_restore_context_tbl {
+    struct universal_reg_entry *table;
+    int table_size;
+};
+
+struct universal_configure_state_tbl {
+    struct universal_reg_entry *table;
+    int table_size;
+};
+
 struct universal_disable_irq_tbl {
     struct universal_reg_entry *table;
     /* table size must be hard coded */
