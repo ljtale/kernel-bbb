@@ -1619,35 +1619,35 @@ static int omap_i2c_remove(struct platform_device *pdev)
 /* ljtale starts */
 /* TODO: the following code needs to be put in a separate file */
 enum {
-    OMAP_I2C_ZERO = 0,
-    OMAP_I2C_IE,
-    OMAP_I2C_CON,
-    OMAP_I2C_PSC,
-    OMAP_I2C_SCLL,
-    OMAP_I2C_SCLH,
-    OMAP_I2C_IRQENABLE_CLR,
-    OMAP_I2C_WE,
+    OMAP_I2C_UNI_ZERO = 0,
+    OMAP_I2C_UNI_IE,
+    OMAP_I2C_UNI_CON,
+    OMAP_I2C_UNI_PSC,
+    OMAP_I2C_UNI_SCLL,
+    OMAP_I2C_UNI_SCLH,
+    OMAP_I2C_UNI_IRQENABLE_CLR,
+    OMAP_I2C_UNI_WE,
 };
 static u32 omap_i2c_reg_context[] = {
-    [OMAP_I2C_ZERO] = 0,
-    [OMAP_I2C_IE] = 0, 
-    [OMAP_I2C_CON] = OMAP_I2C_CON_EN,
-    [OMAP_I2C_PSC] = 0,
-    [OMAP_I2C_SCLL] = 0,
-    [OMAP_I2C_SCLH] = 0,
-    [OMAP_I2C_IRQENABLE_CLR] = OMAP_I2C_IP_V2_INTERRUPTS_MASK,
-    [OMAP_I2C_WE] = OMAP_I2C_WE_ALL,
+    [OMAP_I2C_UNI_ZERO] = 0,
+    [OMAP_I2C_UNI_IE] = 0, 
+    [OMAP_I2C_UNI_CON] = OMAP_I2C_CON_EN,
+    [OMAP_I2C_UNI_PSC] = 0,
+    [OMAP_I2C_UNI_SCLL] = 0,
+    [OMAP_I2C_UNI_SCLH] = 0,
+    [OMAP_I2C_UNI_IRQENABLE_CLR] = OMAP_I2C_IP_V2_INTERRUPTS_MASK,
+    [OMAP_I2C_UNI_WE] = OMAP_I2C_WE_ALL,
 };
 static struct universal_reg_entry omap_i2c_disable_irq_tbl[] = {
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_IP_V2_IRQENABLE_CLR,
-        .ctx_index = OMAP_I2C_IRQENABLE_CLR,
+        .ctx_index = OMAP_I2C_UNI_IRQENABLE_CLR,
     },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_STAT_REG,
-        .ctx_index = OMAP_I2C_IE,
+        .ctx_index = OMAP_I2C_UNI_IE,
     },
     {
         .reg_op = RPM_REG_READ,
@@ -1660,7 +1660,7 @@ static struct universal_reg_entry omap_i2c_disable_irq_tbl[] = {
 static struct universal_disable_irq omap_i2c_disable_irq = {
     .disable_table = {
         .table = omap_i2c_disable_irq_tbl,
-        .table_size = 4,
+        .table_size = ARRAY_SIZE(omap_i2c_disable_irq_tbl),
     },
     .check_pending = false,
 };
@@ -1670,28 +1670,28 @@ static struct universal_reg_entry omap_i2c_save_context_tbl[] = {
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_PSC_REG,
-        .ctx_index = OMAP_I2C_PSC,
+        .ctx_index = OMAP_I2C_UNI_PSC,
     },
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_SCLL_REG,
-        .ctx_index = OMAP_I2C_SCLL,
+        .ctx_index = OMAP_I2C_UNI_SCLL,
     },
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_SCLH_REG,
-        .ctx_index = OMAP_I2C_SCLH,
+        .ctx_index = OMAP_I2C_UNI_SCLH,
     },
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_IE_REG,
-        .ctx_index = OMAP_I2C_IE,
+        .ctx_index = OMAP_I2C_UNI_IE,
     },
 };
 
 static struct universal_save_context_tbl omap_i2C_save_context = {
     .table = omap_i2c_save_context_tbl,
-    .table_size = 4,
+    .table_size = ARRAY_SIZE(omap_i2c_save_context_tbl),
 };
 
 /* restoring context table could be both reading (flushing) and writings */
@@ -1701,29 +1701,29 @@ static struct universal_reg_entry omap_i2c_restore_context_tbl[] = {
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_CON_REG,
-        .ctx_index = OMAP_I2C_ZERO,
+        .ctx_index = OMAP_I2C_UNI_ZERO,
     },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_PSC_REG,
-        .ctx_index = OMAP_I2C_PSC,
+        .ctx_index = OMAP_I2C_UNI_PSC,
     },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_SCLL_REG,
-        .ctx_index = OMAP_I2C_SCLL,
+        .ctx_index = OMAP_I2C_UNI_SCLL,
 
     },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_SCLH_REG,
-        .ctx_index = OMAP_I2C_SCLH,
+        .ctx_index = OMAP_I2C_UNI_SCLH,
 
     },
 };
 static struct universal_restore_context_tbl omap_i2c_restore_context = {
     .table = omap_i2c_restore_context_tbl,
-    .table_size = 4,
+    .table_size = ARRAY_SIZE(omap_i2c_restore_context_tbl),
 };
 
 /* reconfigure table could be further divided into separate actions */
@@ -1731,23 +1731,23 @@ static struct universal_reg_entry omap_i2c_configure_state_tbl[] = {
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_WE_REG,
-        .ctx_index = OMAP_I2C_WE,
+        .ctx_index = OMAP_I2C_UNI_WE,
     },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_CON_REG,
-        .ctx_index = OMAP_I2C_CON,
+        .ctx_index = OMAP_I2C_UNI_CON,
     },
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_IE_REG,
-        .ctx_index = OMAP_I2C_IE,
+        .ctx_index = OMAP_I2C_UNI_IE,
     },
 };
 
 static struct universal_configure_state_tbl omap_i2c_configure_state = {
     .table = omap_i2c_configure_state_tbl,
-    .table_size = 3,
+    .table_size = ARRAY_SIZE(omap_i2c_configure_state_tbl),
 };
 
 static struct universal_pin_control omap_i2c_pinctrl = {

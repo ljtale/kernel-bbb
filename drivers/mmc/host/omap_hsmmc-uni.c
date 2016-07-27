@@ -2902,6 +2902,101 @@ static int omap_hsmmc_resume(struct device *dev)
 }
 #endif
 
+/* ljtale starts */
+#define OMAP_HSMMC_UNI_SYSSTATUS_REG	0x0014
+#define OMAP_HSMMC_UNI_CON_REG		0x002C
+#define OMAP_HSMMC_UNI_DLL_REG		0x0034
+#define OMAP_HSMMC_UNI_SDMASA_REG	0x0100
+#define OMAP_HSMMC_UNI_BLK_REG		0x0104
+#define OMAP_HSMMC_UNI_ARG_REG		0x0108
+#define OMAP_HSMMC_UNI_CMD_REG		0x010C
+#define OMAP_HSMMC_UNI_RSP10_REG	0x0110
+#define OMAP_HSMMC_UNI_RSP32_REG	0x0114
+#define OMAP_HSMMC_UNI_RSP54_REG	0x0118
+#define OMAP_HSMMC_UNI_RSP76_REG	0x011C
+#define OMAP_HSMMC_UNI_DATA_REG		0x0120
+#define OMAP_HSMMC_UNI_PSTATE_REG	0x0124
+#define OMAP_HSMMC_UNI_HCTL_REG		0x0128
+#define OMAP_HSMMC_UNI_SYSCTL_REG	0x012C
+#define OMAP_HSMMC_UNI_STAT_REG		0x0130
+#define OMAP_HSMMC_UNI_IE_REG		0x0134
+#define OMAP_HSMMC_UNI_ISE_REG		0x0138
+#define OMAP_HSMMC_UNI_AC12_REG		0x013C
+#define OMAP_HSMMC_UNI_CAPA_REG		0x0140
+#define OMAP_HSMMC_UNI_CAPA2_REG	0x0144
+
+enum {
+    OMAP_HSMMC_UNI_ZERO = 0,
+    OMAP_HSMMC_UNI_CON,
+    OMAP_HSMMC_UNI_HCTL,
+    OMAP_HSMMC_UNI_SYSCTL,
+    OMAP_HSMMC_UNI_CAPA,
+};
+
+static u32 omap_hsmmc_reg_context[] = {
+    [OMAP_HSMMC_UNI_ZERO] = 0,
+    [OMAP_HSMMC_UNI_CON] = 0,
+    [OMAP_HSMMC_UNI_HCTL] = 0,
+    [OMAP_HSMMC_UNI_SYSCTL] = 0,
+    [OMAP_HSMMC_UNI_CAPA] = 0,
+};
+
+static struct universal_reg_entry omap_hsmmc_disable_irq_tbl[] = {
+    {},
+    /* TODO: */
+};
+
+static struct universal_reg_entry omap_hsmmc_pending_irq_reconfigure[] = {
+    {},
+    /* TODO: */
+};
+static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
+    .disable_table = {
+        .table = omap_hsmmc_disable_irq_tbl,
+        .table_size = ARRAY_SIZE(omap_hsmmc_disable_irq_tbl),
+    },
+    .check_pending = true,
+    .pending = {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_PSTATE_REG,
+        .compare_value = DLEV_DAT(1),
+        .pending = false, /* by default there is no pending */
+    },
+    .reconfigure_table = {
+        .table = omap_hsmmc_pending_irq_reconfigure,
+        .table_size = ARRAY_SIZE(omap_hsmmc_pending_irq_reconfigure),
+    },
+};
+
+static struct universal_reg_entry omap_hsmmc_save_context_tbl[] = {
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_CON_REG,
+        .ctx_index = OMAP_HSMMC_UNI_CON,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
+        .ctx_index = OMAP_HSMMC_UNI_HCTL,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_SYSCTL_REG,
+        .ctx_index = OMAP_HSMMC_UNI_SYSCTL,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_CAPA_REG,
+        .ctx_index = OMAP_HSMMC_UNI_CAPA,
+    },
+};
+
+static struct universal_save_context_tbl omap_hsmmc_save_context = {
+    .table = omap_hsmmc_save_context_tbl,
+    .table_size = ARRAY_SIZE(omap_hsmmc_save_context_tbl),
+};
+
+/* ljtale ends */
 static int omap_hsmmc_runtime_suspend(struct device *dev)
 {
 	struct omap_hsmmc_host *host;
@@ -3003,6 +3098,8 @@ static int omap_hsmmc_universal_local_probe(struct universal_device *uni_dev) {
     return omap_hsmmc_probe(pdev);
 }
 
+extern int omap_hsmmc_rpm_create_reg_context(struct universal_device *uni_dev);
+
 static struct register_accessor omap_hsmmc_regacc = {
     .bus_name = "platform",
     .reg_addr_bits = 32,
@@ -3041,6 +3138,13 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .irq_config_num = NULL,
     .dma_config_num = &omap_hsmmc_dma_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
+
+    .disable_irq = &omap_hsmmc_disable_irq_uni,
+    .ref_ctx = {
+        .array = omap_hsmmc_reg_context,
+        .size = ARRAY_SIZE(omap_hsmmc_reg_context),
+    },
+    .rpm_create_reg_context = omap_hsmmc_rpm_create_reg_context,
 };
 
 static int __init universal_omap_hsmmc_init(void) {

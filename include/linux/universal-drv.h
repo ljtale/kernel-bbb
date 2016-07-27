@@ -242,6 +242,9 @@ struct universal_driver {
     void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
     /* rpm generic logic data structures */
     struct universal_disable_irq *disable_irq;
+    struct universal_save_context_tbl *save_context;
+    struct universal_restore_context_tbl *restore_context;
+    struct universal_configure_state_tbl *configure_state;
     struct universal_pin_control *pin_control;
     struct universal_rpm_ctx ref_ctx;
     int (*rpm_create_reg_context)(struct universal_device *uni_dev);
@@ -383,6 +386,10 @@ struct universal_probe_dev {
 struct universal_rpm {
     spinlock_t rpm_graph_lock;
     struct universal_disable_irq *disable_irq;
+    struct universal_save_context_tbl *save_context;
+    struct universal_restore_context_tbl *restore_context;
+    struct universal_configure_state_tbl *configure_state;
+    struct universal_pin_control *pin_control;
     struct universal_rpm_ctx ref_ctx;
 };
 

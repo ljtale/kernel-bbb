@@ -355,4 +355,9 @@ struct universal_pin_control {
     enum rpm_device_call suspend_state;
     enum rpm_device_call resume_state;
 };
+
+struct universal_rpm_device_call {
+    /* TODO: */
+};
+
 #endif /* _LINUX_UNIVERSAL_RPM_H */
