@@ -183,6 +183,37 @@ int universal_runtime_resume(struct device *dev) {
 
 /*============== generic logic =====================*/
 
+static int process_reg_table(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl, int table_size) {
+    struct universal_reg_entry *tbl_entry;
+    struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_context;
+    int ret = 0;
+    int i;
+    for (i = 0; i < table_size; i++) {
+        tbl_entry = &tbl[i];
+        if (tbl_entry->reg_op == RPM_REG_READ) {
+            if (tbl_entry->flushing)
+                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset, NULL);
+            else
+                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
+                        &(reg_ctx->array[tbl_entry->ctx_index]));
+
+        } else if (tbl_entry->reg_op == RPM_REG_WRITE) {
+            /* no flushing on the register writing */
+            ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                    reg_ctx->array[tbl_entry->ctx_index]);
+        } else {
+            /* unsupported yet */
+            LJTALE_LEVEL_DEBUG(3, "unsupported op for %s\n", uni_dev->name);
+        }
+        if (ret) {
+            LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
+            break;
+        }
+    }
+    return ret;
+}
+
 /* Disable IRQ for runtime suspend, the logic is:
  * Disable IRQ =>
  * Check if there are pending IRQ handling =>
@@ -192,6 +223,73 @@ int universal_disable_irq(struct universal_device *uni_dev) {
     struct universal_disable_irq *disable_irq = 
         uni_dev->drv->disable_irq;
     /* assume when calling this function, the reg context has been created */
-    struct universal_reg_ctx *reg_ctx = &uni_dev->reg_context;
+    struct universal_disable_irq_tbl *tbl = &disable_irq->disable_table;
+    int ret;
+    if (!tbl->table) {
+        LJTALE_LEVEL_DEBUG(3, "device %s does not support disabling IRQ\n",
+                uni_dev->name);
+        return 0;
+    }
+    /* pass through the register table to disable the IRQs */
+    ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
+    if (ret)
+        return ret;
+    /* if check_pending flag is set, check pending IRQ according to
+     * either reading a device register or a runtime monitor (TODO) */
+    if (disable_irq->check_pending) {
+        /* check pending IRQ */
+        u32 reg_value;
+        if (disable_irq->pending.reg_op == RPM_REG_READ)
+            universal_reg_read(uni_dev, disable_irq->pending.reg_offset,
+                    &reg_value);
+        else
+            LJTALE_LEVEL_DEBUG(2, "pending check not read %s\n", uni_dev->name);
+
+        if (reg_value ^ disable_irq->pending.compare_value)
+            disable_irq->pending.pending = false;
+        else
+            disable_irq->pending.pending = true;
+        
+        /* after checking, the pending flag should be set */
+        if (disable_irq->pending.pending) {
+            /* reconfigure the IRQ according to the reconfigure table */
+            tbl = &disable_irq->reconfigure_table;
+            ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
+            if (ret)
+                return ret;
+        } else {
+            /* we are good, no pending IRQ handling*/
+        }
+    }
     return 0;
+}
+
+int universal_enable_irq(struct universal_device *uni_dev) {
+    return 0;
+};
+
+
+int universal_pin_contrl(struct universal_device *uni_dev,
+        enum rpm_action action) {
+    struct universal_pin_control *pin_control = uni_dev->drv->pin_control;
+    enum rpm_device_call pin_state;
+    if (action == SUSPEND)
+        pin_state = pin_control->suspend_state;
+    else if (action == RESUME)
+        pin_state = pin_control->resume_state;
+    switch (pin_state) {
+        case RPM_PINCTRL_DEFAULT:
+            pinctrl_pm_select_default_state(uni_dev->dev);
+            break;
+        case RPM_PINCTRL_SLEEP:
+            pinctrl_pm_select_sleep_state(uni_dev->dev);
+            break;
+        case RPM_PINCTRL_IDLE:
+            pinctrl_pm_select_idle_state(uni_dev->dev);
+            break;
+        default:
+            return -EINVAL;
+    }
+    return 0;
+    /* we don't care about pin select return value */
 }

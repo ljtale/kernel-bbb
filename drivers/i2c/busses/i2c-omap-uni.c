@@ -1628,7 +1628,7 @@ static u32 omap_i2c_reg_context[] = {
     [OMAP_I2C_SCLH] = 0,
     [OMAP_I2C_IRQENABLE_CLR] = 0x6fff,
 };
-static struct universal_disable_irq_entry omap_i2c_disable_irq_tbl[] = {
+static struct universal_reg_entry omap_i2c_disable_irq_tbl[] = {
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_IE_REG,
@@ -1647,16 +1647,21 @@ static struct universal_disable_irq_entry omap_i2c_disable_irq_tbl[] = {
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_STAT_REG,
+        .ctx_index = INVALID_INDEX,
         .flushing = true,
     },
 };
 
 static struct universal_disable_irq omap_i2c_disable_irq = {
-    .table = {
-        .disable_tbl = omap_i2c_disable_irq_tbl,
+    .disable_table = {
+        .table = omap_i2c_disable_irq_tbl,
         .table_size = 4,
     },
     .check_pending = false,
+};
+static struct universal_pin_control omap_i2c_pinctrl = {
+    .suspend_state = RPM_PINCTRL_SLEEP,
+    .resume_state = RPM_PINCTRL_DEFAULT,
 };
 /* ljtale ends */
 static int omap_i2c_runtime_suspend(struct device *dev)
@@ -1799,6 +1804,7 @@ static struct universal_driver omap_i2c_universal_driver = {
 //    .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
 //    .rpm_graph_build = omap_i2c_rpm_graph_build,
     .disable_irq = &omap_i2c_disable_irq,
+    .pin_control = &omap_i2c_pinctrl,
     .ref_ctx = {
         .array = omap_i2c_reg_context,
         .size = ARRAY_SIZE(omap_i2c_reg_context),

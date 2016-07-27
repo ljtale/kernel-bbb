@@ -61,6 +61,7 @@ enum rpm_op {
     RPM_ASSIGNMENT,
     /* TODO: more rpm ops */
 };
+
 #if 0
 enum rpm_pinctrl_state {
     RPM_PINCTRL_DEFAULT,
@@ -68,6 +69,7 @@ enum rpm_pinctrl_state {
     RPM_PINCTRL_IDLE,
 };
 #endif
+
 enum rpm_device_call {
     RPM_MARK_LAST_BUSY,
     RPM_PINCTRL_DEFAULT,
@@ -86,12 +88,6 @@ struct rpm_reg_node {
     unsigned int reg_addr;
     u32 *reg_value;
 };
-
-#if 0
-struct rpm_pinctrl_node {
-    enum rpm_pinctrl_state pinctrl_state;
-};
-#endif
 
 struct rpm_spinlock_node {
     spinlock_t *lock;
@@ -285,6 +281,18 @@ struct rpm_condition_node {
 
 /* ====== data structure for generic logic ====== */
 
+int universal_disable_irq(struct universal_device *uni_dev);
+int universal_enable_irq(struct universal_device *uni_dev);
+int universal_pin_control(struct universal_device *uni_dev);
+
+#define INVALID_INDEX -1
+
+enum rpm_action {
+    SUSPEND,
+    RESUME,
+    IDLE,
+    AUTOSUSPEND,
+};
 /* a reference array for register context, individual device needs
  * to create a per-device context based on this reference */
 struct universal_rpm_ctx {
@@ -292,19 +300,16 @@ struct universal_rpm_ctx {
     int size;
 };
 
-
-struct universal_disable_irq_entry {
+struct universal_reg_entry {
     enum rpm_op reg_op;
     u32 reg_offset;
-    union {
-        int ctx_index;
-        // some register reading is only for flushing the previous write, so
-        // the reading does not affect the register context
-        bool flushing;
-    };
+    int ctx_index;
+    // some register reading is only for flushing the previous write, so
+    // the reading does not affect the register context
+    bool flushing;
 };
 struct universal_disable_irq_tbl {
-    struct universal_disable_irq_entry *disable_tbl;
+    struct universal_reg_entry *table;
     /* table size must be hard coded */
     int table_size;
 };
@@ -323,11 +328,15 @@ struct universal_check_pending_irq {
 };
 
 struct universal_disable_irq {
-    struct universal_disable_irq_tbl table;
+    struct universal_disable_irq_tbl disable_table;
     bool check_pending;
     struct universal_check_pending_irq pending;
     /* only when pending.pending is true should we run reconf table */
-    struct universal_disable_irq_entry *reconf_tbl;
+    struct universal_disable_irq_tbl reconfigure_table;
 };
 
+struct universal_pin_control {
+    enum rpm_device_call suspend_state;
+    enum rpm_device_call resume_state;
+};
 #endif /* _LINUX_UNIVERSAL_RPM_H */
