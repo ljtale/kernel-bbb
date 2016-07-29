@@ -385,6 +385,8 @@ struct universal_probe_dev {
 
 struct universal_rpm {
     spinlock_t rpm_graph_lock;
+    /* exclusive access corresponds to a per-device lock*/
+    bool exclusive_access;      
     struct universal_disable_irq *disable_irq;
     struct universal_save_context_tbl *save_context;
     struct universal_restore_context_tbl *restore_context;
@@ -406,6 +408,7 @@ struct universal_rpm_dev {
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
     struct universal_rpm_ctx rpm_context;
+    spinlock_t rpm_lock;
 };
 
 
