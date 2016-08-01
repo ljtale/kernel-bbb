@@ -344,9 +344,9 @@ struct universal_check_pending_irq {
 };
 
 struct universal_disable_irq {
-    struct universal_disable_irq_tbl disable_table;
     bool check_pending;
     struct universal_check_pending_irq pending;
+    struct universal_disable_irq_tbl disable_table;
     /* only when pending.pending is true should we run reconf table */
     struct universal_disable_irq_tbl reconfigure_table;
 };
@@ -358,6 +358,15 @@ struct universal_pin_control {
 
 struct universal_rpm_device_call {
     /* TODO: */
+};
+
+struct universal_disable_dma {
+};
+
+struct universal_enable_dma {
+};
+
+struct universal_setup_wakeup {
 };
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */

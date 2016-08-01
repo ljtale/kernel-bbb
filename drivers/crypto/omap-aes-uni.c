@@ -475,6 +475,7 @@ static int omap_aes_handle_queue(struct omap_aes_dev *dd,
 	unsigned long flags;
 	int err, ret = 0, len;
 
+    LJTALE_LEVEL_DEBUG(3, "AES handle queue\n");
 	spin_lock_irqsave(&dd->lock, flags);
 	if (req)
 		ret = ablkcipher_enqueue_request(&dd->queue, req);
@@ -1160,6 +1161,10 @@ static int omap_aes_probe(struct platform_device *pdev)
 	if (err == -EPROBE_DEFER) {
 		goto err_irq;
 	} else if (err && AES_REG_IRQ_STATUS(dd) && AES_REG_IRQ_ENABLE(dd)) {
+        /* ljtale: in case where DMA channels are not successfully requested,
+         * the device switch to PIO-only mode where an IRQ is supposed to
+         * be provided via DT or platform data. But here on BBB this code
+         * path is not valid */
 		dd->pio_only = 1;
 
 		irq = platform_get_irq(pdev, 0);
@@ -1261,7 +1266,29 @@ static int omap_aes_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(omap_aes_pm_ops, omap_aes_suspend, omap_aes_resume);
+#ifdef CONFIG_PM
+static int omap_aes_runtime_suspend(struct device *dev)
+{
+    LJTALE_LEVEL_DEBUG(3, "omap aes runtime suspend: %s\n", dev_name(dev));
+    return 0;
+}
+
+static int omap_aes_runtime_resume(struct device *dev)
+{
+
+    LJTALE_LEVEL_DEBUG(3, "omap aes runtime resume: %s\n", dev_name(dev));
+    return 0;
+}
+
+#endif
+
+// static SIMPLE_DEV_PM_OPS(omap_aes_pm_ops, omap_aes_suspend, omap_aes_resume);
+static struct dev_pm_ops omap_aes_pm_ops = {
+    SET_SYSTEM_SLEEP_PM_OPS(omap_aes_suspend, omap_aes_resume)
+    .runtime_suspend = omap_aes_runtime_suspend,
+    .runtime_resume = omap_aes_runtime_resume,
+    
+};
 
 static struct platform_driver omap_aes_driver = {
 	.probe	= omap_aes_probe,

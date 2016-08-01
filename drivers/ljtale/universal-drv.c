@@ -40,6 +40,8 @@ struct regmap_bus spi_eeprom_regmap_bus;
 int __universal_drv_register(struct universal_driver *drv) {
     struct universal_device *dev;
     struct list_head *p;
+    struct universal_rpm *rpm = &drv->rpm;
+    struct universal_rpm_ops *rpm_ops = &drv->rpm_ops;
     int ret;
     if (!drv) {
         LJTALE_MSG(KERN_ERR, "universal driver pointer null\n");
@@ -67,9 +69,10 @@ int __universal_drv_register(struct universal_driver *drv) {
     }
     /* if there is no match for this universal driver, fine, just exit */
     /* power management setup */
-    spin_lock_init(&drv->rpm_graph_lock);
-    if (drv->rpm_graph_build)
-        drv->rpm_graph_build();
+    
+    spin_lock_init(&rpm->rpm_graph_lock);
+    if (rpm_ops->rpm_graph_build)
+        rpm_ops->rpm_graph_build();
 
     return 0;
 }
@@ -200,6 +203,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
+    struct universal_rpm_ops *rpm_ops;
     int i;
     
     if (!dev || !dev->drv) {
@@ -245,8 +249,9 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
 
     /* TODO: runtime pm configuration and clock configuration */
-    if (drv->rpm_create_reg_context) {
-        ret = drv->rpm_create_reg_context(dev);
+    rpm_ops = &drv->rpm_ops;
+    if (rpm_ops->rpm_create_reg_context) {
+        ret = rpm_ops->rpm_create_reg_context(dev);
         if (ret < 0)
             goto rpm_error;
     }

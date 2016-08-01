@@ -1666,6 +1666,7 @@ static void omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host)
 
 	if (!req->data)
 		return;
+    LJTALE_LEVEL_DEBUG(6, "hsmmc DMA transfer\n");
 	OMAP_HSMMC_WRITE(host->base, BLK, (req->data->blksz)
 				| (req->data->blocks << 16));
 	set_data_timeout(host, req->data->timeout_ns,
@@ -3138,13 +3139,16 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .irq_config_num = NULL,
     .dma_config_num = &omap_hsmmc_dma_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
-
-    .disable_irq = &omap_hsmmc_disable_irq_uni,
-    .ref_ctx = {
-        .array = omap_hsmmc_reg_context,
-        .size = ARRAY_SIZE(omap_hsmmc_reg_context),
+    .rpm = {
+        .disable_irq = &omap_hsmmc_disable_irq_uni,
+        .ref_ctx = {
+            .array = omap_hsmmc_reg_context,
+            .size = ARRAY_SIZE(omap_hsmmc_reg_context),
+        },
     },
-    .rpm_create_reg_context = omap_hsmmc_rpm_create_reg_context,
+    .rpm_ops = {
+        .rpm_create_reg_context = omap_hsmmc_rpm_create_reg_context,
+    },
 };
 
 static int __init universal_omap_hsmmc_init(void) {

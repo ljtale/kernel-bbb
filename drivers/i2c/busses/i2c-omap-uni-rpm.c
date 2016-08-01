@@ -123,8 +123,9 @@ EXPORT_SYMBOL(omap_i2c_rpm_populate_resume_graph);
 
 /* ============ rpm generic logic part ===========*/
 int omap_i2c_rpm_create_reg_context(struct universal_device *uni_dev) {
-    u32 *array = uni_dev->drv->ref_ctx.array;
-    int size = uni_dev->drv->ref_ctx.size;
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    u32 *array = rpm->ref_ctx.array;
+    int size = rpm->ref_ctx.size;
     if (!array)
         return 0;
     int i;

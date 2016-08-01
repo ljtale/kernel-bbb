@@ -222,8 +222,8 @@ static int process_reg_table(struct universal_device *uni_dev,
  *      If there is IRQ handling => reconfigure IRQ and abort 
  *      If there is no IRQ handling => succeed*/
 int universal_disable_irq(struct universal_device *uni_dev) {
-    struct universal_disable_irq *disable_irq = 
-        uni_dev->drv->disable_irq;
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_disable_irq *disable_irq = rpm->disable_irq; 
     /* assume when calling this function, the reg context has been created */
     struct universal_disable_irq_tbl *tbl = &disable_irq->disable_table;
     int ret;
@@ -273,7 +273,8 @@ int universal_enable_irq(struct universal_device *uni_dev) {
 
 int universal_pin_contrl(struct universal_device *uni_dev,
         enum rpm_action action) {
-    struct universal_pin_control *pin_control = uni_dev->drv->pin_control;
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_pin_control *pin_control = rpm->pin_control;
     enum rpm_device_call pin_state = RPM_PINCTRL_DEFAULT;
     if (action == SUSPEND)
         pin_state = pin_control->suspend_state;

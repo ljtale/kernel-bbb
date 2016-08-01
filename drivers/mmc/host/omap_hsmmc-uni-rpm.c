@@ -155,12 +155,15 @@ void omap_hsmmc_rpm_populate_suspend_graph(struct universal_device *uni_dev) {
 
 /* =============== rpm generic logic part ===== */
 int omap_hsmmc_rpm_create_reg_context (struct universal_device *uni_dev) {
-    u32 *array = uni_dev->drv->ref_ctx.array;
-    int size = uni_dev->drv->ref_ctx.size;
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    u32 *array = rpm->ref_ctx.array;
+    int size = rpm->ref_ctx.size;
+    int i;
+    u32 *dev_array;
+
     if (!array)
         return 0;
-    int i;
-    u32 *dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
+    dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
     if (!dev_array)
         return -ENOMEM;
     for (i = 0; i < size; i++)

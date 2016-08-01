@@ -212,11 +212,6 @@ static void omap_aes_dma_out_callback(void *data)
 
 static int omap_aes_dma_init(struct omap_aes_dev *dd)
 {
-    /* we make sure if the universal driver returns an invalid DMA channel,
-     * code will not reach here */
-    /* FIXME: do not use DMA channel in the conventional driver later on */
-    return 0;
-#if 0
 	int err;
 	dma_cap_mask_t mask;
 
@@ -249,7 +244,6 @@ err_dma_out:
 	dma_release_channel(dd->dma_lch_in);
 
 	return err;
-#endif 
 }
 
 static void omap_aes_dma_cleanup(struct omap_aes_dev *dd)
@@ -1150,6 +1144,7 @@ static int omap_aes_probe(struct platform_device *pdev)
 	if (err == -EPROBE_DEFER) {
 		goto err_irq;
 	} else if (err && AES_REG_IRQ_STATUS(dd) && AES_REG_IRQ_ENABLE(dd)) {
+        LJTALE_LEVEL_DEBUG(3, "AES irq enabled\n");
 		dd->pio_only = 1;
 
 		irq = platform_get_irq(pdev, 0);

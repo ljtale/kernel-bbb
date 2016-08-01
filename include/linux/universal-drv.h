@@ -205,10 +205,59 @@ struct drv_kernel_interface {
 #define UNIDRV_TYPE(activity) \
     struct universal_##activity_type
 
+/*================ wrap data structures ============= */
+struct universal_probe {
+    struct register_accessor *regacc;
+    struct irq_config_num *irq_config_num;
+    struct dma_config_num *dma_config_num;
+};
+
+struct universal_probe_ops {
+    int (*local_probe)(struct universal_device *uni_dev);
+};
+
+struct universal_probe_dev {
+    struct mutex lock;
+    struct {
+        spinlock_t spinlock;
+        unsigned long spinlock_flags;
+    };
+    struct regacc_dev regacc_dev;
+    struct dma_config_dev_num  dma_config_dev_num;
+};
+
+struct universal_rpm {
+    spinlock_t rpm_graph_lock;
+    /* exclusive access corresponds to a per-device lock*/
+    bool exclusive_access;      
+    struct universal_disable_irq *disable_irq;
+    struct universal_save_context_tbl *save_context;
+    struct universal_restore_context_tbl *restore_context;
+    struct universal_configure_state_tbl *configure_state;
+    struct universal_pin_control *pin_control;
+    struct universal_rpm_ctx ref_ctx;
+};
+
+struct universal_rpm_ops {
+    void (*rpm_graph_build)(void);
+    void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
+    void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
+
+    int (*rpm_create_reg_context)(struct universal_device *uni_dev);
+};
+
+struct universal_rpm_dev {
+    void *rpm_data_dev;
+    struct rpm_node *rpm_suspend_graph;
+    struct rpm_node *rpm_resume_graph;
+    struct universal_rpm_ctx rpm_context;
+    spinlock_t rpm_lock;
+};
+
+
 /*
  * universal driver struct 
  */
-
 struct universal_driver {
     const char *name;
     /* the driver reference helps to use existing driver mechanisms such
@@ -235,19 +284,8 @@ struct universal_driver {
     int (*local_probe)(struct universal_device *dev);
 
     /* power management operations */
-    /* TODO: wrap them into a separate data structure */
-    spinlock_t rpm_graph_lock;
-    void (*rpm_graph_build)(void);
-    void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
-    void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
-    /* rpm generic logic data structures */
-    struct universal_disable_irq *disable_irq;
-    struct universal_save_context_tbl *save_context;
-    struct universal_restore_context_tbl *restore_context;
-    struct universal_configure_state_tbl *configure_state;
-    struct universal_pin_control *pin_control;
-    struct universal_rpm_ctx ref_ctx;
-    int (*rpm_create_reg_context)(struct universal_device *uni_dev);
+    struct universal_rpm rpm;
+    struct universal_rpm_ops rpm_ops;
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;
@@ -291,6 +329,7 @@ struct universal_device {
 
     struct dma_config_dev_num dma_config_dev_num;
 
+    struct universal_rpm_dev rpm_dev;
     void *rpm_data_dev;
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
@@ -361,55 +400,6 @@ extern int __universal_get_irq(struct universal_device *uni_dev,
 /* TODO: debugfs support for universal driver debugging */
 char *universal_req_type_str (enum universal_req_type type);
 
-/*================ wrap data structures ============= */
-
-struct universal_probe {
-    struct register_accessor *regacc;
-    struct irq_config_num *irq_config_num;
-    struct dma_config_num *dma_config_num;
-};
-
-struct universal_probe_ops {
-    int (*local_probe)(struct universal_device *uni_dev);
-};
-
-struct universal_probe_dev {
-    struct mutex lock;
-    struct {
-        spinlock_t spinlock;
-        unsigned long spinlock_flags;
-    };
-    struct regacc_dev regacc_dev;
-    struct dma_config_dev_num  dma_config_dev_num;
-};
-
-struct universal_rpm {
-    spinlock_t rpm_graph_lock;
-    /* exclusive access corresponds to a per-device lock*/
-    bool exclusive_access;      
-    struct universal_disable_irq *disable_irq;
-    struct universal_save_context_tbl *save_context;
-    struct universal_restore_context_tbl *restore_context;
-    struct universal_configure_state_tbl *configure_state;
-    struct universal_pin_control *pin_control;
-    struct universal_rpm_ctx ref_ctx;
-};
-
-struct universal_rpm_ops {
-    void (*rpm_graph_build)(void);
-    void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
-    void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
-
-    int (*rpm_create_reg_context)(struct universal_device *uni_dev);
-};
-
-struct universal_rpm_dev {
-    void *rpm_data_dev;
-    struct rpm_node *rpm_suspend_graph;
-    struct rpm_node *rpm_resume_graph;
-    struct universal_rpm_ctx rpm_context;
-    spinlock_t rpm_lock;
-};
 
 
 #endif /* _LINUX_UNIVERSAL_DRV_H */

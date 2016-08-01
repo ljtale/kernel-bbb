@@ -1895,13 +1895,17 @@ static struct universal_driver omap_i2c_universal_driver = {
 //    .rpm_populate_suspend_graph = omap_i2c_rpm_populate_suspend_graph,
 //    .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
 //    .rpm_graph_build = omap_i2c_rpm_graph_build,
-    .disable_irq = &omap_i2c_disable_irq,
-    .pin_control = &omap_i2c_pinctrl,
-    .ref_ctx = {
-        .array = omap_i2c_reg_context,
-        .size = ARRAY_SIZE(omap_i2c_reg_context),
+    .rpm = {
+        .disable_irq = &omap_i2c_disable_irq,
+        .pin_control = &omap_i2c_pinctrl,
+        .ref_ctx = {
+            .array = omap_i2c_reg_context,
+            .size = ARRAY_SIZE(omap_i2c_reg_context),
+        },
     },
-    .rpm_create_reg_context = omap_i2c_rpm_create_reg_context,
+    .rpm_ops = {
+        .rpm_create_reg_context = omap_i2c_rpm_create_reg_context,
+    }
 };
 
 static int __init universal_omap_i2c_init(void)
