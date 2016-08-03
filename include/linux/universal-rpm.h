@@ -280,19 +280,20 @@ struct rpm_condition_node {
 
 
 /* ====== data structure for generic logic ====== */
-
-int universal_disable_irq(struct universal_device *uni_dev);
-int universal_enable_irq(struct universal_device *uni_dev);
-int universal_pin_control(struct universal_device *uni_dev);
-
-#define INVALID_INDEX -1
-
 enum rpm_action {
     SUSPEND,
     RESUME,
     IDLE,
     AUTOSUSPEND,
 };
+
+int universal_disable_irq(struct universal_device *uni_dev);
+int universal_enable_irq(struct universal_device *uni_dev);
+int universal_pin_control(struct universal_device *uni_dev, 
+        enum rpm_action action);
+
+#define INVALID_INDEX -1
+
 /* a reference array for register context, individual device needs
  * to create a per-device context based on this reference */
 struct universal_rpm_ctx {
@@ -319,14 +320,13 @@ struct universal_restore_context_tbl {
     int table_size;
 };
 
-struct universal_configure_state_tbl {
+struct universal_enable_irq_tbl {
     struct universal_reg_entry *table;
     int table_size;
 };
 
 struct universal_disable_irq_tbl {
     struct universal_reg_entry *table;
-    /* table size must be hard coded */
     int table_size;
 };
 
@@ -350,6 +350,7 @@ struct universal_disable_irq {
 };
 
 struct universal_enable_irq {
+    struct universal_enable_irq_tbl enable_table;
 };
 
 struct universal_pin_control {

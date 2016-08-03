@@ -200,6 +200,8 @@ static int universal_dma_config(struct universal_device *uni_dev,
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
     struct universal_driver *drv;
+    struct universal_probe_dev *probe_dev;
+    struct universal_rpm_dev *rpm_dev;
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
@@ -213,6 +215,8 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
     LJTALE_MSG(KERN_INFO, "universal driver probe: %s\n", dev->name);
     drv = dev->drv;
+    probe_dev = &dev->probe_dev;
+    rpm_dev = &dev->rpm_dev;
     /* do a set of initialization */
     mutex_init(&dev->probe_dev.lock);
     spin_lock_init(&dev->probe_dev.spinlock);
@@ -232,7 +236,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     dma_config_num = drv->dma_config_num;
     if (dma_config_num) {
         struct dma_config_dev_num *dma_config_dev_num = 
-            &dev->probe_dev.dma_config_dev_num;
+            &probe_dev->dma_config_dev_num;
         dma_config_dev_num->dma_config_dev = devm_kzalloc(dev->dev,
                 sizeof(struct dma_config_dev) * dma_config_num->dma_num, 
                 GFP_KERNEL);
@@ -249,6 +253,28 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
 
     /* TODO: runtime pm configuration and clock configuration */
+    /* get properties from device tree to populate the device knowledge */
+    if (dev->dev->of_node) {
+        struct device_node *of_node = dev->dev->of_node;
+        if (of_property_read_bool(of_node, "support_irq"))
+            rpm_dev->support_irq = true;
+        else
+            rpm_dev->support_irq = false;
+        if (of_property_read_bool(of_node, "irq_need_lock")) {
+            rpm_dev->irq_need_lock = true;
+            spin_lock_init(&rpm_dev->irq_lock);
+            LJTALE_LEVEL_DEBUG(4 ,"IRQ need lock read bool true: %s\n",
+                    dev->name);
+        } else
+            rpm_dev->irq_need_lock = false;
+    } else {
+        /* FIXME: we assume there is a device tree node for the device
+         * in this prototype */
+        LJTALE_LEVEL_DEBUG(1, "device: %s does not have a device tree node\n",
+                dev->name);
+        return 0;
+    }
+    rpm_dev->first_resume_called = false;
     rpm_ops = &drv->rpm_ops;
     if (rpm_ops->rpm_create_reg_context) {
         ret = rpm_ops->rpm_create_reg_context(dev);
@@ -266,6 +292,13 @@ int __universal_drv_probe(struct universal_device *dev) {
 
     irq_config_num = drv->irq_config_num;
     if (irq_config_num) {
+        struct irq_config_dev_num *irq_config_dev_num = 
+            &probe_dev->irq_config_dev_num;
+        irq_config_dev_num->irq_value = devm_kzalloc(dev->dev,
+                sizeof(int) * irq_config_num->irq_num, GFP_KERNEL);
+        if (!irq_config_dev_num->irq_value)
+            return -ENOMEM;
+        irq_config_dev_num->irq_num = irq_config_num->irq_num;
         for (i = 0; i < irq_config_num->irq_num; i++) {
             /* It is the responsibility of the device knowledge provider to
              * make sure that the provided IRQ numbers are unique, otherwise
@@ -273,6 +306,8 @@ int __universal_drv_probe(struct universal_device *dev) {
             ret = universal_irq_config(dev, &irq_config_num->irq_config[i], i);
             if (ret != 0)
                 goto irq_config_err;
+            irq_config_dev_num->irq_value[i] =
+                irq_config_num->irq_config[i].irq;
         }
     }
 

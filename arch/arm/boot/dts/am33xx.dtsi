@@ -290,11 +290,7 @@
 			interrupts = <70>;
 			status = "disabled";
             reset_all = <0>;
-            psc = <0x4>;
-            scll = <0x9>;
-            sclh = <0x3>;
-            westate = <0x636f>;
-            mod_en = <0x8000>;
+            support_irq;
 		};
 
 		i2c1: i2c@4802a000 {
@@ -305,6 +301,7 @@
 			reg = <0x4802a000 0x1000>;
 			interrupts = <71>;
 			status = "disabled";
+            support_irq;
 		};
 
 		i2c2: i2c@4819c000 {
@@ -316,11 +313,7 @@
 			interrupts = <30>;
 			status = "disabled";
             reset_all = <0>;
-            psc = <0xb>;
-            scll = <0xd>;
-            sclh = <0xf>;
-            westate = <0x636f>;
-            mod_en = <0x8000>;
+            support_irq;
 		};
 
 		mmc1: mmc@48060000 {
@@ -336,6 +329,8 @@
 			interrupt-parent = <&intc>;
 			reg = <0x48060000 0x1000>;
 			status = "disabled";
+            support_irq;
+            irq_need_lock;
 		};
 
 		mmc2: mmc@481d8000 {
@@ -349,6 +344,8 @@
 			interrupt-parent = <&intc>;
 			reg = <0x481d8000 0x1000>;
 			status = "disabled";
+            support_irq;
+            irq_need_lock;
 		};
 
 		mmc3: mmc@47810000 {
@@ -359,6 +356,8 @@
 			interrupt-parent = <&intc>;
 			reg = <0x47810000 0x1000>;
 			status = "disabled";
+            support_irq;
+            irq_need_lock;
 		};
 
 		hwspinlock: spinlock@480ca000 {

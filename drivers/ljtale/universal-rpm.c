@@ -230,13 +230,14 @@ int universal_disable_irq(struct universal_device *uni_dev) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_disable_irq *disable_irq = rpm->disable_irq; 
     /* assume when calling this function, the reg context has been created */
-    struct universal_disable_irq_tbl *tbl = &disable_irq->disable_table;
-    int ret;
-    if (!tbl->table) {
+    struct universal_disable_irq_tbl *tbl;
+    int ret = 0;
+    if (!rpm->disable_irq) {
         LJTALE_LEVEL_DEBUG(3, "device %s does not support disabling IRQ\n",
                 uni_dev->name);
         return 0;
     }
+    tbl = &disable_irq->disable_table;
     /* if check_pending flag is set, check pending IRQ according to
      * either reading a device register or a runtime monitor (TODO) */
     if (disable_irq->check_pending) {
@@ -256,31 +257,51 @@ int universal_disable_irq(struct universal_device *uni_dev) {
         /* after checking, the pending flag should be set */
         if (disable_irq->pending.pending) 
             return -EBUSY;
-        else {
-            /* we are good, no pending IRQ handling*/
-            /* pass through the register table to disable the IRQs */
-            ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
-            if (ret)
-                return ret;
-        }
     }
-    return 0;
+     
+    /* we are good, no pending IRQ handling*/
+    /* pass through the register table to disable the IRQs */
+    ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
+    return ret;
 }
 
 int universal_enable_irq(struct universal_device *uni_dev) {
-    return 0;
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_enable_irq *enable_irq = rpm->enable_irq;
+    struct universal_enable_irq_tbl *tbl;
+    if (!rpm->enable_irq) {
+        LJTALE_LEVEL_DEBUG(3, "device %s does not support enabling IRQ\n",
+                uni_dev->name);
+        return 0;
+    }
+    tbl = &enable_irq->enable_table;
+    return process_reg_table(uni_dev, tbl->table, tbl->table_size);
 };
 
 
-int universal_pin_contrl(struct universal_device *uni_dev,
+int universal_pin_control(struct universal_device *uni_dev,
         enum rpm_action action) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_pin_control *pin_control = rpm->pin_control;
     enum rpm_device_call pin_state = RPM_PINCTRL_DEFAULT;
-    if (action == SUSPEND)
-        pin_state = pin_control->suspend_state;
-    else if (action == RESUME)
-        pin_state = pin_control->resume_state;
+    if (!pin_control)
+        return 0;
+    switch(action) {
+        case SUSPEND:
+            pin_state = pin_control->suspend_state;
+            break;
+        case RESUME:
+            pin_state = pin_control->resume_state;
+            break;
+        case IDLE:
+            pin_state = RPM_PINCTRL_IDLE;
+            break;
+        case AUTOSUSPEND:
+            pin_state = pin_control->suspend_state;
+            break;
+        default:
+            break;
+    }
     switch (pin_state) {
         case RPM_PINCTRL_DEFAULT:
             pinctrl_pm_select_default_state(uni_dev->dev);
@@ -297,3 +318,116 @@ int universal_pin_contrl(struct universal_device *uni_dev,
     return 0;
     /* we don't care about pin select return value */
 }
+
+int universal_save_context(struct universal_device *uni_dev) {
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_save_context_tbl *tbl = rpm->save_context;
+    return process_reg_table(uni_dev, tbl->table, tbl->table_size);
+}
+
+int universal_restore_context(struct universal_device *uni_dev) {
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_restore_context_tbl *tbl = rpm->restore_context;
+    return process_reg_table(uni_dev, tbl->table, tbl->table_size);
+}
+
+
+int universal_runtime_suspend(struct device *dev) {
+    struct universal_device *uni_dev;
+    struct universal_rpm_dev *rpm_dev;
+    unsigned long irq_lock_flags = 0;
+    int ret = 0;
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
+        return 0;
+    }
+    rpm_dev = &uni_dev->rpm_dev;
+    LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
+
+    /* save context */
+    ret = universal_save_context(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3, "universal save context failed: %d\n", ret);
+        return ret;
+    }
+
+    /* TODO: disable dma */
+    /* disable irq */
+    /* If the irq needs a lock to protect mutex access, then the lock should
+     * protect until the pinctrl state is selected */
+    if (rpm_dev->irq_need_lock)
+        spin_lock_irqsave(&rpm_dev->irq_lock, irq_lock_flags);
+
+    ret = universal_disable_irq(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3 ,"universal disable irq failed: %d\n", ret);
+        return ret;
+    }
+    /* select pinctrl state */
+    universal_pin_control(uni_dev, SUSPEND);
+
+    if (rpm_dev->irq_need_lock)
+        spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
+    /* TODO: setup wakeup events */
+
+
+    return 0;
+}
+
+int universal_runtime_resume(struct device *dev) {
+    struct universal_device *uni_dev;
+    struct universal_rpm_dev *rpm_dev;
+    struct universal_rpm_ops *rpm_ops;
+    unsigned long irq_lock_flags = 0;
+    int ret = 0;
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
+        return 0;
+    }
+    rpm_dev = &uni_dev->rpm_dev;
+    rpm_ops = &uni_dev->drv->rpm_ops;
+    LJTALE_LEVEL_DEBUG(3, "universal rpm resume...%s\n", uni_dev->name);
+    /* Make sure universal runtime resume is not the first resume for
+     * the device. Because the context for runtime suspend/resume does
+     * not depend on probe context, universal runtime suspend must
+     * be called before universal resume to build the context. */
+
+    /* TODO: if we want to put the first resume in the universal resume,
+     * driver developers should define the first context that is used
+     * to configure the device to an initial states */
+    if (!rpm_dev->first_resume_called) {
+        BUG_ON(!rpm_ops->first_runtime_resume);
+        LJTALE_LEVEL_DEBUG(3 ,"first rpm resume from conventional driver: %s\n",
+                uni_dev->name);
+        ret = rpm_ops->first_runtime_resume(dev);
+        rpm_dev->first_resume_called = true;
+        return ret;
+    }
+    /* not the first time, do generic procedures */
+    
+    /* restore the context */
+    ret = universal_restore_context(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3, "universal restore context failed: %d\n", ret);
+        return ret;
+    }
+    /* TODO: device-specific configuration logic */
+
+    if (rpm_dev->irq_need_lock)
+        spin_lock_irqsave(&rpm_dev->irq_lock, irq_lock_flags);
+    /* select pinctrl state */
+    universal_pin_control(uni_dev, RESUME);
+    /* enable irq */
+    universal_enable_irq(uni_dev);
+
+    if (rpm_dev->irq_need_lock)
+        spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
+
+
+    /* TODO: enable dma */
+
+    return 0;
+}
+

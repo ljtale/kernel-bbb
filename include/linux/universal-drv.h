@@ -189,6 +189,11 @@ struct dma_config_dev_num {
     int dma_num;
 };
 
+struct irq_config_dev_num {
+    int *irq_value;
+    int irq_num;
+};
+
 /*
  * communication interfaces between the driver and the kernel
  * NOTE: this part probably is the most driver-dependent, which means this
@@ -222,8 +227,10 @@ struct universal_probe_dev {
         spinlock_t spinlock;
         unsigned long spinlock_flags;
     };
+
     struct regacc_dev regacc_dev;
-    struct dma_config_dev_num  dma_config_dev_num;
+    struct dma_config_dev_num dma_config_dev_num;
+    struct irq_config_dev_num irq_config_dev_num;
 };
 
 struct universal_rpm {
@@ -235,11 +242,9 @@ struct universal_rpm {
     struct universal_disable_dma *disable_dma;
     struct universal_setup_wakeup *setup_wakeup;
 
-
     struct universal_restore_context_tbl *restore_context;
     struct universal_enable_irq *enable_irq;
     struct universal_enable_dma *enable_dma;
-    struct universal_configure_state_tbl *configure_state;
 
     struct universal_pin_control *pin_control;
     struct universal_rpm_ctx ref_ctx;
@@ -254,6 +259,7 @@ struct universal_rpm_ops {
 
     int (*local_runtime_suspend)(struct device *dev);
     int (*local_runtime_resume)(struct device *dev);
+    int (*first_runtime_resume)(struct device *dev);
 };
 
 struct universal_rpm_dev {
@@ -261,8 +267,11 @@ struct universal_rpm_dev {
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
 
+    bool first_resume_called:1;
     bool support_irq:1;
     bool irq_need_lock:1;
+    bool support_dma:1;
+    bool dma_channel_requested:1;
     spinlock_t irq_lock;
     struct universal_rpm_ctx rpm_context;
     spinlock_t rpm_lock;

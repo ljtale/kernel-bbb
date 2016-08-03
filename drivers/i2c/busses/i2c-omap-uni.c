@@ -1398,6 +1398,8 @@ omap_i2c_probe(struct platform_device *pdev)
         rpm_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
     } else 
         omap_i2c_rpm_reg_values = rpm_dev->rpm_data_dev;
+    /* FIXME: not all the device need to call first resume in probe */
+    rpm_dev->first_resume_called = true;
     /* ljtale ends */
 
 #if 0
@@ -1693,7 +1695,7 @@ static struct universal_reg_entry omap_i2c_save_context_tbl[] = {
     },
 };
 
-static struct universal_save_context_tbl omap_i2C_save_context = {
+static struct universal_save_context_tbl omap_i2c_save_context = {
     .table = omap_i2c_save_context_tbl,
     .table_size = ARRAY_SIZE(omap_i2c_save_context_tbl),
 };
@@ -1724,14 +1726,6 @@ static struct universal_reg_entry omap_i2c_restore_context_tbl[] = {
         .ctx_index = OMAP_I2C_UNI_SCLH,
 
     },
-};
-static struct universal_restore_context_tbl omap_i2c_restore_context = {
-    .table = omap_i2c_restore_context_tbl,
-    .table_size = ARRAY_SIZE(omap_i2c_restore_context_tbl),
-};
-
-/* reconfigure table could be further divided into separate actions */
-static struct universal_reg_entry omap_i2c_configure_state_tbl[] = {
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_WE_REG,
@@ -1742,6 +1736,14 @@ static struct universal_reg_entry omap_i2c_configure_state_tbl[] = {
         .reg_offset = OMAP_I2C_UNI_CON_REG,
         .ctx_index = OMAP_I2C_UNI_CON,
     },
+};
+static struct universal_restore_context_tbl omap_i2c_restore_context = {
+    .table = omap_i2c_restore_context_tbl,
+    .table_size = ARRAY_SIZE(omap_i2c_restore_context_tbl),
+};
+
+/* reconfigure table could be further divided into separate actions */
+static struct universal_reg_entry omap_i2c_enable_irq_tbl[] = {
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_IE_REG,
@@ -1749,9 +1751,11 @@ static struct universal_reg_entry omap_i2c_configure_state_tbl[] = {
     },
 };
 
-static struct universal_configure_state_tbl omap_i2c_configure_state = {
-    .table = omap_i2c_configure_state_tbl,
-    .table_size = ARRAY_SIZE(omap_i2c_configure_state_tbl),
+static struct universal_enable_irq omap_i2c_enable_irq = {
+    .enable_table = {
+        .table = omap_i2c_enable_irq_tbl,
+        .table_size = ARRAY_SIZE(omap_i2c_enable_irq_tbl),
+    },
 };
 
 static struct universal_pin_control omap_i2c_pinctrl = {
@@ -1810,22 +1814,16 @@ static int omap_i2c_runtime_resume(struct device *dev)
 
 	return 0;
 }
-#if 0
-static int omap_i2c_runtime_suspend(struct device *dev) {
-    return universal_runtime_suspend(dev);
-}
-static int omap_i2c_runtime_resume(struct device *dev) {
-    return universal_runtime_resume(dev);
-}
 static struct dev_pm_ops omap_i2c_pm_ops = {
     SET_RUNTIME_PM_OPS(universal_runtime_suspend,
             universal_runtime_resume, NULL)
 };
-#endif
+#if 0
 static struct dev_pm_ops omap_i2c_pm_ops = {
 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
 			   omap_i2c_runtime_resume, NULL)
 };
+#endif
 #define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
 #else
 #define OMAP_I2C_PM_OPS NULL
@@ -1896,12 +1894,16 @@ static struct universal_driver omap_i2c_universal_driver = {
     .regacc = &omap_i2c_regacc,
     .irq_config_num = &omap_i2c_irq_config_num,
     .local_probe = omap_i2c_universal_local_probe,
-//    .rpm_populate_suspend_graph = omap_i2c_rpm_populate_suspend_graph,
-//    .rpm_populate_resume_graph = omap_i2c_rpm_populate_resume_graph,
-//    .rpm_graph_build = omap_i2c_rpm_graph_build,
+
+#ifdef CONFIG_PM
     .rpm = {
+        .save_context = &omap_i2c_save_context,
         .disable_irq = &omap_i2c_disable_irq,
         .pin_control = &omap_i2c_pinctrl,
+
+        .restore_context = &omap_i2c_restore_context,
+        .enable_irq = &omap_i2c_enable_irq,
+
         .ref_ctx = {
             .array = omap_i2c_reg_context,
             .size = ARRAY_SIZE(omap_i2c_reg_context),
@@ -1909,7 +1911,9 @@ static struct universal_driver omap_i2c_universal_driver = {
     },
     .rpm_ops = {
         .rpm_create_reg_context = omap_i2c_rpm_create_reg_context,
+        .first_runtime_resume = omap_i2c_runtime_resume,
     }
+#endif
 };
 
 static int __init universal_omap_i2c_init(void)
