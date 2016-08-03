@@ -168,7 +168,7 @@ int omap_hsmmc_rpm_create_reg_context (struct universal_device *uni_dev) {
         return -ENOMEM;
     for (i = 0; i < size; i++)
         dev_array[i] = array[i];
-    uni_dev->rpm_context.array = dev_array;
-    uni_dev->rpm_context.size = size;
+    uni_dev->rpm_dev.rpm_context.array = dev_array;
+    uni_dev->rpm_dev.rpm_context.size = size;
     return 0;
 }

@@ -90,7 +90,7 @@ static int universal_regacc_config(struct universal_device *uni_dev,
     const struct regmap_bus *regmap_bus;
     struct device *dev = uni_dev->dev;
     struct platform_device *pdev;
-    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
+    struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     int ret;
     if (regacc->regmap_support) {
         LJTALE_LEVEL_DEBUG(2, "regmap config...%s\n", uni_dev->name);
@@ -159,7 +159,7 @@ static int universal_irq_config(struct universal_device *uni_dev,
 static int universal_dma_config(struct universal_device *uni_dev,
         struct dma_config *dma_config, int index) {
     struct dma_config_dev_num *dma_config_dev_num = 
-        &uni_dev->dma_config_dev_num;
+        &uni_dev->probe_dev.dma_config_dev_num;
     dma_cap_mask_t mask;
     unsigned fn_param;
     struct device_node *nd = uni_dev->dev->of_node;
@@ -214,8 +214,8 @@ int __universal_drv_probe(struct universal_device *dev) {
     LJTALE_MSG(KERN_INFO, "universal driver probe: %s\n", dev->name);
     drv = dev->drv;
     /* do a set of initialization */
-    mutex_init(&dev->lock);
-    spin_lock_init(&dev->spinlock);
+    mutex_init(&dev->probe_dev.lock);
+    spin_lock_init(&dev->probe_dev.spinlock);
 
     /* do a series of universal driver probe */
     /* for register accessors */
@@ -232,7 +232,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     dma_config_num = drv->dma_config_num;
     if (dma_config_num) {
         struct dma_config_dev_num *dma_config_dev_num = 
-            &dev->dma_config_dev_num;
+            &dev->probe_dev.dma_config_dev_num;
         dma_config_dev_num->dma_config_dev = devm_kzalloc(dev->dev,
                 sizeof(struct dma_config_dev) * dma_config_num->dma_num, 
                 GFP_KERNEL);

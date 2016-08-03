@@ -1373,6 +1373,8 @@ omap_i2c_probe(struct platform_device *pdev)
 
     /* ljtale starts */
     struct universal_device *uni_dev;
+    struct universal_probe_dev *probe_dev;
+    struct universal_rpm_dev *rpm_dev;
     struct regacc_dev  *regacc_dev;
     struct irq_config_num *irq_config_num;
     struct omap_i2c_rpm_reg_value *omap_i2c_rpm_reg_values;
@@ -1384,16 +1386,18 @@ omap_i2c_probe(struct platform_device *pdev)
                 pdev->name);
         return -EINVAL;
     }
-    regacc_dev = &uni_dev->regacc_dev;
+    probe_dev = &uni_dev->probe_dev;
+    rpm_dev = &uni_dev->rpm_dev;
+    regacc_dev = &probe_dev->regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
-    if (!uni_dev->rpm_data_dev) {
+    if (!rpm_dev->rpm_data_dev) {
         omap_i2c_rpm_reg_values = devm_kzalloc(uni_dev->dev, 
                 sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
         if (!omap_i2c_rpm_reg_values)
             return -ENOMEM;
-        uni_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
+        rpm_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
     } else 
-        omap_i2c_rpm_reg_values = uni_dev->rpm_data_dev;
+        omap_i2c_rpm_reg_values = rpm_dev->rpm_data_dev;
     /* ljtale ends */
 
 #if 0

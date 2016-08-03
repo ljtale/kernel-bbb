@@ -230,10 +230,17 @@ struct universal_rpm {
     spinlock_t rpm_graph_lock;
     /* exclusive access corresponds to a per-device lock*/
     bool exclusive_access;      
-    struct universal_disable_irq *disable_irq;
     struct universal_save_context_tbl *save_context;
+    struct universal_disable_irq *disable_irq;
+    struct universal_disable_dma *disable_dma;
+    struct universal_setup_wakeup *setup_wakeup;
+
+
     struct universal_restore_context_tbl *restore_context;
+    struct universal_enable_irq *enable_irq;
+    struct universal_enable_dma *enable_dma;
     struct universal_configure_state_tbl *configure_state;
+
     struct universal_pin_control *pin_control;
     struct universal_rpm_ctx ref_ctx;
 };
@@ -244,12 +251,19 @@ struct universal_rpm_ops {
     void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
 
     int (*rpm_create_reg_context)(struct universal_device *uni_dev);
+
+    int (*local_runtime_suspend)(struct device *dev);
+    int (*local_runtime_resume)(struct device *dev);
 };
 
 struct universal_rpm_dev {
     void *rpm_data_dev;
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
+
+    bool support_irq:1;
+    bool irq_need_lock:1;
+    spinlock_t irq_lock;
     struct universal_rpm_ctx rpm_context;
     spinlock_t rpm_lock;
 };
@@ -315,26 +329,8 @@ struct universal_device {
         };
     };
 #endif
-    /* FIXME: to save memory and make the lock mechanism generic, we could
-     * put the mutex lock and spin lock variables in the same location as
-     * above using union. */
-    struct mutex lock;
-    struct {
-        spinlock_t  spinlock;
-        unsigned long spinlock_flags;
-    };
-
-    /* per-device states in universal device model */
-    struct regacc_dev regacc_dev;
-
-    struct dma_config_dev_num dma_config_dev_num;
-
+    struct universal_probe_dev probe_dev;
     struct universal_rpm_dev rpm_dev;
-    void *rpm_data_dev;
-    struct rpm_node *rpm_suspend_graph;
-    struct rpm_node *rpm_resume_graph;
-
-    struct universal_rpm_ctx rpm_context;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;

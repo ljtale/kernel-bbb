@@ -2536,6 +2536,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 
     /* ljtale starts */
     struct universal_device *uni_dev;
+    struct universal_probe_dev *probe_dev;
     struct regacc_dev *regacc_dev;
     struct dma_config_dev *dma_config_dev;
     int dma_num;
@@ -2545,9 +2546,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
                 pdev->name);
         return -EINVAL;
     }
-    regacc_dev = &uni_dev->regacc_dev;
-    dma_config_dev = uni_dev->dma_config_dev_num.dma_config_dev;
-    dma_num = uni_dev->dma_config_dev_num.dma_num;
+    probe_dev = &uni_dev->probe_dev;
+    regacc_dev = &probe_dev->regacc_dev;
+    dma_config_dev = probe_dev->dma_config_dev_num.dma_config_dev;
+    dma_num = probe_dev->dma_config_dev_num.dma_num;
     /* ljtale ends */
 
 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
@@ -2782,6 +2784,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	ret = omap_hsmmc_configure_wake_irq(host);
 	if (!ret)
 		mmc->caps |= MMC_CAP_SDIO_IRQ;
+    else
+        LJTALE_LEVEL_DEBUG(3, "no SDIO IRQ cap, irq: %d, wakeup_irq: %d\n",
+                host->irq, host->wake_irq);
+    LJTALE_LEVEL_DEBUG(3, "MMC caps: 0x%x\n", mmc->caps);
 
 	omap_hsmmc_protect_card(host);
 
@@ -2947,15 +2953,7 @@ static struct universal_reg_entry omap_hsmmc_disable_irq_tbl[] = {
     /* TODO: */
 };
 
-static struct universal_reg_entry omap_hsmmc_pending_irq_reconfigure[] = {
-    {},
-    /* TODO: */
-};
 static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
-    .disable_table = {
-        .table = omap_hsmmc_disable_irq_tbl,
-        .table_size = ARRAY_SIZE(omap_hsmmc_disable_irq_tbl),
-    },
     .check_pending = true,
     .pending = {
         .reg_op = RPM_REG_READ,
@@ -2963,9 +2961,9 @@ static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
         .compare_value = DLEV_DAT(1),
         .pending = false, /* by default there is no pending */
     },
-    .reconfigure_table = {
-        .table = omap_hsmmc_pending_irq_reconfigure,
-        .table_size = ARRAY_SIZE(omap_hsmmc_pending_irq_reconfigure),
+    .disable_table = {
+        .table = omap_hsmmc_disable_irq_tbl,
+        .table_size = ARRAY_SIZE(omap_hsmmc_disable_irq_tbl),
     },
 };
 
@@ -3009,8 +3007,12 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
 	dev_dbg(dev, "disabled\n");
 
 	spin_lock_irqsave(&host->irq_lock, flags);
+#if 0
 	if ((host->mmc->caps & MMC_CAP_SDIO_IRQ) &&
 	    (host->flags & HSMMC_SDIO_IRQ_ENABLED)) {
+#endif
+    if(1) {
+        LJTALE_LEVEL_DEBUG(4, "HSMMC sdio irq disable\n");
 		/* disable sdio irq handling to prevent race */
 		OMAP_HSMMC_WRITE(host->base, ISE, 0);
 		OMAP_HSMMC_WRITE(host->base, IE, 0);

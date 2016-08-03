@@ -242,7 +242,7 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
     if (uni_dev)
         LJTALE_LEVEL_DEBUG(2,"no universal driver for device: %s\n",
                 dev_name(pdev->dev.parent));
-    regacc_dev = &uni_dev->regacc_dev;
+    regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* ljtale ends */
 	if (tps65217_chip_id(tps) != TPS65217) {
 		dev_err(&pdev->dev, "Invalid tps chip version\n");

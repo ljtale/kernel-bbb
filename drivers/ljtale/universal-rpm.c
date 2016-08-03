@@ -145,6 +145,7 @@ int universal_rpm_process_graph(struct universal_device *uni_dev,
 
 int universal_runtime_suspend(struct device *dev) {
     struct universal_device *uni_dev;
+    struct universal_rpm_dev *rpm_dev;
     unsigned long flags;
     int ret;
     /* first find universal device */
@@ -153,18 +154,20 @@ int universal_runtime_suspend(struct device *dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return 0;
     }
+    rpm_dev = &uni_dev->rpm_dev;
     LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
     spin_lock_irqsave(&uni_dev->drv->rpm_graph_lock, flags);
     if (uni_dev->drv->rpm_populate_suspend_graph)
         uni_dev->drv->rpm_populate_suspend_graph(uni_dev);
     /* Or the suspend graph is not populated or does not need to be */
-    ret = universal_rpm_process_graph(uni_dev, uni_dev->rpm_suspend_graph);
+    ret = universal_rpm_process_graph(uni_dev, rpm_dev->rpm_suspend_graph);
     spin_unlock_irqrestore(&uni_dev->drv->rpm_graph_lock, flags);
     return ret;
 }
 
 int universal_runtime_resume(struct device *dev) {
     struct universal_device *uni_dev;
+    struct universal_rpm_dev *rpm_dev;
     unsigned long flags;
     int ret;
     /* first find universal device */
@@ -173,11 +176,12 @@ int universal_runtime_resume(struct device *dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return 0;
     }
+    rpm_dev = &uni_dev->rpm_dev;
     LJTALE_LEVEL_DEBUG(3, "universal rpm resume...%s\n", uni_dev->name);
     spin_lock_irqsave(&uni_dev->drv->rpm_graph_lock, flags);
     if (uni_dev->drv->rpm_populate_resume_graph)
         uni_dev->drv->rpm_populate_resume_graph(uni_dev);
-    ret = universal_rpm_process_graph(uni_dev, uni_dev->rpm_resume_graph);
+    ret = universal_rpm_process_graph(uni_dev, rpm_dev->rpm_resume_graph);
     spin_unlock_irqrestore(&uni_dev->drv->rpm_graph_lock, flags);
     return ret;
 }
@@ -188,7 +192,8 @@ int universal_runtime_resume(struct device *dev) {
 static int process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size) {
     struct universal_reg_entry *tbl_entry;
-    struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_context;
+    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
+    struct universal_rpm_ctx *reg_ctx = &rpm_dev->rpm_context;
     int ret = 0;
     int i;
     for (i = 0; i < table_size; i++) {
@@ -232,10 +237,6 @@ int universal_disable_irq(struct universal_device *uni_dev) {
                 uni_dev->name);
         return 0;
     }
-    /* pass through the register table to disable the IRQs */
-    ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
-    if (ret)
-        return ret;
     /* if check_pending flag is set, check pending IRQ according to
      * either reading a device register or a runtime monitor (TODO) */
     if (disable_irq->check_pending) {
@@ -253,14 +254,14 @@ int universal_disable_irq(struct universal_device *uni_dev) {
             disable_irq->pending.pending = true;
         
         /* after checking, the pending flag should be set */
-        if (disable_irq->pending.pending) {
-            /* reconfigure the IRQ according to the reconfigure table */
-            tbl = &disable_irq->reconfigure_table;
+        if (disable_irq->pending.pending) 
+            return -EBUSY;
+        else {
+            /* we are good, no pending IRQ handling*/
+            /* pass through the register table to disable the IRQs */
             ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
             if (ret)
                 return ret;
-        } else {
-            /* we are good, no pending IRQ handling*/
         }
     }
     return 0;

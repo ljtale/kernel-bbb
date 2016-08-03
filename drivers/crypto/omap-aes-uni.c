@@ -1101,15 +1101,17 @@ static int omap_aes_probe(struct platform_device *pdev)
 
     /* ljtale starts */
     struct universal_device *uni_dev;
+    struct universal_probe_dev *probe_dev;
     struct regacc_dev *regacc_dev;
     struct dma_config_dev *dma_config_dev;
     int dma_num;    /* may not be used */
     uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev)
         return -EINVAL;
-    regacc_dev = &uni_dev->regacc_dev;
-    dma_config_dev = uni_dev->dma_config_dev_num.dma_config_dev;
-    dma_num = uni_dev->dma_config_dev_num.dma_num;
+    probe_dev = &uni_dev->probe_dev;
+    regacc_dev = &probe_dev->regacc_dev;
+    dma_config_dev = probe_dev->dma_config_dev_num.dma_config_dev;
+    dma_num = probe_dev->dma_config_dev_num.dma_num;
     /* ljtale ends */
 
 	dd = devm_kzalloc(dev, sizeof(struct omap_aes_dev), GFP_KERNEL);

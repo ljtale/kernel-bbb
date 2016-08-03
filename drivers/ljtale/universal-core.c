@@ -27,13 +27,13 @@ extern struct list_head universal_devices;
 void regacc_lock_mutex(void *__dev)
 {
     struct universal_device *dev = __dev;
-    mutex_lock(&dev->lock);
+    mutex_lock(&dev->probe_dev.lock);
 }
 
 void regacc_unlock_mutex(void *__dev)
 {
     struct universal_device *dev = __dev;
-    mutex_unlock(&dev->lock);
+    mutex_unlock(&dev->probe_dev.lock);
 }
 
 /* check if there is a universal device for the existing struct device, also
@@ -151,7 +151,7 @@ static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
 
     if (unlikely(!count))
         return count;
-    mutex_lock(&uni_dev->lock);
+    mutex_lock(&uni_dev->probe_dev.lock);
     while (count) {
         status = i2c_eeprom_read(uni_dev, buf, off, count);
         if (status <= 0) {
@@ -164,7 +164,7 @@ static ssize_t eeprom_read(struct universal_device *uni_dev, char *buf,
         count -= status;
         ret += status;
     }
-    mutex_unlock(&uni_dev->lock);
+    mutex_unlock(&uni_dev->probe_dev.lock);
     return ret;
 }
 
@@ -272,7 +272,7 @@ static int eeprom_write(struct universal_device *uni_dev, const char *buf,
     if (unlikely(!count))
         return count;
 
-    mutex_lock(&uni_dev->lock);
+    mutex_lock(&uni_dev->probe_dev.lock);
     while (count) {
         status = i2c_eeprom_write(uni_dev, buf, off, count);
         if (status < 0) {
@@ -285,7 +285,7 @@ static int eeprom_write(struct universal_device *uni_dev, const char *buf,
         count -= status;
         ret += status;
     }
-    mutex_unlock(&uni_dev->lock);
+    mutex_unlock(&uni_dev->probe_dev.lock);
     return ret;
 }
 
@@ -358,7 +358,7 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
     /* TODO: the register description should be part of the device model, which
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
-    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
+    struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* in case val is NULL, such as when read is used to flush the register
      * written value, we should avoid that */
     u32 temp_val;
@@ -407,7 +407,7 @@ int universal_reg_read(struct universal_device *uni_dev, unsigned int reg,
     struct register_accessor *regacc = NULL;
     struct regacc_dev *regacc_dev;
     
-    regacc_dev = &uni_dev->regacc_dev;
+    regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* check_universal_driver already make sure the drv pointer for uni_dev
      * is not NULL */
     regacc = uni_dev->drv->regacc;
@@ -429,7 +429,7 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
     /* TODO: the register description should be part of the device model, which
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
-    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
+    struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {
@@ -471,7 +471,7 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
 int universal_reg_write(struct universal_device *uni_dev, unsigned int reg,
         unsigned int val) {
     struct register_accessor *regacc = NULL;
-    struct regacc_dev *regacc_dev = &uni_dev->regacc_dev;
+    struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     
     regacc = uni_dev->drv->regacc;
     BUG_ON(!regacc);

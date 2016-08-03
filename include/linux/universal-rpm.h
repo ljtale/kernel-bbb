@@ -347,8 +347,9 @@ struct universal_disable_irq {
     bool check_pending;
     struct universal_check_pending_irq pending;
     struct universal_disable_irq_tbl disable_table;
-    /* only when pending.pending is true should we run reconf table */
-    struct universal_disable_irq_tbl reconfigure_table;
+};
+
+struct universal_enable_irq {
 };
 
 struct universal_pin_control {

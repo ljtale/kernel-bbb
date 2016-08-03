@@ -639,7 +639,7 @@ static int omap_rtc_probe(struct platform_device *pdev)
                 dev_name(&pdev->dev));
         return -EINVAL;
     }
-    regacc_dev = &uni_dev->regacc_dev;
+    regacc_dev = &uni_dev->probe_dev.regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
     /* ljtale ends */
 
