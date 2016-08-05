@@ -2103,6 +2103,7 @@ static struct platform_driver davinci_mcasp_driver = {
 	},
 };
 
+module_platform_driver(davinci_mcasp_driver);
 
 /* ljtale starts */
 static int davinci_mcasp_universal_local_probe(struct universal_device *uni_dev) {
@@ -2121,21 +2122,15 @@ static struct universal_driver davinci_mcasp_universal_driver = {
     .local_probe = davinci_mcasp_universal_local_probe,
 };
 
-// module_platform_driver(davinci_mcasp_driver);
-
-static int __init davinci_mcasp_driver_init(void) {
+static int __init universal_davinci_mcasp_driver_init(void) {
     int ret;
     ret = universal_driver_register(&davinci_mcasp_universal_driver);
-    if (ret < 0)
+    if (ret)
         LJTALE_MSG(KERN_ERR, "universal driver registration fail: %s -- %d\n", 
                 davinci_mcasp_universal_driver.name, ret);
-    return platform_driver_register(&davinci_mcasp_driver);
+    return ret;
 }
-module_init(davinci_mcasp_driver_init);
-static void __exit davinci_mcasp_driver_exit(void) {
-    platform_driver_unregister(&davinci_mcasp_driver);
-}
-module_exit(davinci_mcasp_driver_exit);
+arch_initcall(universal_davinci_mcasp_driver_init);
 
 /* ljtale ends */
 

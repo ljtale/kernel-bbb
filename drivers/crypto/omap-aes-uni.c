@@ -177,6 +177,7 @@ static void omap_aes_dma_trigger_omap4(struct omap_aes_dev *dd, int length)
 		omap_aes_write(dd, AES_REG_A_LEN, dd->assoc_len);
 
 	omap_aes_dma_trigger_omap2(dd, length);
+    LJTALE_LEVEL_DEBUG(4, "aes DMA is enabled and triggered\n");
 }
 
 static void omap_aes_dma_stop(struct omap_aes_dev *dd)
@@ -187,6 +188,7 @@ static void omap_aes_dma_stop(struct omap_aes_dev *dd)
 	       dd->pdata->dma_start;
 
 	omap_aes_write_mask(dd, AES_REG_MASK(dd), 0, mask);
+    LJTALE_LEVEL_DEBUG(4, "aes DMA is stopped\n");
 }
 
 struct omap_aes_dev *omap_aes_find_dev(struct omap_aes_ctx *ctx)
@@ -1145,12 +1147,14 @@ static int omap_aes_probe(struct platform_device *pdev)
 			__func__, err);
 		goto err_res;
 	}
-
+    LJTALE_LEVEL_DEBUG(4, "aes after runtime get...\n");
 	omap_aes_dma_stop(dd);
 
 	reg = omap_aes_read(dd, AES_REG_REV(dd));
 
 	pm_runtime_put_sync(dev);
+
+    LJTALE_LEVEL_DEBUG(4, "aes after runtime put...\n");
 
 	dev_info(dev, "OMAP AES hw accel rev: %u.%u\n",
 		 (reg & dd->pdata->major_mask) >> dd->pdata->major_shift,

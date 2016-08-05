@@ -331,6 +331,7 @@ struct universal_driver {
 struct universal_device {
     const char *name;
     struct device *dev;
+    bool ljtale_add;
 
     struct universal_driver *drv;   
      /* lock protects against concurrent access to this device, used by

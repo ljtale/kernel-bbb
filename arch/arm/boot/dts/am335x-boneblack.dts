@@ -37,6 +37,13 @@
 	status = "okay";
 };
 
+/* ljtale starts */
+&spi0 {
+    status = "okay";
+    ljtale-add;
+};
+/* ljtale ends */
+
 &am33xx_pinmux {
 	nxp_hdmi_bonelt_pins: nxp_hdmi_bonelt_pins {
 		pinctrl-single,pins = <

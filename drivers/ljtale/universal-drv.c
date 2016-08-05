@@ -202,6 +202,10 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     struct device_node *of_node = uni_dev->dev->of_node;
     BUG_ON(!of_node);
+    if (of_property_read_bool(of_node, "ljtale-add"))
+        uni_dev->ljtale_add = true;
+    else
+        uni_dev->ljtale_add = false;
     if (of_property_read_bool(of_node, "support_irq"))
         rpm_dev->support_irq = true;
     else
@@ -238,6 +242,7 @@ int __universal_drv_probe(struct universal_device *dev) {
         return -ENODEV;
     }
     LJTALE_MSG(KERN_INFO, "universal driver probe: %s\n", dev->name);
+
     drv = dev->drv;
     probe_dev = &dev->probe_dev;
     rpm_dev = &dev->rpm_dev;
