@@ -47,7 +47,8 @@
 #include <linux/pm_wakeirq.h>
 #include <linux/platform_data/hsmmc-omap.h>
 
-#include <linux/universal-drv.h>
+/* ljtale */
+#include <linux/universal-utils.h>
 
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSSTATUS	0x0014
@@ -3156,7 +3157,6 @@ static struct universal_enable_irq omap_hsmmc_enable_irq_uni = {
     },
 }; 
 
-static bool dma_paused = false;
 /* ljtale ends */
 static int omap_hsmmc_runtime_suspend(struct device *dev)
 {
@@ -3167,16 +3167,6 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
 	host = platform_get_drvdata(to_platform_device(dev));
 	omap_hsmmc_context_save(host);
 	dev_dbg(dev, "disabled\n");
-    /* ljtale starts */
-    /* pause DMA channels */
-    if (!dma_paused) {
-        if (host->rx_chan)
-            dmaengine_pause(host->rx_chan);
-        if (host->tx_chan)
-            dmaengine_pause(host->tx_chan);
-        dma_paused = true;
-    }
-    /* ljtale ends */
 
 	spin_lock_irqsave(&host->irq_lock, flags);
 #if 0
@@ -3221,16 +3211,6 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 	host = platform_get_drvdata(to_platform_device(dev));
 	omap_hsmmc_context_restore(host);
 	dev_dbg(dev, "enabled\n");
-    
-    /* ljtale starts */
-    if (dma_paused) {
-        if (host->rx_chan)
-            dmaengine_resume(host->rx_chan);
-        if (host->tx_chan)
-            dmaengine_resume(host->tx_chan);
-        dma_paused = false;
-    }
-    /* ljtale ends */
 
 	spin_lock_irqsave(&host->irq_lock, flags);
 #if 0
@@ -3264,6 +3244,8 @@ static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 	.runtime_suspend = omap_hsmmc_runtime_suspend,
 	.runtime_resume = omap_hsmmc_runtime_resume,
 #endif
+    .runtime_suspend = universal_runtime_suspend,
+    .runtime_resume = universal_runtime_resume,
     /* ljtale ends */
 };
 

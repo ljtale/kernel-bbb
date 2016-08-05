@@ -182,6 +182,7 @@ struct dma_config_dev {
      * we need to get the cookie when the dma request is submitted. */
     dma_cookie_t last_dma_cookie;
     enum dma_status chan_status;
+    bool chan_paused;
 };
 
 struct dma_config_num {

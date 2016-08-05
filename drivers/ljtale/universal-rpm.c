@@ -400,8 +400,6 @@ static bool universal_check_context_loss(struct universal_device *uni_dev) {
     /* similar to the register table process, except that we only
      * read registers */
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
-    struct universal_restore_context *restore_context = 
-        &rpm->restore_context;
     struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_dev.rpm_context;
     /* we assume check_context_loss has been set */
     struct universal_restore_context_tbl *check_ctx_loss_tbl = 
@@ -453,6 +451,91 @@ int universal_restore_context(struct universal_device *uni_dev) {
     return ret;
 }
 
+/* IMPORTATN NOTE:
+ * DMA disable/enable don't really need rpm knowledge from the conventional
+ * driver, because some information has been passed through DT and others
+ * are got from universal probe, e.g., dma channels. 
+ * For a full DMA disable, we need to call dmaengine_terminate_all() to
+ * to terminate the dma channel, but here maybe data loss on the running
+ * channel, thus we have to have device-specific callbacks to copy/save
+ * the DMA buffer to prevent data loss. However, this is very burden-intensive.
+ * Moreover, during full DMA enable, we need to reconfigure the DMA channels
+ * such as setting completion callback, submit DMA request, which is also
+ * burden-intensive. Therefore, full disable/enable DMA is not a good option
+ * for us.
+ * Newer kernel versions (>= 4.6) provide dmaengine_terminate_sync() to
+ * completely terminate the dma channel but make sure the data is not lost
+ * (synchronized). If the DMA engine supports this, then this is a good 
+ * feature to do runtime DMA disabling/enabling.
+ * For a simpler version of runtime DMA disabling/enabling, we use the 
+ * dmaengine_pause/resume() calls to pause the DMA channels and resume them
+ * later without reconfiguring DMA stuff. We can rely on the call
+ * dma_async_is_complete() to check the status of the last cookie sent by
+ * dmaengine_submitt (I demonstrated this a little bit for MMC controller).*/
+
+int universal_rpm_disable_dma(struct universal_device *uni_dev) {
+    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
+    /* we rely on the per-device probe states to do runtime PM */
+    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
+    struct dma_config_dev_num *dma_config_dev_num = 
+        &probe_dev->dma_config_dev_num;
+    struct dma_config_dev *dma_config_dev;
+    int i;
+    /* only when the device supports DMA and DMA channel is requested
+     * should we perform DMA pausing */
+    if (!rpm_dev->support_dma || !rpm_dev->dma_channel_requested)
+        return 0;
+    dma_config_dev = dma_config_dev_num->dma_config_dev;
+    for (i = 0; i < dma_config_dev_num->dma_num; i++) {
+        /* we should check the last cookie returned by dmaengine_submitt().
+         * If the cookie is IN_PROGRESS or ERROR, we should abor.
+         * This is an inaccurate estimation of the channel activities */
+        /* TODO: this is not critical right now, we do it later */
+        if (!dma_config_dev[i].chan_paused &&
+                dma_config_dev[i].channel) {
+            dmaengine_pause(dma_config_dev[i].channel);
+            dma_config_dev[i].chan_paused = true;
+            LJTALE_LEVEL_DEBUG(3, "%s dma channel %d paused\n",
+                    uni_dev->name, i);
+        }
+    }
+    return 0;
+#if 0
+abort:
+    for (i = 0; i < dma_config_dev->dma_num; i++) {
+        if (dma_config_dev[i].chan_paused &&
+                dma_config_dev[i].channel)
+            dmaengine_resume(dma_config_dev[i].channel);
+    }
+    return -EBUSY;
+#endif 
+}
+
+int universal_rpm_enable_dma(struct universal_device *uni_dev) {
+    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
+    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
+    struct dma_config_dev_num *dma_config_dev_num = 
+        &probe_dev->dma_config_dev_num;
+    struct dma_config_dev *dma_config_dev;
+    int i;
+    /* only when the device supports DMA and DMA channel is requested
+     * should we perform DMA pausing */
+    if (!rpm_dev->support_dma || !rpm_dev->dma_channel_requested)
+        return 0;
+    dma_config_dev = dma_config_dev_num->dma_config_dev;
+    for (i = 0; i < dma_config_dev_num->dma_num; i++) {
+        /* TODO: if the channel is fully terminated, we need device-specific
+         * callback to reconfigure the channels */
+        if (dma_config_dev[i].chan_paused &&
+                dma_config_dev[i].channel) {
+            dmaengine_resume(dma_config_dev[i].channel);
+            dma_config_dev[i].chan_paused = false;
+            LJTALE_LEVEL_DEBUG(3, "%s dma channel %d resumed\n",
+                    uni_dev->name, i);
+        }
+    }
+    return 0;
+}
 
 int universal_runtime_suspend(struct device *dev) {
     struct universal_device *uni_dev;
@@ -474,7 +557,12 @@ int universal_runtime_suspend(struct device *dev) {
         return ret;
     }
 
-    /* TODO: disable dma */
+    /* disable dma */
+    ret = universal_rpm_disable_dma(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3, "universal disable dma failed: %d\n",ret);
+        return ret;
+    }
     /* disable irq */
     /* If the irq needs a lock to protect mutex access, then the lock should
      * protect until the pinctrl state is selected */
@@ -548,8 +636,12 @@ int universal_runtime_resume(struct device *dev) {
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
 
 
-    /* TODO: enable dma */
-
+    /* enable dma */
+    ret = universal_rpm_enable_dma(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3, "universal enable dma failed: %d\n",ret);
+        return ret;
+    }
     return 0;
 }
 
