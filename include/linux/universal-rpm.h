@@ -51,6 +51,11 @@ enum rpm_op {
     RPM_STOP,
     RPM_REG_WRITE,
     RPM_REG_READ,
+    RPM_REG_WRITE_READ, /* read after write, flushing read */
+    RPM_REG_READ_WRITE_OR, /* write value =  read value | value */
+    RPM_REG_READ_WRITE_AND, /* write value = read value & value */
+    RPM_REG_WRITE_AUG_OR,
+    RPM_REG_WRITE_AUG_AND,
     RPM_PIN_STATE_SELECT, /* could be merged to DEVICE_CALL op */
     RPM_SPIN_LOCK,
     RPM_SPIN_UNLOCK,
@@ -301,13 +306,23 @@ struct universal_rpm_ctx {
     int size;
 };
 
+struct reg_timeout {
+    bool check_timeout;
+    u32 compare_value;
+    unsigned long timeout;
+};
+
 struct universal_reg_entry {
     enum rpm_op reg_op;
     u32 reg_offset;
     int ctx_index;
-    // some register reading is only for flushing the previous write, so
-    // the reading does not affect the register context
-    bool flushing;
+    u32 write_augment;  /* this is a value to augment write operations */
+    /* timing information for a register
+     * Usually the reg op is write and timing check is specified, we need
+     * to read the same register and compare against it to a pre-defined
+     * value. Only when the value is stable (equal to the value) or a
+     * timeout is triggered should we proceed. */
+    struct reg_timeout timeout;
 };
 
 struct universal_save_context_tbl {
@@ -358,8 +373,18 @@ struct universal_pin_control {
     enum rpm_device_call resume_state;
 };
 
-struct universal_rpm_device_call {
-    /* TODO: */
+struct universal_save_context {
+    struct universal_save_context_tbl *save_tbl;
+};
+
+/* restoring context is a little bit complex, besides writing whatever
+ * is saved during suspening, some device specific context has to be
+ * restored. We pass a callback to the conventional driver to do that */
+struct universal_restore_context {
+    bool check_context_loss;
+    struct universal_restore_context_tbl *check_ctx_loss_tbl;
+    struct universal_restore_context_tbl *restore_tbl;
+    int (*rpm_local_restore_context)(struct universal_device *uni_dev);
 };
 
 struct universal_disable_dma {

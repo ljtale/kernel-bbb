@@ -189,29 +189,96 @@ int universal_runtime_resume(struct device *dev) {
 
 /*============== generic logic =====================*/
 
-static int process_reg_table(struct universal_device *uni_dev,
+static int inline process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size) {
     struct universal_reg_entry *tbl_entry;
-    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
-    struct universal_rpm_ctx *reg_ctx = &rpm_dev->rpm_context;
+    struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_dev.rpm_context;
     int ret = 0;
     int i;
+    u32 temp_value;
+    u32 timeout_compare = 0, timeout_read;
+    unsigned long timeout;
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
-        if (tbl_entry->reg_op == RPM_REG_READ) {
-            if (tbl_entry->flushing)
-                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset, NULL);
-            else
+        switch(tbl_entry->reg_op) {
+            case RPM_REG_READ:
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
                         &(reg_ctx->array[tbl_entry->ctx_index]));
+                break;
+            case RPM_REG_WRITE:
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                        reg_ctx->array[tbl_entry->ctx_index]);
+                if (tbl_entry->timeout.check_timeout) {
+                    timeout_compare = reg_ctx->array[tbl_entry->ctx_index];
+                    goto timeout_check;
+                }
+                break;
+            case RPM_REG_WRITE_READ:
+                /* a write followed by a read flush */
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                        reg_ctx->array[tbl_entry->ctx_index]);
+                if (ret)
+                    break;
+                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset, NULL);
+                break;
+            case RPM_REG_READ_WRITE_OR:
+                temp_value = 0;
+                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
+                        &temp_value);
+                if (ret)
+                    break;
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                        reg_ctx->array[tbl_entry->ctx_index] | temp_value);
+                break;
 
-        } else if (tbl_entry->reg_op == RPM_REG_WRITE) {
-            /* no flushing on the register writing */
-            ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                    reg_ctx->array[tbl_entry->ctx_index]);
-        } else {
-            /* unsupported yet */
-            LJTALE_LEVEL_DEBUG(3, "unsupported op for %s\n", uni_dev->name);
+            case RPM_REG_READ_WRITE_AND:
+                temp_value = 0xffffffff;
+                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
+                        &temp_value);
+                if (ret)
+                    break;
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                        reg_ctx->array[tbl_entry->ctx_index] & temp_value);
+                break;
+            case RPM_REG_WRITE_AUG_OR:
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                    (reg_ctx->array[tbl_entry->ctx_index] | 
+                     tbl_entry->write_augment));
+                if (tbl_entry->timeout.check_timeout) {
+                    timeout_compare = 
+                        reg_ctx->array[tbl_entry->ctx_index] | 
+                        tbl_entry->write_augment;
+                    goto timeout_check;
+                }
+                break;
+            case RPM_REG_WRITE_AUG_AND:
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                    (reg_ctx->array[tbl_entry->ctx_index] &
+                     tbl_entry->write_augment));
+                if (tbl_entry->timeout.check_timeout) {
+                    timeout_compare = 
+                        reg_ctx->array[tbl_entry->ctx_index] & 
+                        tbl_entry->write_augment;
+                    goto timeout_check;
+                }
+                break;
+
+            default:
+                /* unsupported yet */
+                LJTALE_LEVEL_DEBUG(3, "unsupported op for %s\n",
+                        uni_dev->name);
+                break;
+        }
+timeout_check:
+        if (tbl_entry->timeout.check_timeout) {
+            /* assume timeout is microsecond */
+            timeout = jiffies + msecs_to_jiffies(tbl_entry->timeout.timeout);
+            ret =  universal_reg_read(uni_dev, 
+                    tbl_entry->reg_offset, &timeout_read);
+            while(time_before(jiffies, timeout) && 
+                  timeout_read != timeout_compare)
+                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
+                        &timeout_read);
         }
         if (ret) {
             LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
@@ -249,9 +316,11 @@ int universal_disable_irq(struct universal_device *uni_dev) {
         else
             LJTALE_LEVEL_DEBUG(2, "pending check not read %s\n", uni_dev->name);
 
-        if (reg_value ^ disable_irq->pending.compare_value)
-            disable_irq->pending.pending = false;
+        if (reg_value & disable_irq->pending.compare_value)
+            /* reg value is high, fine */
+            disable_irq->pending.pending = false ;
         else
+            /* reg value is low */
             disable_irq->pending.pending = true;
         
         /* after checking, the pending flag should be set */
@@ -321,14 +390,67 @@ int universal_pin_control(struct universal_device *uni_dev,
 
 int universal_save_context(struct universal_device *uni_dev) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
-    struct universal_save_context_tbl *tbl = rpm->save_context;
+    struct universal_save_context_tbl *tbl = rpm->save_context.save_tbl;
     return process_reg_table(uni_dev, tbl->table, tbl->table_size);
 }
 
-int universal_restore_context(struct universal_device *uni_dev) {
+/* check if there is a context loss for a device
+ * return true if there is a context loss, otherwise return false */
+static bool universal_check_context_loss(struct universal_device *uni_dev) {
+    /* similar to the register table process, except that we only
+     * read registers */
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
-    struct universal_restore_context_tbl *tbl = rpm->restore_context;
-    return process_reg_table(uni_dev, tbl->table, tbl->table_size);
+    struct universal_restore_context *restore_context = 
+        &rpm->restore_context;
+    struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_dev.rpm_context;
+    /* we assume check_context_loss has been set */
+    struct universal_restore_context_tbl *check_ctx_loss_tbl = 
+        rpm->restore_context.check_ctx_loss_tbl;
+    struct universal_reg_entry *reg_entry;
+    int table_size, i;
+    u32 temp_value;
+    BUG_ON(!check_ctx_loss_tbl);
+    if(!check_ctx_loss_tbl->table)
+        return false;
+    table_size = check_ctx_loss_tbl->table_size;
+    for (i = 0; i < table_size; i++) {
+        reg_entry = &check_ctx_loss_tbl->table[i];
+        if (universal_reg_read(uni_dev, reg_entry->reg_offset, &temp_value))
+            return false;
+        /* compare the regsiter values against the saved context */
+        if (temp_value != reg_ctx->array[reg_entry->ctx_index])
+            return true;
+    }
+    return false;
+}
+
+int universal_restore_context(struct universal_device *uni_dev) {
+    int ret = 0;
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_restore_context *restore_context =
+        &rpm->restore_context;
+    struct universal_restore_context_tbl *tbl = 
+        restore_context->restore_tbl;
+    /* for context restoring, we follow these procedures:
+     * 1) check context if there is a context loos 
+     * 2) if there is a context loss restore the context 
+     * 3) if local context restore is required, call local context restore */
+    if (restore_context->check_context_loss) {
+        if (!universal_check_context_loss(uni_dev))
+            /* if there is no context loss, we are safe to go */
+            return 0;
+        else
+            uni_dev->rpm_dev.context_loss_cnt++;
+        /* else there is a context loss, restore the context */
+    }
+    /* process the restore table to restore the context */
+    ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
+    if (ret)
+        return ret;
+    /* call local context restore callback */
+    if (restore_context->rpm_local_restore_context)
+        return restore_context->rpm_local_restore_context(uni_dev);
+    return ret;
 }
 
 

@@ -846,8 +846,9 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 		capa = VS18;
 	}
 
-	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-		hctl |= IWE;
+    /*ljtale: force the first resume to enable wakeup event */
+//	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
+    hctl |= IWE;
 
 	OMAP_HSMMC_WRITE(host->base, HCTL,
 			OMAP_HSMMC_READ(host->base, HCTL) | hctl);
@@ -1593,6 +1594,36 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 
 	tx->callback = omap_hsmmc_dma_callback;
 	tx->callback_param = host;
+
+    /* ljtale starts */
+    /* let me figure out somethign special */
+    struct universal_device *uni_dev = check_universal_driver(host->dev);
+    if (!uni_dev) {
+        LJTALE_LEVEL_DEBUG(3, "no universal driver found: %s - %s\n",
+                dev_name(host->dev), __func__);
+        goto skip_universal_dma;
+    }
+    struct dma_config_dev_num *dma_config_dev_num = 
+        &uni_dev->probe_dev.dma_config_dev_num;
+    dma_cookie_t *last_cookie = NULL;
+    for (i = 0; i < dma_config_dev_num->dma_num; i++) {
+        if (chan == dma_config_dev_num->dma_config_dev[i].channel) {
+            last_cookie = 
+                &(dma_config_dev_num->dma_config_dev[i].last_dma_cookie);
+            break;
+        }
+    }
+    if (!last_cookie) {
+        LJTALE_LEVEL_DEBUG(3, "channel not found, something is wrong: %s\n",
+                __func__);
+        goto skip_universal_dma;
+    } else {
+        *last_cookie = dmaengine_submit(tx);
+        host->dma_ch = 1;
+        return 0;
+    }
+skip_universal_dma:
+    /* ljtale ends */
 
 	/* Does not fail */
 	dmaengine_submit(tx);
@@ -2938,6 +2969,9 @@ enum {
     OMAP_HSMMC_UNI_HCTL,
     OMAP_HSMMC_UNI_SYSCTL,
     OMAP_HSMMC_UNI_CAPA,
+    OMAP_HSMMC_UNI_STAT_CLEAR,
+    OMAP_HSMMC_UNI_ISE,
+    OMAP_HSMMC_UNI_IE,
 };
 
 static u32 omap_hsmmc_reg_context[] = {
@@ -2946,28 +2980,12 @@ static u32 omap_hsmmc_reg_context[] = {
     [OMAP_HSMMC_UNI_HCTL] = 0,
     [OMAP_HSMMC_UNI_SYSCTL] = 0,
     [OMAP_HSMMC_UNI_CAPA] = 0,
+    [OMAP_HSMMC_UNI_STAT_CLEAR] = 0xffffffff,
+    [OMAP_HSMMC_UNI_ISE] = 1 << 8,
+    [OMAP_HSMMC_UNI_IE] = 1 << 8,
 };
 
-static struct universal_reg_entry omap_hsmmc_disable_irq_tbl[] = {
-    {},
-    /* TODO: */
-};
-
-static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
-    .check_pending = true,
-    .pending = {
-        .reg_op = RPM_REG_READ,
-        .reg_offset = OMAP_HSMMC_UNI_PSTATE_REG,
-        .compare_value = DLEV_DAT(1),
-        .pending = false, /* by default there is no pending */
-    },
-    .disable_table = {
-        .table = omap_hsmmc_disable_irq_tbl,
-        .table_size = ARRAY_SIZE(omap_hsmmc_disable_irq_tbl),
-    },
-};
-
-static struct universal_reg_entry omap_hsmmc_save_context_tbl[] = {
+static struct universal_reg_entry omap_hsmmc_save_context_reg_tbl[] = {
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_CON_REG,
@@ -2990,11 +3008,155 @@ static struct universal_reg_entry omap_hsmmc_save_context_tbl[] = {
     },
 };
 
-static struct universal_save_context_tbl omap_hsmmc_save_context = {
-    .table = omap_hsmmc_save_context_tbl,
-    .table_size = ARRAY_SIZE(omap_hsmmc_save_context_tbl),
+static struct universal_save_context_tbl omap_hsmmc_save_context_tbl = {
+    .table = omap_hsmmc_save_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_hsmmc_save_context_reg_tbl),
 };
 
+static struct universal_reg_entry omap_hsmmc_disable_irq_reg_tbl[] = {
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ZERO,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_IE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ZERO,
+    },
+};
+
+static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
+    .check_pending = true,
+    .pending = {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_PSTATE_REG,
+        .compare_value = 1 << 21, // DLEV_DAT(1)
+        .pending = false, /* by default there is no pending */
+    },
+    .disable_table = {
+        .table = omap_hsmmc_disable_irq_reg_tbl,
+        .table_size = ARRAY_SIZE(omap_hsmmc_disable_irq_reg_tbl),
+    },
+};
+
+
+
+static struct universal_pin_control omap_hsmcc_pinctrl = {
+    .suspend_state = RPM_PINCTRL_IDLE,
+    .resume_state = RPM_PINCTRL_DEFAULT,
+};
+
+static struct universal_reg_entry omap_hsmmc_check_ctx_loss_reg_tbl[] = {
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_CON_REG,
+        .ctx_index = OMAP_HSMMC_UNI_CON,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
+        .ctx_index = OMAP_HSMMC_UNI_HCTL,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_SYSCTL_REG,
+        .ctx_index = OMAP_HSMMC_UNI_SYSCTL,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_HSMMC_UNI_CAPA_REG,
+        .ctx_index = OMAP_HSMMC_UNI_CAPA,
+    },
+};
+
+static struct universal_restore_context_tbl omap_hsmmc_check_ctx_loss_tbl = {
+    .table = omap_hsmmc_check_ctx_loss_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_hsmmc_check_ctx_loss_reg_tbl),
+};
+
+static struct universal_reg_entry omap_hsmmc_restore_context_reg_tbl[] = {
+    {
+        .reg_op = RPM_REG_WRITE_AUG_AND,
+        .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
+        .ctx_index = OMAP_HSMMC_UNI_HCTL,
+        .write_augment = ~(1 << 8),
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_CAPA_REG,
+        .ctx_index = OMAP_HSMMC_UNI_CAPA,
+    },
+    {
+        .reg_op = RPM_REG_WRITE_AUG_OR,
+        .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
+        .ctx_index = OMAP_HSMMC_UNI_HCTL,
+        .write_augment = 1 << 8,
+        .timeout = {
+            .check_timeout = true,
+            .compare_value = 1 << 8,
+            .timeout = MMC_TIMEOUT_MS,
+        },
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ZERO,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_IE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ZERO,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_STAT_REG,
+        .ctx_index = OMAP_HSMMC_UNI_STAT_CLEAR,
+    },
+};
+
+static struct universal_restore_context_tbl omap_hsmmc_restore_context_tbl = {
+    .table = omap_hsmmc_restore_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_hsmmc_restore_context_reg_tbl),
+};
+
+static int omap_hsmmc_rpm_local_restore_context(
+        struct universal_device *uni_dev) {
+    struct omap_hsmmc_host *host = dev_get_drvdata(uni_dev->dev);
+    if (host->power_mode == MMC_POWER_OFF)
+        return 0;
+    omap_hsmmc_set_bus_width(host);
+    omap_hsmmc_set_clock(host);
+    omap_hsmmc_set_bus_mode(host);
+    return 0;
+}
+
+static struct universal_reg_entry omap_hsmmc_enable_irq_reg_tbl[] = {
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_STAT_REG,
+        .ctx_index = OMAP_HSMMC_UNI_STAT_CLEAR,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ISE,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_IE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_IE,
+    },
+};
+
+static struct universal_enable_irq omap_hsmmc_enable_irq_uni = {
+    .enable_table = {
+        .table = omap_hsmmc_enable_irq_reg_tbl,
+        .table_size = ARRAY_SIZE(omap_hsmmc_enable_irq_reg_tbl),
+    },
+}; 
+
+static bool dma_paused = false;
 /* ljtale ends */
 static int omap_hsmmc_runtime_suspend(struct device *dev)
 {
@@ -3005,14 +3167,23 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
 	host = platform_get_drvdata(to_platform_device(dev));
 	omap_hsmmc_context_save(host);
 	dev_dbg(dev, "disabled\n");
+    /* ljtale starts */
+    /* pause DMA channels */
+    if (!dma_paused) {
+        if (host->rx_chan)
+            dmaengine_pause(host->rx_chan);
+        if (host->tx_chan)
+            dmaengine_pause(host->tx_chan);
+        dma_paused = true;
+    }
+    /* ljtale ends */
 
 	spin_lock_irqsave(&host->irq_lock, flags);
 #if 0
 	if ((host->mmc->caps & MMC_CAP_SDIO_IRQ) &&
 	    (host->flags & HSMMC_SDIO_IRQ_ENABLED)) {
 #endif
-    if(1) {
-        LJTALE_LEVEL_DEBUG(4, "HSMMC sdio irq disable\n");
+        if(1) {
 		/* disable sdio irq handling to prevent race */
 		OMAP_HSMMC_WRITE(host->base, ISE, 0);
 		OMAP_HSMMC_WRITE(host->base, IE, 0);
@@ -3041,7 +3212,6 @@ abort:
 	spin_unlock_irqrestore(&host->irq_lock, flags);
 	return ret;
 }
-
 static int omap_hsmmc_runtime_resume(struct device *dev)
 {
 	struct omap_hsmmc_host *host;
@@ -3051,11 +3221,23 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 	host = platform_get_drvdata(to_platform_device(dev));
 	omap_hsmmc_context_restore(host);
 	dev_dbg(dev, "enabled\n");
+    
+    /* ljtale starts */
+    if (dma_paused) {
+        if (host->rx_chan)
+            dmaengine_resume(host->rx_chan);
+        if (host->tx_chan)
+            dmaengine_resume(host->tx_chan);
+        dma_paused = false;
+    }
+    /* ljtale ends */
 
 	spin_lock_irqsave(&host->irq_lock, flags);
+#if 0
 	if ((host->mmc->caps & MMC_CAP_SDIO_IRQ) &&
 	    (host->flags & HSMMC_SDIO_IRQ_ENABLED)) {
-
+#endif
+        if (1) {
 		pinctrl_pm_select_default_state(host->dev);
 
 		/* irq lost, if pinmux incorrect */
@@ -3077,8 +3259,12 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 
 static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(omap_hsmmc_suspend, omap_hsmmc_resume)
+    /* ljtale starts */
+#if 0
 	.runtime_suspend = omap_hsmmc_runtime_suspend,
 	.runtime_resume = omap_hsmmc_runtime_resume,
+#endif
+    /* ljtale ends */
 };
 
 static struct platform_driver omap_hsmmc_driver = {
@@ -3142,7 +3328,23 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .dma_config_num = &omap_hsmmc_dma_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
     .rpm = {
+        .save_context = {
+            .save_tbl = &omap_hsmmc_save_context_tbl,
+        },
         .disable_irq = &omap_hsmmc_disable_irq_uni,
+        .pin_control = &omap_hsmcc_pinctrl,
+
+
+        .restore_context = {
+            .check_context_loss = true,
+            .check_ctx_loss_tbl = &omap_hsmmc_check_ctx_loss_tbl,
+            .restore_tbl = &omap_hsmmc_restore_context_tbl,
+            .rpm_local_restore_context = 
+                omap_hsmmc_rpm_local_restore_context,
+        },
+        .enable_irq = &omap_hsmmc_enable_irq_uni,
+
+
         .ref_ctx = {
             .array = omap_hsmmc_reg_context,
             .size = ARRAY_SIZE(omap_hsmmc_reg_context),
@@ -3150,6 +3352,7 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     },
     .rpm_ops = {
         .rpm_create_reg_context = omap_hsmmc_rpm_create_reg_context,
+        .first_runtime_resume = omap_hsmmc_runtime_resume,
     },
 };
 

@@ -197,6 +197,30 @@ static int universal_dma_config(struct universal_device *uni_dev,
     return 0;
 }
 
+/* populate device knowledge from device tree for serving runtime pm */
+void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
+    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
+    struct device_node *of_node = uni_dev->dev->of_node;
+    BUG_ON(!of_node);
+    if (of_property_read_bool(of_node, "support_irq"))
+        rpm_dev->support_irq = true;
+    else
+        rpm_dev->support_irq = false;
+    if (of_property_read_bool(of_node, "irq_need_lock")) {
+        rpm_dev->irq_need_lock = true;
+        spin_lock_init(&rpm_dev->irq_lock);
+        LJTALE_LEVEL_DEBUG(4 ,"IRQ need lock read bool true: %s\n",
+                uni_dev->name);
+    } else
+        rpm_dev->irq_need_lock = false;
+    if (of_property_read_bool(of_node, "dmas")) {
+        rpm_dev->support_dma = true;
+        LJTALE_LEVEL_DEBUG(4, "DMA is supported: %s\n", uni_dev->name);
+    }
+    else
+        rpm_dev->support_dma = false;
+}
+ 
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
     struct universal_driver *drv;
@@ -250,23 +274,13 @@ int __universal_drv_probe(struct universal_device *dev) {
             if (ret < 0)
                 goto dma_config_err;
         }
+        rpm_dev->dma_channel_requested = true;
     }
 
     /* TODO: runtime pm configuration and clock configuration */
     /* get properties from device tree to populate the device knowledge */
     if (dev->dev->of_node) {
-        struct device_node *of_node = dev->dev->of_node;
-        if (of_property_read_bool(of_node, "support_irq"))
-            rpm_dev->support_irq = true;
-        else
-            rpm_dev->support_irq = false;
-        if (of_property_read_bool(of_node, "irq_need_lock")) {
-            rpm_dev->irq_need_lock = true;
-            spin_lock_init(&rpm_dev->irq_lock);
-            LJTALE_LEVEL_DEBUG(4 ,"IRQ need lock read bool true: %s\n",
-                    dev->name);
-        } else
-            rpm_dev->irq_need_lock = false;
+        rpm_knowledge_from_dt(dev);
     } else {
         /* FIXME: we assume there is a device tree node for the device
          * in this prototype */
@@ -275,6 +289,7 @@ int __universal_drv_probe(struct universal_device *dev) {
         return 0;
     }
     rpm_dev->first_resume_called = false;
+    rpm_dev->context_loss_cnt = 0;
     rpm_ops = &drv->rpm_ops;
     if (rpm_ops->rpm_create_reg_context) {
         ret = rpm_ops->rpm_create_reg_context(dev);

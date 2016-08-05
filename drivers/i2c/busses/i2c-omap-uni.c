@@ -1651,28 +1651,22 @@ static struct universal_reg_entry omap_i2c_disable_irq_tbl[] = {
         .ctx_index = OMAP_I2C_UNI_IRQENABLE_CLR,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = RPM_REG_WRITE_READ,
         .reg_offset = OMAP_I2C_UNI_STAT_REG,
         .ctx_index = OMAP_I2C_UNI_IE,
-    },
-    {
-        .reg_op = RPM_REG_READ,
-        .reg_offset = OMAP_I2C_UNI_STAT_REG,
-        .ctx_index = INVALID_INDEX,
-        .flushing = true,
     },
 };
 
 static struct universal_disable_irq omap_i2c_disable_irq = {
+    .check_pending = false,
     .disable_table = {
         .table = omap_i2c_disable_irq_tbl,
         .table_size = ARRAY_SIZE(omap_i2c_disable_irq_tbl),
     },
-    .check_pending = false,
 };
 
 /* save context table are supposed to be readings */
-static struct universal_reg_entry omap_i2c_save_context_tbl[] = {
+static struct universal_reg_entry omap_i2c_save_context_reg_tbl[] = {
     {
         .reg_op = RPM_REG_READ,
         .reg_offset = OMAP_I2C_UNI_PSC_REG,
@@ -1695,13 +1689,13 @@ static struct universal_reg_entry omap_i2c_save_context_tbl[] = {
     },
 };
 
-static struct universal_save_context_tbl omap_i2c_save_context = {
-    .table = omap_i2c_save_context_tbl,
-    .table_size = ARRAY_SIZE(omap_i2c_save_context_tbl),
+static struct universal_save_context_tbl omap_i2c_save_context_tbl = {
+    .table = omap_i2c_save_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_i2c_save_context_reg_tbl),
 };
 
 /* restoring context table could be both reading (flushing) and writings */
-static struct universal_reg_entry omap_i2c_restore_context_tbl[] = {
+static struct universal_reg_entry omap_i2c_restore_context_reg_tbl[] = {
     /* FIXME: context restore requires the device to be in certain states,
      * so we'd better configure the device to the states before restoring */
     {
@@ -1737,13 +1731,13 @@ static struct universal_reg_entry omap_i2c_restore_context_tbl[] = {
         .ctx_index = OMAP_I2C_UNI_CON,
     },
 };
-static struct universal_restore_context_tbl omap_i2c_restore_context = {
-    .table = omap_i2c_restore_context_tbl,
-    .table_size = ARRAY_SIZE(omap_i2c_restore_context_tbl),
+static struct universal_restore_context_tbl omap_i2c_restore_context_tbl = {
+    .table = omap_i2c_restore_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_i2c_restore_context_reg_tbl),
 };
 
 /* reconfigure table could be further divided into separate actions */
-static struct universal_reg_entry omap_i2c_enable_irq_tbl[] = {
+static struct universal_reg_entry omap_i2c_enable_irq_reg_tbl[] = {
     {
         .reg_op = RPM_REG_WRITE,
         .reg_offset = OMAP_I2C_UNI_IE_REG,
@@ -1753,8 +1747,8 @@ static struct universal_reg_entry omap_i2c_enable_irq_tbl[] = {
 
 static struct universal_enable_irq omap_i2c_enable_irq = {
     .enable_table = {
-        .table = omap_i2c_enable_irq_tbl,
-        .table_size = ARRAY_SIZE(omap_i2c_enable_irq_tbl),
+        .table = omap_i2c_enable_irq_reg_tbl,
+        .table_size = ARRAY_SIZE(omap_i2c_enable_irq_reg_tbl),
     },
 };
 
@@ -1897,11 +1891,17 @@ static struct universal_driver omap_i2c_universal_driver = {
 
 #ifdef CONFIG_PM
     .rpm = {
-        .save_context = &omap_i2c_save_context,
+        .save_context = {
+            .save_tbl = &omap_i2c_save_context_tbl,
+        },
         .disable_irq = &omap_i2c_disable_irq,
         .pin_control = &omap_i2c_pinctrl,
 
-        .restore_context = &omap_i2c_restore_context,
+        .restore_context = {
+            .check_context_loss = false,
+            .restore_tbl = &omap_i2c_restore_context_tbl,
+            .rpm_local_restore_context = NULL,
+        },
         .enable_irq = &omap_i2c_enable_irq,
 
         .ref_ctx = {

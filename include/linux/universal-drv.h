@@ -177,6 +177,11 @@ struct dma_config {
 struct dma_config_dev {
     int dma_len;
     struct dma_chan *channel;
+    /* the cookie is used to check the completion of a submitted dma request
+     * use dma_sync_is_tx_complete(chan, cookie, NULL, NULL). But to do so,
+     * we need to get the cookie when the dma request is submitted. */
+    dma_cookie_t last_dma_cookie;
+    enum dma_status chan_status;
 };
 
 struct dma_config_num {
@@ -237,12 +242,12 @@ struct universal_rpm {
     spinlock_t rpm_graph_lock;
     /* exclusive access corresponds to a per-device lock*/
     bool exclusive_access;      
-    struct universal_save_context_tbl *save_context;
+    struct universal_save_context save_context;
     struct universal_disable_irq *disable_irq;
     struct universal_disable_dma *disable_dma;
     struct universal_setup_wakeup *setup_wakeup;
 
-    struct universal_restore_context_tbl *restore_context;
+    struct universal_restore_context restore_context;
     struct universal_enable_irq *enable_irq;
     struct universal_enable_dma *enable_dma;
 
@@ -275,6 +280,7 @@ struct universal_rpm_dev {
     spinlock_t irq_lock;
     struct universal_rpm_ctx rpm_context;
     spinlock_t rpm_lock;
+    int context_loss_cnt;
 };
 
 
