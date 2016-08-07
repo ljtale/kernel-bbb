@@ -206,10 +206,12 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
         uni_dev->ljtale_add = true;
     else
         uni_dev->ljtale_add = false;
+
     if (of_property_read_bool(of_node, "support_irq"))
         rpm_dev->support_irq = true;
     else
         rpm_dev->support_irq = false;
+
     if (of_property_read_bool(of_node, "irq_need_lock")) {
         rpm_dev->irq_need_lock = true;
         spin_lock_init(&rpm_dev->irq_lock);
@@ -217,12 +219,24 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
                 uni_dev->name);
     } else
         rpm_dev->irq_need_lock = false;
+
     if (of_property_read_bool(of_node, "dmas")) {
         rpm_dev->support_dma = true;
         LJTALE_LEVEL_DEBUG(4, "DMA is supported: %s\n", uni_dev->name);
     }
     else
         rpm_dev->support_dma = false;
+
+    if (of_property_read_bool(of_node, "dev_access_spinlock") ||
+            of_property_read_bool(of_node, "dev_access_raw_spinlock"))
+        rpm_dev->dev_access_needs_spinlock = true;
+    else
+        rpm_dev->dev_access_needs_spinlock = false;
+
+    if (of_property_read_bool(of_node, "dev_access_raw_spinlock"))
+        rpm_dev->dev_access_needs_raw_spinlock = true;
+    else
+        rpm_dev->dev_access_needs_raw_spinlock = false;
 }
  
 int __universal_drv_probe(struct universal_device *dev) {
@@ -249,6 +263,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     /* do a set of initialization */
     mutex_init(&dev->probe_dev.lock);
     spin_lock_init(&dev->probe_dev.spinlock);
+    raw_spin_lock_init(&dev->probe_dev.raw_spinlock);
 
     /* do a series of universal driver probe */
     /* for register accessors */

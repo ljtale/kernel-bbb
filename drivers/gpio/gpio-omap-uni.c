@@ -1701,6 +1701,7 @@ static struct universal_driver omap_gpio_universal_driver = {
     .driver = &omap_gpio_driver.driver,
     .regacc = NULL,
     .irq_config_num = NULL,
+    /* no dma support */
     .local_probe = omap_gpio_universal_local_probe,
 };
 

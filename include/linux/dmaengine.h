@@ -1139,12 +1139,6 @@ static inline struct dma_chan
 
 	if (!chan)
 		chan = ERR_PTR(-ENODEV);
-
-    if (dev)
-        LJTALE_LEVEL_DEBUG(4, "request channel from device: %s\n",
-                dev_name(dev));
-    else
-        LJTALE_LEVEL_DEBUG(4, "request channel from null\n");
  
 	return chan;
 }

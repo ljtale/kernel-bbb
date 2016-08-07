@@ -540,6 +540,7 @@ int universal_rpm_enable_dma(struct universal_device *uni_dev) {
 int universal_runtime_suspend(struct device *dev) {
     struct universal_device *uni_dev;
     struct universal_rpm_dev *rpm_dev;
+    struct universal_rpm_ops *rpm_ops;
     unsigned long irq_lock_flags = 0;
     int ret = 0;
     uni_dev = check_universal_driver(dev);
@@ -548,6 +549,7 @@ int universal_runtime_suspend(struct device *dev) {
         return 0;
     }
     rpm_dev = &uni_dev->rpm_dev;
+    rpm_ops = &uni_dev->drv->rpm_ops;
     LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
 
     /* save context */
@@ -577,12 +579,22 @@ int universal_runtime_suspend(struct device *dev) {
     /* select pinctrl state */
     universal_pin_control(uni_dev, SUSPEND);
 
+    /* call local suspend within lock */
+    if (rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend) {
+        ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
+        if (ret)
+            return ret;
+    }
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
     /* TODO: setup wakeup events */
 
 
-    return 0;
+    /* in case local suspend does not need a lock */
+    if (!rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend)
+        ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
+
+    return ret;
 }
 
 int universal_runtime_resume(struct device *dev) {
@@ -632,9 +644,14 @@ int universal_runtime_resume(struct device *dev) {
     /* enable irq */
     universal_enable_irq(uni_dev);
 
+    if (rpm_dev->local_resume_lock && rpm_ops->local_runtime_resume) {
+        ret = rpm_ops->local_runtime_resume(uni_dev->dev);
+        if (ret)
+            return ret;
+    }
+
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
-
 
     /* enable dma */
     ret = universal_rpm_enable_dma(uni_dev);
@@ -642,6 +659,11 @@ int universal_runtime_resume(struct device *dev) {
         LJTALE_LEVEL_DEBUG(3, "universal enable dma failed: %d\n",ret);
         return ret;
     }
-    return 0;
+
+    /* in case the local resume does not need lock */
+    if (!rpm_dev->local_resume_lock && rpm_ops->local_runtime_resume)
+        ret = rpm_ops->local_runtime_resume(uni_dev->dev);
+
+    return ret;
 }
 

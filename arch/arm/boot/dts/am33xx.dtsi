@@ -197,6 +197,7 @@
 			#interrupt-cells = <2>;
 			reg = <0x4804c000 0x1000>;
 			interrupts = <98>;
+            dev_access_raw_spinlock;
 		};
 
 		gpio2: gpio@481ac000 {

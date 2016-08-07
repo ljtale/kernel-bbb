@@ -664,6 +664,12 @@ EXPORT_SYMBOL_GPL(__dma_request_channel);
 struct dma_chan *dma_request_slave_channel_reason(struct device *dev,
 						  const char *name)
 {
+    if (dev)
+        LJTALE_LEVEL_DEBUG(4, "request channel from device: %s\n",
+                dev_name(dev));
+    else
+        LJTALE_LEVEL_DEBUG(4, "request channel from null\n");
+
 	/* If device-tree is present get slave info from here */
 	if (dev->of_node)
 		return of_dma_request_slave_channel(dev->of_node, name);

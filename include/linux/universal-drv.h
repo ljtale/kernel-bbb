@@ -233,6 +233,7 @@ struct universal_probe_dev {
         spinlock_t spinlock;
         unsigned long spinlock_flags;
     };
+    raw_spinlock_t raw_spinlock;
 
     struct regacc_dev regacc_dev;
     struct dma_config_dev_num dma_config_dev_num;
@@ -278,6 +279,10 @@ struct universal_rpm_dev {
     bool irq_need_lock:1;
     bool support_dma:1;
     bool dma_channel_requested:1;
+    bool local_suspend_lock:1;
+    bool local_resume_lock:1;
+    bool dev_access_needs_spinlock:1;
+    bool dev_access_needs_raw_spinlock:1;
     spinlock_t irq_lock;
     struct universal_rpm_ctx rpm_context;
     spinlock_t rpm_lock;
