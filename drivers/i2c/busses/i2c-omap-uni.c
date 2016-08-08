@@ -1841,7 +1841,6 @@ extern void omap_i2c_rpm_populate_suspend_graph(
 extern void omap_i2c_rpm_populate_resume_graph(
         struct universal_device *uni_dev);
 #endif
-extern int omap_i2c_rpm_create_reg_context(struct universal_device *uni_dev);
 
 static int omap_i2c_universal_local_probe(struct universal_device *uni_dev) {
     struct platform_device *pdev;
@@ -1910,7 +1909,6 @@ static struct universal_driver omap_i2c_universal_driver = {
         },
     },
     .rpm_ops = {
-        .rpm_create_reg_context = omap_i2c_rpm_create_reg_context,
         .first_runtime_resume = omap_i2c_runtime_resume,
     }
 #endif

@@ -262,8 +262,6 @@ struct universal_rpm_ops {
     void (*rpm_populate_suspend_graph)(struct universal_device *uni_dev);
     void (*rpm_populate_resume_graph)(struct universal_device *uni_dev);
 
-    int (*rpm_create_reg_context)(struct universal_device *uni_dev);
-
     int (*local_runtime_suspend)(struct device *dev);
     int (*local_runtime_resume)(struct device *dev);
     int (*first_runtime_resume)(struct device *dev);
@@ -274,6 +272,7 @@ struct universal_rpm_dev {
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
 
+    bool rpm_reg_context:1;
     bool first_resume_called:1;
     bool support_irq:1;
     bool irq_need_lock:1;

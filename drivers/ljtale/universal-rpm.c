@@ -189,6 +189,26 @@ int universal_runtime_resume(struct device *dev) {
 
 /*============== generic logic =====================*/
 
+int universal_rpm_create_reg_context(struct universal_device *uni_dev) {
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    u32 *array = rpm->ref_ctx.array;
+    int size = rpm->ref_ctx.size;
+    int i;
+    u32 *dev_array;
+    if (!array)
+        return 0;
+    dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
+    if (!dev_array)
+        return -ENOMEM;
+    /* copy everything including the constant values */
+    for (i = 0; i < size; i++)
+        dev_array[i] = array[i];
+
+    uni_dev->rpm_dev.rpm_context.array = dev_array;
+    uni_dev->rpm_dev.rpm_context.size = size;
+    return 0;
+}
+
 static int inline process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size) {
     struct universal_reg_entry *tbl_entry;

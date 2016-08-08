@@ -38,12 +38,12 @@ struct omap_hsmmc_rpm_context {
     u32 lock_flags;
 };
 
-struct universal_pm_ops {
-    int (*suspend)(struct universal_device *uni_dev);
-    int (*resume)(struct universal_device *uni_dev);
-    int (*runtime_suspend)(struct universal_device *uni_dev);
-    int (*runtime_resume)(struct universal_device *uni_dev);
-};
+int universal_runtime_suspend(struct device *dev);
+int universal_runtime_resume(struct device *dev);
+int universal_suspend(struct device *dev);
+int universal_resume(struct device *dev);
+
+int universal_rpm_create_reg_context(struct universal_device *uni_dev);
 
 /* operation type of each step of runtime pm doing */
 enum rpm_op {

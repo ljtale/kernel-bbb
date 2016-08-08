@@ -1550,6 +1550,7 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 	int ret = 0, i;
 	struct mmc_data *data = req->data;
 	struct dma_chan *chan;
+    struct universal_device *uni_dev;
 
 	/* Sanity check: all the SG entries must be aligned by block size. */
 	for (i = 0; i < data->sg_len; i++) {
@@ -1598,7 +1599,7 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 
     /* ljtale starts */
     /* let me figure out somethign special */
-    struct universal_device *uni_dev = check_universal_driver(host->dev);
+    uni_dev = check_universal_driver(host->dev);
     if (!uni_dev) {
         LJTALE_LEVEL_DEBUG(3, "no universal driver found: %s - %s\n",
                 dev_name(host->dev), __func__);
@@ -3269,8 +3270,6 @@ static int omap_hsmmc_universal_local_probe(struct universal_device *uni_dev) {
     return omap_hsmmc_probe(pdev);
 }
 
-extern int omap_hsmmc_rpm_create_reg_context(struct universal_device *uni_dev);
-
 static struct register_accessor omap_hsmmc_regacc = {
     .bus_name = "platform",
     .reg_addr_bits = 32,
@@ -3333,7 +3332,6 @@ static struct universal_driver omap_hsmmc_universal_driver = {
         },
     },
     .rpm_ops = {
-        .rpm_create_reg_context = omap_hsmmc_rpm_create_reg_context,
         .first_runtime_resume = omap_hsmmc_runtime_resume,
     },
 };

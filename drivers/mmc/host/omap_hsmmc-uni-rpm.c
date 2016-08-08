@@ -151,24 +151,3 @@ void omap_hsmmc_rpm_populate_suspend_graph(struct universal_device *uni_dev) {
     RPM_SPINLOCK_NODE_NAME(spinlock_2).lock = &rpm_context->irq_lock;
 }
 #endif
-
-
-/* =============== rpm generic logic part ===== */
-int omap_hsmmc_rpm_create_reg_context (struct universal_device *uni_dev) {
-    struct universal_rpm *rpm = &uni_dev->drv->rpm;
-    u32 *array = rpm->ref_ctx.array;
-    int size = rpm->ref_ctx.size;
-    int i;
-    u32 *dev_array;
-
-    if (!array)
-        return 0;
-    dev_array = devm_kzalloc(uni_dev->dev, sizeof(u32) * size, GFP_KERNEL);
-    if (!dev_array)
-        return -ENOMEM;
-    for (i = 0; i < size; i++)
-        dev_array[i] = array[i];
-    uni_dev->rpm_dev.rpm_context.array = dev_array;
-    uni_dev->rpm_dev.rpm_context.size = size;
-    return 0;
-}

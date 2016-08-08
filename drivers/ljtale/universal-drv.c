@@ -237,6 +237,7 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
         rpm_dev->dev_access_needs_raw_spinlock = true;
     else
         rpm_dev->dev_access_needs_raw_spinlock = false;
+
 }
  
 int __universal_drv_probe(struct universal_device *dev) {
@@ -247,7 +248,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
-    struct universal_rpm_ops *rpm_ops;
+    struct universal_rpm *rpm;
     int i;
     
     if (!dev || !dev->drv) {
@@ -260,6 +261,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     drv = dev->drv;
     probe_dev = &dev->probe_dev;
     rpm_dev = &dev->rpm_dev;
+    rpm = &dev->drv->rpm;
     /* do a set of initialization */
     mutex_init(&dev->probe_dev.lock);
     spin_lock_init(&dev->probe_dev.spinlock);
@@ -310,9 +312,8 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
     rpm_dev->first_resume_called = false;
     rpm_dev->context_loss_cnt = 0;
-    rpm_ops = &drv->rpm_ops;
-    if (rpm_ops->rpm_create_reg_context) {
-        ret = rpm_ops->rpm_create_reg_context(dev);
+    if (rpm->ref_ctx.array) {
+        ret = universal_rpm_create_reg_context(dev);
         if (ret < 0)
             goto rpm_error;
     }
