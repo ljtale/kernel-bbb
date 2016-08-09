@@ -387,13 +387,13 @@ struct universal_restore_context {
     int (*rpm_local_restore_context)(struct universal_device *uni_dev);
 };
 
-struct universal_disable_dma {
-};
-
-struct universal_enable_dma {
-};
-
 struct universal_setup_wakeup {
+};
+
+struct universal_disable_clk {
+};
+
+struct universal_enable_clk {
 };
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */

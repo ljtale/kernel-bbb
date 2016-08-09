@@ -1267,7 +1267,8 @@ static int omap_gpio_probe(struct platform_device *pdev)
 	pm_runtime_put(bank->dev);
 
 	list_add_tail(&bank->node, &omap_gpio_list);
-
+    LJTALE_LEVEL_DEBUG(4, "get context loss count callback: 0x%x\n",
+            (unsigned int)bank->get_context_loss_count);
 	return 0;
 }
 
@@ -1287,6 +1288,191 @@ static int omap_gpio_remove(struct platform_device *pdev)
 #ifdef CONFIG_ARCH_OMAP2PLUS
 
 #if defined(CONFIG_PM)
+
+/* ljtale starts */
+/* Following the macro quote CONFIG_PM, define rpm data here */
+/* register offsets */
+#define OMAP_GPIO_UNI_IRQENABLE1_REG        0x0034
+#define OMAP_GPIO_UNI_IRQENABLE2_REG        0x0038
+#define OMAP_GPIO_UNI_WAKE_EN_REG           0x0044 
+#define OMAP_GPIO_UNI_CTRL_REG              0x0130
+#define OMAP_GPIO_UNI_OE_REG                0x0134
+#define OMAP_GPIO_UNI_LEVELDETECT0_REG      0x0140
+#define OMAP_GPIO_UNI_LEVELDETECT1_REG      0x0144
+#define OMAP_GPIO_UNI_RISINGDETECT_REG      0x0148
+#define OMAP_GPIO_UNI_FALLINGDETECT_REG     0x014c
+#define OMAP_GPIO_UNI_DATAOUT_REG           0x013c
+#define OMAP_GPIO_UNI_DEBOUNCE_REG          0x0154
+#define OMAP_GPIO_UNI_DEBOUNCE_EN_REG       0x0150
+#define OMAP_GPIO_UNI_SETDATAOUT_REG       0x0150
+
+enum {
+    OMAP_GPIO_UNI_ZERO = 0,
+    OMAP_GPIO_UNI_IRQENABLE1,
+    OMAP_GPIO_UNI_IRQENABLE2,
+    OMAP_GPIO_UNI_WAKE_EN,
+    OMAP_GPIO_UNI_CTRL,
+    OMAP_GPIO_UNI_OE,
+    OMAP_GPIO_UNI_LEVELDETECT0,
+    OMAP_GPIO_UNI_LEVELDETECT1,
+    OMAP_GPIO_UNI_RISINGDETECT,
+    OMAP_GPIO_UNI_FALLINGDETECT,
+    OMAP_GPIO_UNI_DATAOUT,
+    OMAP_GPIO_UNI_DEBOUNCE,
+    OMAP_GPIO_UNI_DEBOUNCE_EN,
+};
+
+u32 omap_gpio_reg_context[] = {
+    [OMAP_GPIO_UNI_ZERO] = 0,
+    [OMAP_GPIO_UNI_IRQENABLE1] = 0,
+    [OMAP_GPIO_UNI_IRQENABLE2] = 0,
+    [OMAP_GPIO_UNI_WAKE_EN] = 0,
+    [OMAP_GPIO_UNI_CTRL] = 0,
+    [OMAP_GPIO_UNI_OE] = 0,
+    [OMAP_GPIO_UNI_LEVELDETECT0] = 0,
+    [OMAP_GPIO_UNI_LEVELDETECT1] = 0,
+    [OMAP_GPIO_UNI_RISINGDETECT] = 0,
+    [OMAP_GPIO_UNI_FALLINGDETECT] = 0,
+    [OMAP_GPIO_UNI_DATAOUT] = 0,
+    [OMAP_GPIO_UNI_DEBOUNCE] = 0,
+    [OMAP_GPIO_UNI_DEBOUNCE_EN] = 0,
+};
+
+static struct universal_reg_entry omap_gpio_save_context_reg_tbl[] = {
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_CTRL_REG,
+        .ctx_index = OMAP_GPIO_UNI_CTRL,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_OE_REG,
+        .ctx_index = OMAP_GPIO_UNI_OE,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_WAKE_EN_REG,
+        .ctx_index = OMAP_GPIO_UNI_WAKE_EN,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_LEVELDETECT0_REG,
+        .ctx_index = OMAP_GPIO_UNI_LEVELDETECT0,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_LEVELDETECT1_REG,
+        .ctx_index = OMAP_GPIO_UNI_LEVELDETECT1,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_RISINGDETECT_REG,
+        .ctx_index = OMAP_GPIO_UNI_RISINGDETECT,
+
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_FALLINGDETECT_REG,
+        .ctx_index = OMAP_GPIO_UNI_FALLINGDETECT,
+
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_IRQENABLE1_REG,
+        .ctx_index = OMAP_GPIO_UNI_IRQENABLE1,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_IRQENABLE2_REG,
+        .ctx_index = OMAP_GPIO_UNI_IRQENABLE2,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_SETDATAOUT_REG,
+        .ctx_index = OMAP_GPIO_UNI_DATAOUT,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_REG,
+        .ctx_index = OMAP_GPIO_UNI_DEBOUNCE,
+    },
+    {
+        .reg_op = RPM_REG_READ,
+        .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_EN_REG,
+        .ctx_index = OMAP_GPIO_UNI_DEBOUNCE_EN,
+    },
+};
+static struct universal_save_context_tbl omap_gpio_save_context_tbl = {
+    .table = omap_gpio_save_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_gpio_save_context_reg_tbl),
+};
+
+
+static struct universal_reg_entry omap_gpio_restore_context_reg_tbl[] = {
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_WAKE_EN_REG,
+        .ctx_index = OMAP_GPIO_UNI_WAKE_EN,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_CTRL_REG,
+        .ctx_index = OMAP_GPIO_UNI_CTRL,
+    },
+    {
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_LEVELDETECT0_REG,
+        .ctx_index = OMAP_GPIO_UNI_LEVELDETECT0,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_LEVELDETECT1_REG,
+        .ctx_index = OMAP_GPIO_UNI_LEVELDETECT1,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_RISINGDETECT_REG,
+        .ctx_index = OMAP_GPIO_UNI_RISINGDETECT,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_FALLINGDETECT_REG,
+        .ctx_index = OMAP_GPIO_UNI_FALLINGDETECT,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_SETDATAOUT_REG,
+        .ctx_index = OMAP_GPIO_UNI_DATAOUT,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_OE_REG,
+        .ctx_index = OMAP_GPIO_UNI_OE,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_REG,
+        .ctx_index = OMAP_GPIO_UNI_DEBOUNCE,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_EN_REG,
+        .ctx_index = OMAP_GPIO_UNI_DEBOUNCE_EN,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_IRQENABLE1_REG,
+        .ctx_index = OMAP_GPIO_UNI_IRQENABLE1,
+    },
+    {        
+        .reg_op = RPM_REG_WRITE,
+        .reg_offset = OMAP_GPIO_UNI_IRQENABLE2_REG,
+        .ctx_index = OMAP_GPIO_UNI_IRQENABLE2,
+    },
+
+};
+/* ljtale ends */
+
 static void omap_gpio_restore_context(struct gpio_bank *bank);
 
 static int omap_gpio_runtime_suspend(struct device *dev)
