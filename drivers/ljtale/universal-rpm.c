@@ -221,7 +221,7 @@ static int inline process_reg_table(struct universal_device *uni_dev,
     u32 temp_value;
     u32 timeout_compare = 0, timeout_read;
     unsigned long timeout;
-    if (!tbl)
+    if (!tbl || !reg_ctx->array)
         return 0;
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
@@ -376,7 +376,8 @@ static int universal_disable_irq(struct universal_device *uni_dev) {
         if (disable_irq->pending.pending) 
             return -EBUSY;
     }
-     
+    if (!tbl)
+       return 0; 
     /* we are good, no pending IRQ handling*/
     /* pass through the register table to disable the IRQs */
     ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
@@ -393,6 +394,8 @@ static int universal_enable_irq(struct universal_device *uni_dev) {
         return 0;
     }
     tbl = &enable_irq->enable_table;
+    if (!tbl)
+        return 0;
     return process_reg_table(uni_dev, tbl->table, tbl->table_size);
 };
 
@@ -442,6 +445,8 @@ static int universal_save_context(struct universal_device *uni_dev) {
     struct universal_save_context_tbl *tbl = rpm->save_context.save_tbl;
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     int ret = 0;
+    if (!tbl)
+        return 0;
     if (rpm_dev->save_context_once && !rpm_dev->context_saved) {
         ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
         if (ret)
@@ -499,6 +504,8 @@ static int universal_restore_context(struct universal_device *uni_dev) {
             uni_dev->rpm_dev.context_loss_cnt++;
         /* else there is a context loss, restore the context */
     }
+    if (!tbl)
+        return 0;
     /* process the restore table to restore the context */
     ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
     if (ret)
@@ -599,19 +606,27 @@ static int universal_rpm_enable_dma(struct universal_device *uni_dev) {
 
 static int universal_setup_wakeup(struct universal_device *uni_dev) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
-    struct universal_reg_entry *reg_tbl = rpm->setup_wakeup->reg_table;
-    int table_size = rpm->setup_wakeup->table_size;
+    struct universal_reg_entry *reg_tbl;
+    int table_size;
+    if (!rpm->setup_wakeup)
+        return 0;
+    reg_tbl = rpm->setup_wakeup->reg_table;
+    table_size = rpm->setup_wakeup->table_size;
     return process_reg_table(uni_dev, reg_tbl, table_size);
 }
 
 static int universal_disable_clk(struct universal_device *uni_dev) {
    struct universal_rpm *rpm = &uni_dev->drv->rpm;
    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
-   struct universal_reg_entry *reg_tbl = rpm->disable_clk->reg_table;
-   int table_size = rpm->disable_clk->table_size;
+   struct universal_reg_entry *reg_tbl;
+   int table_size;
    struct clk_config_dev_num *clk_num = &probe_dev->clk_config_dev_num;
    int ret;
    int i;
+   if (!rpm->disable_clk)
+       return 0;
+   reg_tbl = rpm->disable_clk->reg_table;
+   table_size = rpm->disable_clk->table_size;
    ret = process_reg_table(uni_dev, reg_tbl, table_size);
    if (ret)
        return ret;
@@ -628,10 +643,14 @@ static int universal_enable_clk(struct universal_device *uni_dev) {
    struct universal_rpm *rpm = &uni_dev->drv->rpm;
    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
    struct clk_config_dev_num *clk_num = &probe_dev->clk_config_dev_num;
-   struct universal_reg_entry *reg_tbl = rpm->disable_clk->reg_table;
-   int table_size = rpm->disable_clk->table_size;
+   struct universal_reg_entry *reg_tbl;
+   int table_size;
    int ret;
    int i;
+   if (!rpm->enable_clk)
+       return 0;
+   reg_tbl = rpm->enable_clk->reg_table;
+   table_size = rpm->enable_clk->table_size;
    for (i = 0; i < clk_num->clk_num; i++) {
        if (clk_num->clk_config_dev[i].clock_flag)
            clk_enable(clk_num->clk_config_dev[i].clk);
