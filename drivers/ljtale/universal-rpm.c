@@ -206,8 +206,11 @@ int universal_rpm_create_reg_context(struct universal_device *uni_dev) {
 
     uni_dev->rpm_dev.rpm_context.array = dev_array;
     uni_dev->rpm_dev.rpm_context.size = size;
+    LJTALE_LEVEL_DEBUG(4, "%s successfully created reg context array\n",
+            uni_dev->name);
     return 0;
 }
+EXPORT_SYMBOL(universal_rpm_create_reg_context);
 
 static int inline process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size) {
@@ -218,8 +221,34 @@ static int inline process_reg_table(struct universal_device *uni_dev,
     u32 temp_value;
     u32 timeout_compare = 0, timeout_read;
     unsigned long timeout;
+    if (!tbl)
+        return 0;
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
+        if (tbl_entry->reg_op == RPM_REG_WRITE_AUG_OR ||
+                tbl_entry->reg_op == RPM_REG_WRITE_AUG_AND) {
+            // compute the augment value before continuing
+            if (tbl_entry->reg_write_augment_flag) {
+                struct reg_write_augment *augment = 
+                    &tbl_entry->reg_write_augment;
+                /* FIXME: a generic computation method is needed */
+                switch(augment->op) {
+                    case REG_BIT_AND:
+                        tbl_entry->write_augment = 
+                            reg_ctx->array[augment->index1] & 
+                            reg_ctx->array[augment->index2];
+                        break;
+                    case REG_BIT_OR:
+                        tbl_entry->write_augment = 
+                            reg_ctx->array[augment->index1] & 
+                            reg_ctx->array[augment->index2];
+                        break;
+                        /* TODO: more ops */
+                    default:
+                        break;
+                }
+            }
+        }
         switch(tbl_entry->reg_op) {
             case RPM_REG_READ:
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
@@ -313,7 +342,7 @@ timeout_check:
  * Check if there are pending IRQ handling =>
  *      If there is IRQ handling => reconfigure IRQ and abort 
  *      If there is no IRQ handling => succeed*/
-int universal_disable_irq(struct universal_device *uni_dev) {
+static int universal_disable_irq(struct universal_device *uni_dev) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_disable_irq *disable_irq = rpm->disable_irq; 
     /* assume when calling this function, the reg context has been created */
@@ -354,7 +383,7 @@ int universal_disable_irq(struct universal_device *uni_dev) {
     return ret;
 }
 
-int universal_enable_irq(struct universal_device *uni_dev) {
+static int universal_enable_irq(struct universal_device *uni_dev) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_enable_irq *enable_irq = rpm->enable_irq;
     struct universal_enable_irq_tbl *tbl;
@@ -368,7 +397,7 @@ int universal_enable_irq(struct universal_device *uni_dev) {
 };
 
 
-int universal_pin_control(struct universal_device *uni_dev,
+static int universal_pin_control(struct universal_device *uni_dev,
         enum rpm_action action) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_pin_control *pin_control = rpm->pin_control;
@@ -408,9 +437,18 @@ int universal_pin_control(struct universal_device *uni_dev,
     /* we don't care about pin select return value */
 }
 
-int universal_save_context(struct universal_device *uni_dev) {
+static int universal_save_context(struct universal_device *uni_dev) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_save_context_tbl *tbl = rpm->save_context.save_tbl;
+    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
+    int ret = 0;
+    if (rpm_dev->save_context_once && !rpm_dev->context_saved) {
+        ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
+        if (ret)
+            return ret;
+        rpm_dev->context_saved = true;
+        return 0;
+    }
     return process_reg_table(uni_dev, tbl->table, tbl->table_size);
 }
 
@@ -442,7 +480,7 @@ static bool universal_check_context_loss(struct universal_device *uni_dev) {
     return false;
 }
 
-int universal_restore_context(struct universal_device *uni_dev) {
+static int universal_restore_context(struct universal_device *uni_dev) {
     int ret = 0;
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_restore_context *restore_context =
@@ -486,14 +524,16 @@ int universal_restore_context(struct universal_device *uni_dev) {
  * Newer kernel versions (>= 4.6) provide dmaengine_terminate_sync() to
  * completely terminate the dma channel but make sure the data is not lost
  * (synchronized). If the DMA engine supports this, then this is a good 
- * feature to do runtime DMA disabling/enabling.
+ * feature to do runtime DMA disabling/enabling. To prevent the DMA
+ * synchronization from blocking the kernel, we can add a timeout mechanism
+ * to make the runtime suspend return after a certain amount of time.
  * For a simpler version of runtime DMA disabling/enabling, we use the 
  * dmaengine_pause/resume() calls to pause the DMA channels and resume them
  * later without reconfiguring DMA stuff. We can rely on the call
  * dma_async_is_complete() to check the status of the last cookie sent by
  * dmaengine_submitt (I demonstrated this a little bit for MMC controller).*/
 
-int universal_rpm_disable_dma(struct universal_device *uni_dev) {
+static int universal_rpm_disable_dma(struct universal_device *uni_dev) {
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     /* we rely on the per-device probe states to do runtime PM */
     struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
@@ -531,7 +571,7 @@ abort:
 #endif 
 }
 
-int universal_rpm_enable_dma(struct universal_device *uni_dev) {
+static int universal_rpm_enable_dma(struct universal_device *uni_dev) {
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
     struct dma_config_dev_num *dma_config_dev_num = 
@@ -557,11 +597,58 @@ int universal_rpm_enable_dma(struct universal_device *uni_dev) {
     return 0;
 }
 
+static int universal_setup_wakeup(struct universal_device *uni_dev) {
+    struct universal_rpm *rpm = &uni_dev->drv->rpm;
+    struct universal_reg_entry *reg_tbl = rpm->setup_wakeup->reg_table;
+    int table_size = rpm->setup_wakeup->table_size;
+    return process_reg_table(uni_dev, reg_tbl, table_size);
+}
+
+static int universal_disable_clk(struct universal_device *uni_dev) {
+   struct universal_rpm *rpm = &uni_dev->drv->rpm;
+   struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
+   struct universal_reg_entry *reg_tbl = rpm->disable_clk->reg_table;
+   int table_size = rpm->disable_clk->table_size;
+   struct clk_config_dev_num *clk_num = &probe_dev->clk_config_dev_num;
+   int ret;
+   int i;
+   ret = process_reg_table(uni_dev, reg_tbl, table_size);
+   if (ret)
+       return ret;
+   else {
+       for (i = 0; i < clk_num->clk_num; i++) {
+           if (clk_num->clk_config_dev[i].clock_flag)
+               clk_disable(clk_num->clk_config_dev[i].clk);
+       }
+   }
+   return 0;
+}
+
+static int universal_enable_clk(struct universal_device *uni_dev) {
+   struct universal_rpm *rpm = &uni_dev->drv->rpm;
+   struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
+   struct clk_config_dev_num *clk_num = &probe_dev->clk_config_dev_num;
+   struct universal_reg_entry *reg_tbl = rpm->disable_clk->reg_table;
+   int table_size = rpm->disable_clk->table_size;
+   int ret;
+   int i;
+   for (i = 0; i < clk_num->clk_num; i++) {
+       if (clk_num->clk_config_dev[i].clock_flag)
+           clk_enable(clk_num->clk_config_dev[i].clk);
+   }
+   ret = process_reg_table(uni_dev, reg_tbl, table_size);
+   if (ret)
+       return ret;
+   return 0;
+
+}
+
 int universal_runtime_suspend(struct device *dev) {
     struct universal_device *uni_dev;
     struct universal_rpm_dev *rpm_dev;
     struct universal_rpm_ops *rpm_ops;
     unsigned long irq_lock_flags = 0;
+    unsigned long dev_lock_flags = 0;
     int ret = 0;
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
@@ -572,18 +659,26 @@ int universal_runtime_suspend(struct device *dev) {
     rpm_ops = &uni_dev->drv->rpm_ops;
     LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
 
+    /* device access lock */
+    /* TODO: we should build a universal locking mechanism for all type of
+     * locks */
+    if (rpm_dev->dev_access_needs_spinlock)
+        spin_lock_irqsave(&uni_dev->probe_dev.spinlock, dev_lock_flags);
+    else if (rpm_dev->dev_access_needs_raw_spinlock)
+        raw_spin_lock_irqsave(&uni_dev->probe_dev.raw_spinlock, dev_lock_flags);
+
     /* save context */
     ret = universal_save_context(uni_dev);
     if (ret) {
         LJTALE_LEVEL_DEBUG(3, "universal save context failed: %d\n", ret);
-        return ret;
+        goto lock_err;
     }
 
     /* disable dma */
     ret = universal_rpm_disable_dma(uni_dev);
     if (ret) {
         LJTALE_LEVEL_DEBUG(3, "universal disable dma failed: %d\n",ret);
-        return ret;
+        goto lock_err;
     }
     /* disable irq */
     /* If the irq needs a lock to protect mutex access, then the lock should
@@ -594,7 +689,7 @@ int universal_runtime_suspend(struct device *dev) {
     ret = universal_disable_irq(uni_dev);
     if (ret) {
         LJTALE_LEVEL_DEBUG(3 ,"universal disable irq failed: %d\n", ret);
-        return ret;
+        goto irq_lock_err;
     }
     /* select pinctrl state */
     universal_pin_control(uni_dev, SUSPEND);
@@ -603,16 +698,32 @@ int universal_runtime_suspend(struct device *dev) {
     if (rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend) {
         ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
         if (ret)
-            return ret;
+            goto irq_lock_err;
     }
+irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
-    /* TODO: setup wakeup events */
-
 
     /* in case local suspend does not need a lock */
     if (!rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend)
         ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
+        if (ret)
+            goto lock_err;
+
+    /* setup wakeup event */
+    ret = universal_setup_wakeup(uni_dev);
+    if (ret)
+        goto lock_err;
+    ret = universal_disable_clk(uni_dev);
+    if (ret)
+        goto lock_err;
+lock_err:
+
+    if (rpm_dev->dev_access_needs_spinlock)
+        spin_unlock_irqrestore(&uni_dev->probe_dev.spinlock, dev_lock_flags);
+    else if (rpm_dev->dev_access_needs_raw_spinlock)
+        raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
+                dev_lock_flags);
 
     return ret;
 }
@@ -622,6 +733,7 @@ int universal_runtime_resume(struct device *dev) {
     struct universal_rpm_dev *rpm_dev;
     struct universal_rpm_ops *rpm_ops;
     unsigned long irq_lock_flags = 0;
+    unsigned long dev_lock_flags = 0;
     int ret = 0;
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
@@ -648,28 +760,41 @@ int universal_runtime_resume(struct device *dev) {
         return ret;
     }
     /* not the first time, do generic procedures */
+    /* FIXME: assume the first assume provides its own lock, but this lock
+     * should be the same ones defined in uni_dev or rpm_dev. */
+    if (rpm_dev->dev_access_needs_spinlock)
+        spin_lock_irqsave(&uni_dev->probe_dev.spinlock, dev_lock_flags);
+    else if (rpm_dev->dev_access_needs_raw_spinlock)
+        raw_spin_lock_irqsave(&uni_dev->probe_dev.raw_spinlock, dev_lock_flags);
     
     /* restore the context */
     ret = universal_restore_context(uni_dev);
     if (ret) {
         LJTALE_LEVEL_DEBUG(3, "universal restore context failed: %d\n", ret);
-        return ret;
+        goto lock_err;
     }
-    /* TODO: device-specific configuration logic */
+    /* enable clock */
+    ret = universal_enable_clk(uni_dev);
+    if (ret)
+        goto irq_lock_err;
 
     if (rpm_dev->irq_need_lock)
         spin_lock_irqsave(&rpm_dev->irq_lock, irq_lock_flags);
     /* select pinctrl state */
-    universal_pin_control(uni_dev, RESUME);
+    ret = universal_pin_control(uni_dev, RESUME);
     /* enable irq */
-    universal_enable_irq(uni_dev);
+    ret = universal_enable_irq(uni_dev);
+    if (ret)
+        goto irq_lock_err;
+
+    /* TODO: device-specific configuration logic */
 
     if (rpm_dev->local_resume_lock && rpm_ops->local_runtime_resume) {
         ret = rpm_ops->local_runtime_resume(uni_dev->dev);
         if (ret)
-            return ret;
+            goto irq_lock_err;
     }
-
+irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
 
@@ -677,12 +802,19 @@ int universal_runtime_resume(struct device *dev) {
     ret = universal_rpm_enable_dma(uni_dev);
     if (ret) {
         LJTALE_LEVEL_DEBUG(3, "universal enable dma failed: %d\n",ret);
-        return ret;
+        goto lock_err;
     }
 
     /* in case the local resume does not need lock */
     if (!rpm_dev->local_resume_lock && rpm_ops->local_runtime_resume)
         ret = rpm_ops->local_runtime_resume(uni_dev->dev);
+lock_err:
+
+    if (rpm_dev->dev_access_needs_spinlock)
+        spin_unlock_irqrestore(&uni_dev->probe_dev.spinlock, dev_lock_flags);
+    else if (rpm_dev->dev_access_needs_raw_spinlock)
+        raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
+                dev_lock_flags);
 
     return ret;
 }

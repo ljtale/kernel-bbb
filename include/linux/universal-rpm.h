@@ -67,6 +67,15 @@ enum rpm_op {
     /* TODO: more rpm ops */
 };
 
+enum reg_context_op {
+    REG_BIT_AND,
+    REG_BIT_OR,
+    REG_BIT_NOT,
+    REG_AND,
+    REG_OR,
+    REG_NOT,
+};
+
 #if 0
 enum rpm_pinctrl_state {
     RPM_PINCTRL_DEFAULT,
@@ -292,11 +301,6 @@ enum rpm_action {
     AUTOSUSPEND,
 };
 
-int universal_disable_irq(struct universal_device *uni_dev);
-int universal_enable_irq(struct universal_device *uni_dev);
-int universal_pin_control(struct universal_device *uni_dev, 
-        enum rpm_action action);
-
 #define INVALID_INDEX -1
 
 /* a reference array for register context, individual device needs
@@ -309,7 +313,15 @@ struct universal_rpm_ctx {
 struct reg_timeout {
     bool check_timeout;
     u32 compare_value;
+    /* assume timeout is microseconds */
     unsigned long timeout;
+};
+
+struct reg_write_augment {
+    /* TODO: define a generic computation method to get this augment value */
+    int index1;
+    int index2;
+    enum reg_context_op op;
 };
 
 struct universal_reg_entry {
@@ -317,12 +329,18 @@ struct universal_reg_entry {
     u32 reg_offset;
     int ctx_index;
     u32 write_augment;  /* this is a value to augment write operations */
+
     /* timing information for a register
      * Usually the reg op is write and timing check is specified, we need
      * to read the same register and compare against it to a pre-defined
      * value. Only when the value is stable (equal to the value) or a
      * timeout is triggered should we proceed. */
     struct reg_timeout timeout;
+
+    // For some devices, the write_augment value comes from the register
+    // context, thus this augment value should be specified by device vendor
+    bool reg_write_augment_flag;
+    struct reg_write_augment reg_write_augment;
 };
 
 struct universal_save_context_tbl {
@@ -388,12 +406,25 @@ struct universal_restore_context {
 };
 
 struct universal_setup_wakeup {
+    // setup wakeup in rpm is likely to be GPIO-specific, essentially change
+    // level-triggered pins to be edge-triggered in order to receive wakeup
+    // interrupts. According to what is saved during suspend we can know what
+    // registers to write to setup wakeup events
+    struct universal_reg_entry *reg_table;
+    int table_size;
+};
+
+struct universal_reset_wakeup {
 };
 
 struct universal_disable_clk {
+    struct universal_reg_entry *reg_table;
+    int table_size;
 };
 
 struct universal_enable_clk {
+    struct universal_reg_entry *reg_table;
+    int table_size;
 };
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */

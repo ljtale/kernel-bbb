@@ -1399,7 +1399,7 @@ omap_i2c_probe(struct platform_device *pdev)
     } else 
         omap_i2c_rpm_reg_values = rpm_dev->rpm_data_dev;
     /* FIXME: not all the device need to call first resume in probe */
-    rpm_dev->first_resume_called = true;
+//    rpm_dev->first_resume_called = true;
     /* ljtale ends */
 
 #if 0

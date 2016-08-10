@@ -310,6 +310,13 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     else
         rpm_dev->dev_access_needs_raw_spinlock = false;
 
+    if (of_property_read_bool(of_node, "save_context_once")) {
+        LJTALE_LEVEL_DEBUG(4, "context save only once: %s\n", uni_dev->name);
+        rpm_dev->save_context_once = true;
+    }
+    else
+        rpm_dev->save_context_once = false;
+    rpm_dev->context_saved = false;
 }
  
 int __universal_drv_probe(struct universal_device *dev) {
@@ -337,6 +344,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     rpm = &dev->drv->rpm;
     /* do a set of initialization */
     mutex_init(&dev->probe_dev.lock);
+    /* The lock should be consistent to the lock in the conventional driver */
     spin_lock_init(&dev->probe_dev.spinlock);
     raw_spin_lock_init(&dev->probe_dev.raw_spinlock);
 

@@ -280,10 +280,12 @@ struct universal_rpm {
     struct universal_disable_irq *disable_irq;
     struct universal_disable_dma *disable_dma;
     struct universal_setup_wakeup *setup_wakeup;
+    struct universal_disable_clk *disable_clk;
 
     struct universal_restore_context restore_context;
     struct universal_enable_irq *enable_irq;
     struct universal_enable_dma *enable_dma;
+    struct universal_enable_clk *enable_clk;
 
     struct universal_pin_control *pin_control;
     struct universal_rpm_ctx ref_ctx;
@@ -327,6 +329,7 @@ struct universal_rpm_dev {
     /* some devices needs only to save the context once and they are not
      * suppposed to change during time, such as GPIO controller */
     bool save_context_once:1;
+    bool context_saved:1;
 };
 
 
