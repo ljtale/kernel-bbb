@@ -1164,6 +1164,28 @@ static int omap_gpio_probe(struct platform_device *pdev)
 	struct irq_chip *irqc;
 	int ret;
 
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    struct universal_probe_dev *probe_dev;
+    struct universal_rpm_dev *rpm_dev;
+    struct regacc_dev *regacc_dev;
+    struct clk_config_dev *clk_config_dev;
+
+    LJTALE_LEVEL_DEBUG(3, "omap gpio local probe get called\n");
+
+    uni_dev = check_universal_driver(dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
+                dev_name(dev));
+        return -EINVAL;
+    }
+    probe_dev = &uni_dev->probe_dev;
+    rpm_dev = &uni_dev->rpm_dev;
+    regacc_dev = &probe_dev->regacc_dev;
+    clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
+    rpm_dev->first_resume_called = false;
+    /* ljtale ends */
+
 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
 
 	pdata = match ? match->data : dev_get_platdata(dev);
@@ -1226,13 +1248,16 @@ static int omap_gpio_probe(struct platform_device *pdev)
 	raw_spin_lock_init(&bank->lock);
 	raw_spin_lock_init(&bank->wa_lock);
 
+#if 0
 	/* Static mapping, never released */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	bank->base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(bank->base)) {
 		return PTR_ERR(bank->base);
 	}
-
+#endif
+    bank->base = regacc_dev->base;
+#if 0
 	if (bank->dbck_flag) {
 		bank->dbck = devm_clk_get(bank->dev, "dbclk");
 		if (IS_ERR(bank->dbck)) {
@@ -1243,6 +1268,10 @@ static int omap_gpio_probe(struct platform_device *pdev)
 			clk_prepare(bank->dbck);
 		}
 	}
+#endif
+    /* TODO: replace all the dbck clock related field */
+    bank->dbck = clk_config_dev[0].clk;
+    bank->dbck_flag = clk_config_dev[0].clock_flag;
 
 	platform_set_drvdata(pdev, bank);
 
@@ -1882,12 +1911,27 @@ static struct irq_config_num  omap_gpio_irq_config_num = {
     .irq_num = 1,
 };
 
+static struct clk_config omap_gpio_clk_config[] = {
+    {
+        .clock_name = "dbclk",
+        .optional = false,
+        .clock_prepare = true,
+        .clock_enable = false,
+    },
+};
+
+static struct clk_config_num omap_gpio_clk_config_num = {
+    .clk_config = omap_gpio_clk_config,
+    .clk_num = ARRAY_SIZE(omap_gpio_clk_config),
+};
+
 static struct universal_driver omap_gpio_universal_driver = {
     .name = "omap-gpio-universal-driver",
     .driver = &omap_gpio_driver.driver,
-    .regacc = NULL,
+    .regacc = &omap_gpio_regacc,
     .irq_config_num = NULL,
     /* no dma support */
+    .clk_config_num = &omap_gpio_clk_config_num,
     .local_probe = omap_gpio_universal_local_probe,
 };
 

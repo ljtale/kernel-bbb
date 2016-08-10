@@ -197,6 +197,78 @@ static int universal_dma_config(struct universal_device *uni_dev,
     return 0;
 }
 
+static int universal_clk_config(struct universal_device *uni_dev,
+        struct clk_config_num *clk_config_num) {
+    struct clk_config_dev_num *clk_config_dev_num =
+        &uni_dev->probe_dev.clk_config_dev_num;
+    struct clk_config_dev *clk_config_dev;
+    struct clk_config *clk_config;
+    int i;
+    int ret;
+    clk_config_dev_num->clk_config_dev = devm_kzalloc(uni_dev->dev,
+            sizeof(struct clk_config_dev) * clk_config_num->clk_num,
+            GFP_KERNEL);
+    if (!clk_config_dev_num->clk_config_dev)
+        return -ENOMEM;
+    clk_config_dev_num->clk_num = clk_config_num->clk_num;
+    for (i = 0; i < clk_config_dev_num->clk_num; i++) {
+        clk_config = &clk_config_num->clk_config[i];
+        clk_config_dev = &clk_config_dev_num->clk_config_dev[i];
+        clk_config_dev->clk = 
+            devm_clk_get(uni_dev->dev, clk_config->clock_name);
+        if (IS_ERR(clk_config_dev->clk)) {
+            dev_err(uni_dev->dev, "failed to get clk %d for %s\n",
+                    i, uni_dev->name);
+            if(clk_config->optional)
+                goto optional_clk_err;
+            else {
+                ret = PTR_ERR(clk_config_dev->clk);
+                goto err;
+            }
+        }
+        if (clk_config->freq_max || clk_config->freq_min) {
+            clk_config->freq_max = 
+                clk_config->freq_max > clk_config->freq_min ?
+                clk_config->freq_max : clk_config->freq_min;
+           ret = clk_set_rate(clk_config_dev->clk, clk_config->freq_max); 
+           if (ret) {
+               dev_err(uni_dev->dev, "failed to set clock freq: %s - %d\n",
+                       uni_dev->name, clk_config->freq_max);
+               goto err;
+           }
+        }
+        if (clk_config->clock_enable && clk_config->clock_prepare) {
+            ret = clk_prepare_enable(clk_config_dev->clk);
+            if (ret && clk_config->optional)
+                goto optional_clk_err;
+            else if (ret)
+                goto err;
+        } else if (clk_config->clock_enable && !clk_config->clock_prepare) {
+            ret = clk_enable(clk_config_dev->clk);
+            if (ret && clk_config->optional)
+                goto optional_clk_err;
+            else if (ret)
+                goto err;
+        } else if (!clk_config->clock_enable && clk_config->clock_prepare) {
+            ret = clk_prepare(clk_config_dev->clk);
+            if (ret && clk_config->optional)
+                goto optional_clk_err;
+            else if (ret)
+                goto err;
+        }
+        clk_config_dev->clock_flag = true;
+        continue;
+optional_clk_err:
+        clk_config_dev->clk = NULL;
+        clk_config_dev->clock_flag = false;
+        continue;
+err:
+        clk_config_dev->clock_flag = false;
+        return ret;
+    }
+    return 0;
+}
+
 /* populate device knowledge from device tree for serving runtime pm */
 void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
@@ -248,6 +320,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
+    struct clk_config_num *clk_config_num;
     struct universal_rpm *rpm;
     int i;
     
@@ -300,6 +373,18 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
 
     /* TODO: runtime pm configuration and clock configuration */
+    clk_config_num = drv->clk_config_num;
+    if (clk_config_num) {
+        ret = universal_clk_config(dev, clk_config_num);
+        if (ret) {
+            LJTALE_LEVEL_DEBUG(3, "clock configuration failed: %s\n",
+                    dev->name);
+            goto clk_config_err;
+        } else 
+            LJTALE_LEVEL_DEBUG(3, "clock configuration returns:%s --> %d\n",
+                    dev->name, ret);
+    }
+
     /* get properties from device tree to populate the device knowledge */
     if (dev->dev->of_node) {
         rpm_knowledge_from_dt(dev);
@@ -354,6 +439,7 @@ int __universal_drv_probe(struct universal_device *dev) {
 irq_config_err:
 local_probe_err:
 rpm_error:
+clk_config_err:
 dma_config_err:
 regacc_err:
     return ret;

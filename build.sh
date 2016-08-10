@@ -4,6 +4,8 @@
 # are compiled into separate binaries.
 # By Jie Liao
 
+clear
+
 if [ $# == 1 ]
 then
     

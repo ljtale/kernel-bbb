@@ -8,6 +8,7 @@
 #include <linux/interrupt.h>
 #include <linux/dmaengine.h>
 #include <linux/omap-dmaengine.h>
+#include <linux/clk.h>
 
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
@@ -200,6 +201,33 @@ struct irq_config_dev_num {
     int irq_num;
 };
 
+struct clk_config {
+    /* clock name that is used to get the clk reference */
+    char *clock_name;
+    unsigned int freq_max;
+    unsigned int freq_min;
+    /* if optional is true, then the device probe does not fail even the
+     * clock is not successfully acquired */
+    bool optional:1;
+    bool clock_prepare:1;
+    bool clock_enable:1;
+};
+
+struct clk_config_num {
+    struct clk_config *clk_config;
+    int clk_num;
+};
+
+struct clk_config_dev {
+    struct clk *clk;
+    bool clock_flag;
+};
+
+struct clk_config_dev_num {
+    struct clk_config_dev *clk_config_dev;
+    int clk_num;
+};
+
 /*
  * communication interfaces between the driver and the kernel
  * NOTE: this part probably is the most driver-dependent, which means this
@@ -221,6 +249,7 @@ struct universal_probe {
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
+    struct clk_config_num *clk_config_num;
 };
 
 struct universal_probe_ops {
@@ -240,6 +269,7 @@ struct universal_probe_dev {
     struct regacc_dev regacc_dev;
     struct dma_config_dev_num dma_config_dev_num;
     struct irq_config_dev_num irq_config_dev_num;
+    struct clk_config_dev_num clk_config_dev_num;
 };
 
 struct universal_rpm {
@@ -274,6 +304,11 @@ struct universal_rpm_dev {
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
 
+    spinlock_t irq_lock;
+    struct universal_rpm_ctx rpm_context;
+    spinlock_t rpm_lock;
+    int context_loss_cnt;
+
     bool first_resume_called:1;
 
     bool support_irq:1;
@@ -292,11 +327,6 @@ struct universal_rpm_dev {
     /* some devices needs only to save the context once and they are not
      * suppposed to change during time, such as GPIO controller */
     bool save_context_once:1;
-
-    spinlock_t irq_lock;
-    struct universal_rpm_ctx rpm_context;
-    spinlock_t rpm_lock;
-    int context_loss_cnt;
 };
 
 
@@ -321,6 +351,8 @@ struct universal_driver {
     struct irq_config_num *irq_config_num;
     /* DMA configuration */
     struct dma_config_num *dma_config_num;
+    /* Clock configuration */
+    struct clk_config_num *clk_config_num;
 
     /* the universal driver provides a universal probe function for the 
      * device driver to call upon a device-driver binding, but there

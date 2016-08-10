@@ -2572,6 +2572,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     struct universal_probe_dev *probe_dev;
     struct regacc_dev *regacc_dev;
     struct dma_config_dev *dma_config_dev;
+    struct clk_config_dev *clk_config_dev;
     int dma_num;
     uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev) {
@@ -2582,6 +2583,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     probe_dev = &uni_dev->probe_dev;
     regacc_dev = &probe_dev->regacc_dev;
     dma_config_dev = probe_dev->dma_config_dev_num.dma_config_dev;
+    clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
     dma_num = probe_dev->dma_config_dev_num.dma_num;
     /* ljtale ends */
 
@@ -2672,7 +2674,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 	spin_lock_init(&host->irq_lock);
 	setup_timer(&host->timer, omap_hsmmc_soft_timeout,
 		    (unsigned long)host);
-
+#if 0
 	host->fclk = devm_clk_get(&pdev->dev, "fck");
 	if (IS_ERR(host->fclk)) {
 		ret = PTR_ERR(host->fclk);
@@ -2684,7 +2686,9 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to set clock to %d\n", mmc->f_max);
 		goto err1;
 	}
-
+#endif
+    host->fclk = clk_config_dev[0].clk;
+    host->dbclk = clk_config_dev[1].clk;
 	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
 		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
 		omap_hsmmc_ops.multi_io_quirk = omap_hsmmc_multi_io_quirk;
@@ -2698,7 +2702,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 
     /* ljtale: wierd implementation */
 	omap_hsmmc_context_save(host);
-
+#if 0
 	host->dbclk = devm_clk_get(&pdev->dev, "mmchsdb_fck");
 	/*
 	 * MMC can still work without debounce clock.
@@ -2709,6 +2713,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		dev_warn(mmc_dev(host->mmc), "Failed to enable debounce clk\n");
 		host->dbclk = NULL;
 	}
+#endif
 
 	/* Since we do only SG emulation, we can have as many segs
 	 * as we want. */
@@ -3301,13 +3306,36 @@ static struct dma_config_num omap_hsmmc_dma_config_num = {
     .dma_num = 2,
 };
 
+static struct clk_config omap_hsmmc_clk_config[] = {
+    {
+        .clock_name = "fck",
+        .freq_max = OMAP_MMC_MAX_CLOCK,
+        .optional = false,
+        .clock_prepare = false,
+        .clock_enable = false,
+    },
+    {
+        .clock_name = "mmchsdb_fck",
+        .optional = true,
+        .clock_prepare = true,
+        .clock_enable = true,
+    },
+};
+
+static struct clk_config_num omap_hsmmc_clk_config_num = {
+    .clk_config = omap_hsmmc_clk_config,
+    .clk_num = ARRAY_SIZE(omap_hsmmc_clk_config),
+};
+
 static struct universal_driver omap_hsmmc_universal_driver = {
     .name = "omap-hsmmc-universal-driver",
     .driver = &omap_hsmmc_driver.driver,
     .regacc = &omap_hsmmc_regacc,
     .irq_config_num = NULL,
     .dma_config_num = &omap_hsmmc_dma_config_num,
+    .clk_config_num = &omap_hsmmc_clk_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
+
     .rpm = {
         .save_context = {
             .save_tbl = &omap_hsmmc_save_context_tbl,
