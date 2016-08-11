@@ -310,10 +310,8 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     else
         rpm_dev->dev_access_needs_raw_spinlock = false;
 
-    if (of_property_read_bool(of_node, "save_context_once")) {
-        LJTALE_LEVEL_DEBUG(4, "context save only once: %s\n", uni_dev->name);
+    if (of_property_read_bool(of_node, "save_context_once"))
         rpm_dev->save_context_once = true;
-    }
     else
         rpm_dev->save_context_once = false;
     rpm_dev->context_saved = false;

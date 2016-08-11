@@ -1835,11 +1835,19 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
 #define omap_gpio_runtime_resume NULL
 static inline void omap_gpio_init_context(struct gpio_bank *p) {}
 #endif
-
+/* ljtale starts */
+# if 0
 static const struct dev_pm_ops gpio_pm_ops = {
 	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
 									NULL)
 };
+#endif
+static const struct dev_pm_ops gpio_pm_ops = {
+	SET_RUNTIME_PM_OPS(universal_runtime_suspend, universal_runtime_resume,
+            NULL)
+};
+
+/* ljtale ends */
 
 #if defined(CONFIG_OF)
 static struct omap_gpio_reg_offs omap2_gpio_regs = {
@@ -1936,6 +1944,106 @@ static struct platform_driver omap_gpio_driver = {
 
 /* ljtale starts */
 
+/* local runtime suspend/resume share the same context as rpm context,
+ * otherwise we need a method to access the rpm context from the conventional
+ * drivers. This is easy to do, but it requires another pass to the universal
+ * device list */
+static int omap_gpio_local_runtime_suspend(struct device *dev) {
+    struct platform_device *pdev = to_platform_device(dev);
+    struct gpio_bank *bank = platform_get_drvdata(pdev);
+    u32 l1 = 0, l2 = 0;
+	if (!bank->enabled_non_wakeup_gpios)
+        return 0;
+
+	if (bank->power_mode != OFF_MODE) {
+		bank->power_mode = 0;
+        return 0;
+	}
+	/*
+	 * If going to OFF, remove triggering for all
+	 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
+	 * generated.  See OMAP2420 Errata item 1.101.
+	 */
+	bank->saved_datain = readl_relaxed(bank->base +
+						bank->regs->datain);
+	l1 = bank->context.fallingdetect;
+	l2 = bank->context.risingdetect;
+
+	l1 &= ~bank->enabled_non_wakeup_gpios;
+	l2 &= ~bank->enabled_non_wakeup_gpios;
+
+	writel_relaxed(l1, bank->base + bank->regs->fallingdetect);
+	writel_relaxed(l2, bank->base + bank->regs->risingdetect);
+
+	bank->workaround_enabled = true;
+
+    // unlock was done in universal runtime suspend
+    return 0;
+}
+
+
+static int omap_gpio_local_runtime_resume(struct device *dev) {
+    struct platform_device *pdev = to_platform_device(dev);
+    struct gpio_bank *bank = platform_get_drvdata(pdev);
+    u32 l = 0, gen, gen0, gen1;
+
+	if (!bank->workaround_enabled) 
+		return 0;
+
+	l = readl_relaxed(bank->base + bank->regs->datain);
+
+	/*
+	 * Check if any of the non-wakeup interrupt GPIOs have changed
+	 * state.  If so, generate an IRQ by software.  This is
+	 * horribly racy, but it's the best we can do to work around
+	 * this silicon bug.
+	 */
+	l ^= bank->saved_datain;
+	l &= bank->enabled_non_wakeup_gpios;
+
+	/*
+	 * No need to generate IRQs for the rising edge for gpio IRQs
+	 * configured with falling edge only; and vice versa.
+	 */
+	gen0 = l & bank->context.fallingdetect;
+	gen0 &= bank->saved_datain;
+
+	gen1 = l & bank->context.risingdetect;
+	gen1 &= ~(bank->saved_datain);
+
+	/* FIXME: Consider GPIO IRQs with level detections properly! */
+	gen = l & (~(bank->context.fallingdetect) &
+					 ~(bank->context.risingdetect));
+	/* Consider all GPIO IRQs needed to be updated */
+	gen |= gen0 | gen1;
+
+	if (gen) {
+		u32 old0, old1;
+
+		old0 = readl_relaxed(bank->base + bank->regs->leveldetect0);
+		old1 = readl_relaxed(bank->base + bank->regs->leveldetect1);
+
+		if (!bank->regs->irqstatus_raw0) {
+			writel_relaxed(old0 | gen, bank->base +
+						bank->regs->leveldetect0);
+			writel_relaxed(old1 | gen, bank->base +
+						bank->regs->leveldetect1);
+		}
+
+		if (bank->regs->irqstatus_raw0) {
+			writel_relaxed(old0 | l, bank->base +
+						bank->regs->leveldetect0);
+			writel_relaxed(old1 | l, bank->base +
+						bank->regs->leveldetect1);
+		}
+		writel_relaxed(old0, bank->base + bank->regs->leveldetect0);
+		writel_relaxed(old1, bank->base + bank->regs->leveldetect1);
+	}
+
+	bank->workaround_enabled = false;
+    return 0;
+}
+
 static int omap_gpio_universal_local_probe(struct universal_device *uni_dev) {
     struct platform_device *pdev;
     LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s -- device: %s\n",
@@ -2019,6 +2127,8 @@ static struct universal_driver omap_gpio_universal_driver = {
     },
 
     .rpm_ops = {
+        .local_runtime_suspend = omap_gpio_local_runtime_suspend,
+        .local_runtime_resume = omap_gpio_local_runtime_resume,
         .first_runtime_resume = omap_gpio_runtime_resume,
     },
 };

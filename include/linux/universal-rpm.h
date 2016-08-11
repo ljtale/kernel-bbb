@@ -70,10 +70,10 @@ enum rpm_op {
 enum reg_context_op {
     REG_BIT_AND,
     REG_BIT_OR,
-    REG_BIT_NOT,
+    REG_BIT_NOT, // unary operation
     REG_AND,
     REG_OR,
-    REG_NOT,
+    REG_NOT,    // unary operation
 };
 
 #if 0

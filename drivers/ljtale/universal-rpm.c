@@ -452,6 +452,8 @@ static int universal_save_context(struct universal_device *uni_dev) {
         if (ret)
             return ret;
         rpm_dev->context_saved = true;
+        LJTALE_LEVEL_DEBUG(4, "universal rpm save context only once: %s\n",
+                uni_dev->name);
         return 0;
     }
     return process_reg_table(uni_dev, tbl->table, tbl->table_size);
@@ -713,22 +715,10 @@ int universal_runtime_suspend(struct device *dev) {
     /* select pinctrl state */
     universal_pin_control(uni_dev, SUSPEND);
 
-    /* call local suspend within lock */
-    if (rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend) {
-        ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
-        if (ret)
-            goto irq_lock_err;
-    }
 irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
-
-    /* in case local suspend does not need a lock */
-    if (!rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend)
-        ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
-        if (ret)
-            goto lock_err;
-
+    
     /* setup wakeup event */
     ret = universal_setup_wakeup(uni_dev);
     if (ret)
@@ -736,6 +726,12 @@ irq_lock_err:
     ret = universal_disable_clk(uni_dev);
     if (ret)
         goto lock_err;
+
+    /* in case local suspend does not need a lock */
+    if (!rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend)
+        ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
+        if (ret)
+            goto lock_err;
 lock_err:
 
     if (rpm_dev->dev_access_needs_spinlock)
@@ -808,11 +804,6 @@ int universal_runtime_resume(struct device *dev) {
 
     /* TODO: device-specific configuration logic */
 
-    if (rpm_dev->local_resume_lock && rpm_ops->local_runtime_resume) {
-        ret = rpm_ops->local_runtime_resume(uni_dev->dev);
-        if (ret)
-            goto irq_lock_err;
-    }
 irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
