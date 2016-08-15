@@ -635,6 +635,10 @@ static int universal_disable_clk(struct universal_device *uni_dev) {
    else {
        for (i = 0; i < clk_num->clk_num; i++) {
            if (clk_num->clk_config_dev[i].clock_flag)
+               /* FIXME: clk_core_disable will check if the enable count for 
+                * this clock is 0, it will throw a warning and return if the
+                * enable count is 0. Here we have to check if the clock is
+                * valid or not, which is different from the clk_core_disable */
                clk_disable(clk_num->clk_config_dev[i].clk);
        }
    }
@@ -678,7 +682,7 @@ int universal_runtime_suspend(struct device *dev) {
     }
     rpm_dev = &uni_dev->rpm_dev;
     rpm_ops = &uni_dev->drv->rpm_ops;
-    LJTALE_LEVEL_DEBUG(3, "universal rpm suspend...%s\n", uni_dev->name);
+    LJTALE_LEVEL_DEBUG(2, "universal rpm suspend...%s\n", uni_dev->name);
 
     /* device access lock */
     /* TODO: we should build a universal locking mechanism for all type of
@@ -757,7 +761,7 @@ int universal_runtime_resume(struct device *dev) {
     }
     rpm_dev = &uni_dev->rpm_dev;
     rpm_ops = &uni_dev->drv->rpm_ops;
-    LJTALE_LEVEL_DEBUG(3, "universal rpm resume...%s\n", uni_dev->name);
+    LJTALE_LEVEL_DEBUG(2, "universal rpm resume...%s\n", uni_dev->name);
     /* Make sure universal runtime resume is not the first resume for
      * the device. Because the context for runtime suspend/resume does
      * not depend on probe context, universal runtime suspend must
@@ -768,7 +772,7 @@ int universal_runtime_resume(struct device *dev) {
      * to configure the device to an initial states */
     if (!rpm_dev->first_resume_called) {
         BUG_ON(!rpm_ops->first_runtime_resume);
-        LJTALE_LEVEL_DEBUG(3 ,"first rpm resume from conventional driver: %s\n",
+        LJTALE_LEVEL_DEBUG(2 ,"first rpm resume from conventional driver: %s\n",
                 uni_dev->name);
         ret = rpm_ops->first_runtime_resume(dev);
         rpm_dev->first_resume_called = true;

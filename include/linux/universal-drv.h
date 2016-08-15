@@ -17,6 +17,7 @@
 
 #include <linux/ljtale-utils.h>
 #include <linux/universal-rpm.h>
+#include <linux/universal-pm.h>
 
 struct universal_driver;
 struct universal_device;
@@ -332,6 +333,14 @@ struct universal_rpm_dev {
     bool context_saved:1;
 };
 
+struct universal_pm {
+};
+
+struct universal_pm_ops {
+};
+
+struct universal_pm_dev {
+};
 
 /*
  * universal driver struct 

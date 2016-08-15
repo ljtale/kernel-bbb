@@ -10,10 +10,11 @@
 #include <linux/omap-dmaengine.h>
 #include <linux/pm_runtime.h>
 
+/*
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/platform_data/at24.h>
-
+*/
 
 #endif /* _LINUX_UNIVERSAL_RPM_H */
