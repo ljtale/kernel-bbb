@@ -40,22 +40,25 @@ struct omap_hsmmc_rpm_context {
 
 int universal_runtime_suspend(struct device *dev);
 int universal_runtime_resume(struct device *dev);
-int universal_suspend(struct device *dev);
-int universal_resume(struct device *dev);
 
 int universal_rpm_create_reg_context(struct universal_device *uni_dev);
 
 /* operation type of each step of runtime pm doing */
+enum pm_reg_op {
+    PM_REG_WRITE,
+    PM_REG_READ,
+    PM_REG_WRITE_READ, /* read after write, flushing read */
+    PM_REG_READ_WRITE_OR, /* write value =  read value | value */
+    PM_REG_READ_WRITE_AND, /* write value = read value & value */
+    PM_REG_WRITE_AUG_OR,
+    PM_REG_WRITE_AUG_AND,
+};
+
 enum rpm_op {
     RPM_START,
     RPM_STOP,
-    RPM_REG_WRITE,
     RPM_REG_READ,
-    RPM_REG_WRITE_READ, /* read after write, flushing read */
-    RPM_REG_READ_WRITE_OR, /* write value =  read value | value */
-    RPM_REG_READ_WRITE_AND, /* write value = read value & value */
-    RPM_REG_WRITE_AUG_OR,
-    RPM_REG_WRITE_AUG_AND,
+    RPM_REG_WRITE,
     RPM_PIN_STATE_SELECT, /* could be merged to DEVICE_CALL op */
     RPM_SPIN_LOCK,
     RPM_SPIN_UNLOCK,
@@ -325,7 +328,7 @@ struct reg_write_augment {
 };
 
 struct universal_reg_entry {
-    enum rpm_op reg_op;
+    enum pm_reg_op reg_op;
     u32 reg_offset;
     int ctx_index;
     u32 write_augment;  /* this is a value to augment write operations */
@@ -370,7 +373,7 @@ struct universal_disable_irq_tbl {
  * a specific register and compare the register value with a certain value.*/
 struct universal_check_pending_irq {
     /* reg_op by default is register read */
-    enum rpm_op reg_op;
+    enum pm_reg_op reg_op;
     u32 reg_offset;
     u32 compare_value;
     bool pending;

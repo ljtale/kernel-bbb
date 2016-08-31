@@ -1371,64 +1371,64 @@ u32 omap_gpio_reg_context[] = {
 
 static struct universal_reg_entry omap_gpio_save_context_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_CTRL_REG,
         .ctx_index = OMAP_GPIO_UNI_CTRL,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_OE_REG,
         .ctx_index = OMAP_GPIO_UNI_OE,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_WAKE_EN_REG,
         .ctx_index = OMAP_GPIO_UNI_WAKE_EN,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_LEVELDETECT0_REG,
         .ctx_index = OMAP_GPIO_UNI_LEVELDETECT0,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_LEVELDETECT1_REG,
         .ctx_index = OMAP_GPIO_UNI_LEVELDETECT1,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_RISINGDETECT_REG,
         .ctx_index = OMAP_GPIO_UNI_RISINGDETECT,
 
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_FALLINGDETECT_REG,
         .ctx_index = OMAP_GPIO_UNI_FALLINGDETECT,
 
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_IRQENABLE1_REG,
         .ctx_index = OMAP_GPIO_UNI_IRQENABLE1,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_IRQENABLE2_REG,
         .ctx_index = OMAP_GPIO_UNI_IRQENABLE2,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_SETDATAOUT_REG,
         .ctx_index = OMAP_GPIO_UNI_DATAOUT,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_REG,
         .ctx_index = OMAP_GPIO_UNI_DEBOUNCE,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_EN_REG,
         .ctx_index = OMAP_GPIO_UNI_DEBOUNCE_EN,
     },
@@ -1441,62 +1441,62 @@ static struct universal_save_context_tbl omap_gpio_save_context_tbl = {
 
 static struct universal_reg_entry omap_gpio_restore_context_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_WAKE_EN_REG,
         .ctx_index = OMAP_GPIO_UNI_WAKE_EN,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_CTRL_REG,
         .ctx_index = OMAP_GPIO_UNI_CTRL,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_LEVELDETECT0_REG,
         .ctx_index = OMAP_GPIO_UNI_LEVELDETECT0,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_LEVELDETECT1_REG,
         .ctx_index = OMAP_GPIO_UNI_LEVELDETECT1,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_RISINGDETECT_REG,
         .ctx_index = OMAP_GPIO_UNI_RISINGDETECT,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_FALLINGDETECT_REG,
         .ctx_index = OMAP_GPIO_UNI_FALLINGDETECT,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_SETDATAOUT_REG,
         .ctx_index = OMAP_GPIO_UNI_DATAOUT,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_OE_REG,
         .ctx_index = OMAP_GPIO_UNI_OE,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_REG,
         .ctx_index = OMAP_GPIO_UNI_DEBOUNCE,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_EN_REG,
         .ctx_index = OMAP_GPIO_UNI_DEBOUNCE_EN,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_IRQENABLE1_REG,
         .ctx_index = OMAP_GPIO_UNI_IRQENABLE1,
     },
     {        
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_IRQENABLE2_REG,
         .ctx_index = OMAP_GPIO_UNI_IRQENABLE2,
     },
@@ -1510,7 +1510,7 @@ static struct universal_restore_context_tbl omap_gpio_restore_context_tbl = {
 
 static struct universal_reg_entry omap_gpio_setup_wakeup_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE_AUG_OR,
+        .reg_op = PM_REG_WRITE_AUG_OR,
         .reg_offset = OMAP_GPIO_UNI_FALLINGDETECT_REG,
         .ctx_index = OMAP_GPIO_UNI_FALLINGDETECT,
         .reg_write_augment_flag = true,
@@ -1521,7 +1521,7 @@ static struct universal_reg_entry omap_gpio_setup_wakeup_reg_tbl[] = {
         },
     },
     {
-        .reg_op = RPM_REG_WRITE_AUG_OR,
+        .reg_op = PM_REG_WRITE_AUG_OR,
         .reg_offset = OMAP_GPIO_UNI_RISINGDETECT_REG,
         .ctx_index = OMAP_GPIO_UNI_RISINGDETECT,
         .reg_write_augment_flag = true,
@@ -1540,7 +1540,7 @@ static struct universal_setup_wakeup omap_gpio_setup_wakeup = {
 
 static struct universal_reg_entry omap_gpio_disable_clk_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_EN,
         .ctx_index = OMAP_GPIO_UNI_ZERO,
     },
@@ -1552,7 +1552,7 @@ static struct universal_disable_clk omap_gpio_disable_clk = {
 
 static struct universal_reg_entry omap_gpio_enable_clk_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_GPIO_UNI_DEBOUNCE_EN,
         .ctx_index = OMAP_GPIO_UNI_DEBOUNCE_EN,
     },

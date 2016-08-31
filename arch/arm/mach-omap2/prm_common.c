@@ -42,6 +42,8 @@
 #include "cm.h"
 #include "control.h"
 
+#include <linux/ljtale-utils.h>
+
 /*
  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
  * XXX this is technically not needed, since
@@ -768,6 +770,7 @@ int __init omap2_prm_base_init(void)
 		if (data->init)
 			data->init(data);
 	}
+    LJTALE_LEVEL_DEBUG(0, "PRM base init...%s\n", __func__);
 
 	return 0;
 }

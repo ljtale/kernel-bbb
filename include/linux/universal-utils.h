@@ -3,6 +3,7 @@
 
 #include <linux/universal-drv.h>
 #include <linux/universal-rpm.h>
+#include <linux/universal-pm.h>
 
 int universal_reg_read(struct universal_device *uni_dev, unsigned int reg,
         void *val);

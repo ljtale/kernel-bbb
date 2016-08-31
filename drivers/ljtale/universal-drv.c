@@ -438,7 +438,7 @@ int __universal_drv_probe(struct universal_device *dev) {
         }
     }
 
-    LJTALE_MSG(KERN_INFO, "universal probe done: %s -> %d\n", dev->name, ret);
+    LJTALE_LEVEL_DEBUG(2, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
     
     /* TODO: error handling */

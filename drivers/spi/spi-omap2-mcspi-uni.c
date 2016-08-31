@@ -1469,6 +1469,7 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
 	pm_runtime_enable(&pdev->dev);
 
+    LJTALE_LEVEL_DEBUG(4,"enable spi rpm...%s\n", __func__);
 	status = omap2_mcspi_master_setup(mcspi);
 	if (status < 0)
 		goto disable_pm;
@@ -1480,6 +1481,7 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 	return status;
 
 disable_pm:
+    LJTALE_LEVEL_DEBUG(4, "disable spi rpm...%s\n", __func__);;
 	pm_runtime_disable(&pdev->dev);
 free_master:
 	spi_master_put(master);
@@ -1503,6 +1505,7 @@ MODULE_ALIAS("platform:omap2_mcspi");
 #ifdef	CONFIG_SUSPEND
 static int omap2_mcspi_suspend(struct device *dev)
 {
+    LJTALE_LEVEL_DEBUG(3, "mcspi suspend...\n");
 	pinctrl_pm_select_sleep_state(dev);
 
 	return 0;

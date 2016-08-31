@@ -337,9 +337,13 @@ struct universal_pm {
 };
 
 struct universal_pm_ops {
+    int (*local_suspend)(struct device *dev);
+    int (*local_resume)(struct device *dev);
 };
 
 struct universal_pm_dev {
+    /* per-device power managment lock */
+    spinlock_t pm_lock;
 };
 
 /*
@@ -372,9 +376,13 @@ struct universal_driver {
      * driver TODO: define a proper argument list */
     int (*local_probe)(struct universal_device *dev);
 
-    /* power management operations */
+    /* runtime power management operations */
     struct universal_rpm rpm;
     struct universal_rpm_ops rpm_ops;
+
+    /* system power management operations */
+    struct universal_pm pm;
+    struct universal_pm_ops pm_ops;
 
     /* Currently we assume each device will have a universal driver attached */
     struct list_head drv_list;
@@ -407,6 +415,7 @@ struct universal_device {
 #endif
     struct universal_probe_dev probe_dev;
     struct universal_rpm_dev rpm_dev;
+    struct universal_pm_dev pm_dev;
 
     /* Add the device to a global list for further reference */
     struct list_head dev_list;

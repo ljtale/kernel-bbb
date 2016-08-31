@@ -1,7 +1,7 @@
 #ifndef LINUX_LJTLAE_UTILS_H
 #define LINUX_LJTALE_UTILS_H
 
-#define LJTALE_DEBUG_LEVEL 2
+#define LJTALE_DEBUG_LEVEL 4
 
 #define LJTALE_MSG(LEVEL, args...)             \
     do {                                        \

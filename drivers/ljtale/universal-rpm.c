@@ -225,8 +225,8 @@ static int inline process_reg_table(struct universal_device *uni_dev,
         return 0;
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
-        if (tbl_entry->reg_op == RPM_REG_WRITE_AUG_OR ||
-                tbl_entry->reg_op == RPM_REG_WRITE_AUG_AND) {
+        if (tbl_entry->reg_op == PM_REG_WRITE_AUG_OR ||
+                tbl_entry->reg_op == PM_REG_WRITE_AUG_AND) {
             // compute the augment value before continuing
             if (tbl_entry->reg_write_augment_flag) {
                 struct reg_write_augment *augment = 
@@ -250,11 +250,11 @@ static int inline process_reg_table(struct universal_device *uni_dev,
             }
         }
         switch(tbl_entry->reg_op) {
-            case RPM_REG_READ:
+            case PM_REG_READ:
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
                         &(reg_ctx->array[tbl_entry->ctx_index]));
                 break;
-            case RPM_REG_WRITE:
+            case PM_REG_WRITE:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
                         reg_ctx->array[tbl_entry->ctx_index]);
                 if (tbl_entry->timeout.check_timeout) {
@@ -262,7 +262,7 @@ static int inline process_reg_table(struct universal_device *uni_dev,
                     goto timeout_check;
                 }
                 break;
-            case RPM_REG_WRITE_READ:
+            case PM_REG_WRITE_READ:
                 /* a write followed by a read flush */
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
                         reg_ctx->array[tbl_entry->ctx_index]);
@@ -270,7 +270,7 @@ static int inline process_reg_table(struct universal_device *uni_dev,
                     break;
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset, NULL);
                 break;
-            case RPM_REG_READ_WRITE_OR:
+            case PM_REG_READ_WRITE_OR:
                 temp_value = 0;
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
                         &temp_value);
@@ -280,7 +280,7 @@ static int inline process_reg_table(struct universal_device *uni_dev,
                         reg_ctx->array[tbl_entry->ctx_index] | temp_value);
                 break;
 
-            case RPM_REG_READ_WRITE_AND:
+            case PM_REG_READ_WRITE_AND:
                 temp_value = 0xffffffff;
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
                         &temp_value);
@@ -289,7 +289,7 @@ static int inline process_reg_table(struct universal_device *uni_dev,
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
                         reg_ctx->array[tbl_entry->ctx_index] & temp_value);
                 break;
-            case RPM_REG_WRITE_AUG_OR:
+            case PM_REG_WRITE_AUG_OR:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
                     (reg_ctx->array[tbl_entry->ctx_index] | 
                      tbl_entry->write_augment));
@@ -300,7 +300,7 @@ static int inline process_reg_table(struct universal_device *uni_dev,
                     goto timeout_check;
                 }
                 break;
-            case RPM_REG_WRITE_AUG_AND:
+            case PM_REG_WRITE_AUG_AND:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
                     (reg_ctx->array[tbl_entry->ctx_index] &
                      tbl_entry->write_augment));
@@ -359,7 +359,7 @@ static int universal_disable_irq(struct universal_device *uni_dev) {
     if (disable_irq->check_pending) {
         /* check pending IRQ */
         u32 reg_value;
-        if (disable_irq->pending.reg_op == RPM_REG_READ)
+        if (disable_irq->pending.reg_op == PM_REG_READ)
             universal_reg_read(uni_dev, disable_irq->pending.reg_offset,
                     &reg_value);
         else

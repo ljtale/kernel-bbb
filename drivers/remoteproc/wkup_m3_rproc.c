@@ -140,6 +140,7 @@ static int wkup_m3_rproc_probe(struct platform_device *pdev)
 	int ret;
 	int i;
 
+    printk(KERN_INFO "ljtale: wkup m3 rproc probe...%s\n", __func__);
 	if (!(pdata && pdata->deassert_reset && pdata->assert_reset &&
 	      pdata->reset_name)) {
 		dev_err(dev, "Platform data missing!\n");

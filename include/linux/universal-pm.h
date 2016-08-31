@@ -17,4 +17,11 @@
 #include <linux/platform_data/at24.h>
 */
 
-#endif /* _LINUX_UNIVERSAL_RPM_H */
+#include <linux/universal-rpm.h>
+
+int universal_suspend(struct device *dev);
+int universal_resume(struct device *dev);
+
+// struct universal_reg_entry
+
+#endif /* _LINUX_UNIVERSAL_PM_H */

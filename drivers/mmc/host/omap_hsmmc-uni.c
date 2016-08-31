@@ -2996,22 +2996,22 @@ static u32 omap_hsmmc_reg_context[] = {
 
 static struct universal_reg_entry omap_hsmmc_save_context_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_CON_REG,
         .ctx_index = OMAP_HSMMC_UNI_CON,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_HCTL,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_SYSCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_SYSCTL,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_CAPA_REG,
         .ctx_index = OMAP_HSMMC_UNI_CAPA,
     },
@@ -3024,12 +3024,12 @@ static struct universal_save_context_tbl omap_hsmmc_save_context_tbl = {
 
 static struct universal_reg_entry omap_hsmmc_disable_irq_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
         .ctx_index = OMAP_HSMMC_UNI_ZERO,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_IE_REG,
         .ctx_index = OMAP_HSMMC_UNI_ZERO,
     },
@@ -3038,7 +3038,7 @@ static struct universal_reg_entry omap_hsmmc_disable_irq_reg_tbl[] = {
 static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
     .check_pending = true,
     .pending = {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_PSTATE_REG,
         .compare_value = 1 << 21, // DLEV_DAT(1)
         .pending = false, /* by default there is no pending */
@@ -3058,22 +3058,22 @@ static struct universal_pin_control omap_hsmcc_pinctrl = {
 
 static struct universal_reg_entry omap_hsmmc_check_ctx_loss_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_CON_REG,
         .ctx_index = OMAP_HSMMC_UNI_CON,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_HCTL,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_SYSCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_SYSCTL,
     },
     {
-        .reg_op = RPM_REG_READ,
+        .reg_op = PM_REG_READ,
         .reg_offset = OMAP_HSMMC_UNI_CAPA_REG,
         .ctx_index = OMAP_HSMMC_UNI_CAPA,
     },
@@ -3086,18 +3086,18 @@ static struct universal_restore_context_tbl omap_hsmmc_check_ctx_loss_tbl = {
 
 static struct universal_reg_entry omap_hsmmc_restore_context_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE_AUG_AND,
+        .reg_op = PM_REG_WRITE_AUG_AND,
         .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_HCTL,
         .write_augment = ~(1 << 8),
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_CAPA_REG,
         .ctx_index = OMAP_HSMMC_UNI_CAPA,
     },
     {
-        .reg_op = RPM_REG_WRITE_AUG_OR,
+        .reg_op = PM_REG_WRITE_AUG_OR,
         .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_HCTL,
         .write_augment = 1 << 8,
@@ -3108,17 +3108,17 @@ static struct universal_reg_entry omap_hsmmc_restore_context_reg_tbl[] = {
         },
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
         .ctx_index = OMAP_HSMMC_UNI_ZERO,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_IE_REG,
         .ctx_index = OMAP_HSMMC_UNI_ZERO,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_STAT_REG,
         .ctx_index = OMAP_HSMMC_UNI_STAT_CLEAR,
     },
@@ -3142,17 +3142,17 @@ static int omap_hsmmc_rpm_local_restore_context(
 
 static struct universal_reg_entry omap_hsmmc_enable_irq_reg_tbl[] = {
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_STAT_REG,
         .ctx_index = OMAP_HSMMC_UNI_STAT_CLEAR,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
         .ctx_index = OMAP_HSMMC_UNI_ISE,
     },
     {
-        .reg_op = RPM_REG_WRITE,
+        .reg_op = PM_REG_WRITE,
         .reg_offset = OMAP_HSMMC_UNI_IE_REG,
         .ctx_index = OMAP_HSMMC_UNI_IE,
     },
