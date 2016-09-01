@@ -113,12 +113,14 @@ static int universal_regacc_config(struct universal_device *uni_dev,
          BUG_ON(strcmp("platform", regacc->bus_name));
          pdev = to_platform_device(dev);
          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+         if (!res)
+             return -ENODEV;
+         res->start += regacc->reg_offset;
+         res->end   += regacc->reg_offset;
          regacc_dev->base = devm_ioremap_resource(dev, res);
          if (IS_ERR(regacc_dev->base))
              return PTR_ERR(regacc_dev->base);
-         else
-             regacc_dev->base += regacc->reg_offset;
-         regacc_dev->phys_base = res->start + regacc->reg_offset;
+         regacc_dev->phys_base = res->start;
          /* universal read/write will need to use this base address */
      }
     return 0;

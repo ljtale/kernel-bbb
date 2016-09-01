@@ -22,6 +22,33 @@
 int universal_suspend(struct device *dev);
 int universal_resume(struct device *dev);
 
-// struct universal_reg_entry
+struct universal_reg_entry;
+
+struct universal_pm_ctx {
+    u32 *array;
+    int size;
+};
+
+struct universal_save_context_tbl;
+struct universal_restore_context_tbl;
+struct universal_save_context;
+struct universal_restore_context;
+
+struct universal_disable_irq_tbl;
+struct universal_enable_irq_tbl;
+struct universal_disable_irq;
+struct universal_enable_irq;
+
+struct universal_pin_control;
+
+struct universal_disable_clk;
+struct universal_enabled_clk;
+
+
+struct universal_deactivate_timer {
+};
+
+struct universal_reactivate_timer {
+};
 
 #endif /* _LINUX_UNIVERSAL_PM_H */

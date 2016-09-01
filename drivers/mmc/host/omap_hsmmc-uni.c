@@ -3364,6 +3364,9 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .rpm_ops = {
         .first_runtime_resume = omap_hsmmc_runtime_resume,
     },
+
+    .pm = {
+    },
 };
 
 static int __init universal_omap_hsmmc_init(void) {

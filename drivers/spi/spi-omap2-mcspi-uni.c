@@ -1560,4 +1560,61 @@ static struct platform_driver omap2_mcspi_driver = {
 };
 
 module_platform_driver(omap2_mcspi_driver);
+
+/* ljtale starts */
+static int omap2_mcspi_universal_local_probe(
+        struct universal_device *uni_dev) {
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device: %s\n",
+            uni_dev->drv->name, uni_dev->name);
+    return omap2_mcspi_probe(pdev);
+}
+
+static struct register_accessor omap2_mcspi_regacc = {
+    .bus_name = "platform",
+    .reg_addr_bits = 32,
+    .reg_val_bits = 32, 
+
+    /* MMIO specs */
+    .mmio_support = true,
+    .mb = false,
+    .reg_offset = 0x0,
+};
+
+static struct universal_driver omap2_mcspi_universal_driver = {
+    .name = "omap2-mcspi-universal-driver",
+    .driver = &omap2_mcspi_driver.driver,
+//    .regacc = &omap2_mcspi_regacc,
+    .irq_config_num = NULL,
+    .dma_config_num = NULL,
+    .clk_config_num = NULL,
+    .local_probe = omap2_mcspi_universal_local_probe,
+
+    .rpm = {
+
+        .ref_ctx = {
+        },
+    },
+    .rpm_ops = {
+        .local_runtime_resume = omap_mcspi_runtime_resume,
+        .first_runtime_resume = omap_mcspi_runtime_resume,
+    },
+
+    .pm = {
+    },
+};
+
+static int __init universal_omap2_mcspi_init(void) {
+    int ret = universal_driver_register(&omap2_mcspi_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver regsiter failed: %d\n", ret);
+    return ret;
+}
+/* make sure the SPI module is compiled as builtin, i.e., CONFIG_MCSPI = y
+ * otherwise the compiler will complain about it */
+arch_initcall(universal_omap2_mcspi_init);
+
+/* ljtale ends */
+
+
 MODULE_LICENSE("GPL");

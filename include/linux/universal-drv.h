@@ -334,6 +334,9 @@ struct universal_rpm_dev {
 };
 
 struct universal_pm {
+
+    struct universal_pin_control *pin_control;
+    struct universal_pm_ctx ref_ctx;
 };
 
 struct universal_pm_ops {
@@ -344,6 +347,7 @@ struct universal_pm_ops {
 struct universal_pm_dev {
     /* per-device power managment lock */
     spinlock_t pm_lock;
+    struct universal_pm_ctx pm_context;
 };
 
 /*
