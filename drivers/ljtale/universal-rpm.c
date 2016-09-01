@@ -734,8 +734,6 @@ irq_lock_err:
     /* in case local suspend does not need a lock */
     if (!rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend)
         ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
-        if (ret)
-            goto lock_err;
 lock_err:
 
     if (rpm_dev->dev_access_needs_spinlock)

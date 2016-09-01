@@ -21,6 +21,7 @@
 
 int universal_suspend(struct device *dev);
 int universal_resume(struct device *dev);
+int universal_pm_create_reg_context(struct universal_device *uni_dev);
 
 struct universal_reg_entry;
 

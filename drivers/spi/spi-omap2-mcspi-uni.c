@@ -1348,7 +1348,20 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 	struct device_node	*node = pdev->dev.of_node;
 	const struct of_device_id *match;
 
-    LJTALE_LEVEL_DEBUG(3, "mcspi probe...\n"); 
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    struct universal_probe_dev *probe_dev;
+    struct regacc_dev *regacc_dev;
+
+    uni_dev = check_universal_driver(&pdev->dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver not availabled for: %s\n",
+                pdev->name);
+        return -EINVAL;
+    }
+    probe_dev = &uni_dev->probe_dev;
+    regacc_dev = &probe_dev->regacc_dev;
+    /* ljtale ends */
 
 	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
 	if (master == NULL) {
@@ -1394,7 +1407,7 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 		mcspi->pin_dir = pdata->pin_dir;
 	}
 	regs_offset = pdata->regs_offset;
-
+#if 0
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (r == NULL) {
 		status = -ENODEV;
@@ -1410,7 +1423,9 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 		status = PTR_ERR(mcspi->base);
 		goto free_master;
 	}
-
+#endif
+    mcspi->phys = regacc_dev->phys_base; 
+    mcspi->base = regacc_dev->base;
 	mcspi->dev = &pdev->dev;
 
 	INIT_LIST_HEAD(&mcspi->ctx.cs);
@@ -1544,10 +1559,18 @@ static int omap2_mcspi_resume(struct device *dev)
 }
 #endif /* CONFIG_SUSPEND */
 
+#if 0
 static const struct dev_pm_ops omap2_mcspi_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(omap2_mcspi_suspend, omap2_mcspi_resume)
 	.runtime_resume	= omap_mcspi_runtime_resume,
 };
+#endif
+static const struct dev_pm_ops omap2_mcspi_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(universal_suspend, universal_resume)
+    .runtime_suspend = universal_runtime_suspend,
+	.runtime_resume	= universal_runtime_resume,
+};
+
 
 static struct platform_driver omap2_mcspi_driver = {
 	.driver = {
@@ -1578,13 +1601,13 @@ static struct register_accessor omap2_mcspi_regacc = {
     /* MMIO specs */
     .mmio_support = true,
     .mb = false,
-    .reg_offset = 0x0,
+    .reg_offset = 0x100,
 };
 
 static struct universal_driver omap2_mcspi_universal_driver = {
     .name = "omap2-mcspi-universal-driver",
     .driver = &omap2_mcspi_driver.driver,
-//    .regacc = &omap2_mcspi_regacc,
+    .regacc = &omap2_mcspi_regacc,
     .irq_config_num = NULL,
     .dma_config_num = NULL,
     .clk_config_num = NULL,
@@ -1599,9 +1622,14 @@ static struct universal_driver omap2_mcspi_universal_driver = {
         .local_runtime_resume = omap_mcspi_runtime_resume,
         .first_runtime_resume = omap_mcspi_runtime_resume,
     },
-
+#ifdef CONFIG_SUSPEND
     .pm = {
     },
+    .pm_ops = {
+        .local_suspend = omap2_mcspi_suspend,
+        .local_resume = omap2_mcspi_resume,
+    },
+#endif
 };
 
 static int __init universal_omap2_mcspi_init(void) {

@@ -2903,7 +2903,6 @@ static int omap_hsmmc_suspend(struct device *dev)
 	if (!host)
 		return 0;
 
-    LJTALE_LEVEL_DEBUG(2, "omap hsmmc system suspend...\n");
 	pm_runtime_get_sync(host->dev);
 
 	if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER)) {
@@ -2932,7 +2931,6 @@ static int omap_hsmmc_resume(struct device *dev)
 	if (!host)
 		return 0;
 
-    LJTALE_LEVEL_DEBUG(2, "omap hsmmc system resume...\n");
 	pm_runtime_get_sync(host->dev);
 
 	if (host->dbclk)
