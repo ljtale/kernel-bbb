@@ -709,7 +709,7 @@ int universal_runtime_suspend(struct device *dev) {
     /* If the irq needs a lock to protect mutex access, then the lock should
      * protect until the pinctrl state is selected */
     if (rpm_dev->irq_need_lock)
-        spin_lock_irqsave(&rpm_dev->irq_lock, irq_lock_flags);
+        spin_lock_irqsave(&uni_dev->irq_lock, irq_lock_flags);
 
     ret = universal_disable_irq(uni_dev);
     if (ret) {
@@ -721,7 +721,7 @@ int universal_runtime_suspend(struct device *dev) {
 
 irq_lock_err:
     if (rpm_dev->irq_need_lock)
-        spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
+        spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
     
     /* setup wakeup event */
     ret = universal_setup_wakeup(uni_dev);
@@ -796,7 +796,7 @@ int universal_runtime_resume(struct device *dev) {
         goto irq_lock_err;
 
     if (rpm_dev->irq_need_lock)
-        spin_lock_irqsave(&rpm_dev->irq_lock, irq_lock_flags);
+        spin_lock_irqsave(&uni_dev->irq_lock, irq_lock_flags);
     /* select pinctrl state */
     ret = universal_pin_control(uni_dev, RESUME);
     /* enable irq */
@@ -808,7 +808,7 @@ int universal_runtime_resume(struct device *dev) {
 
 irq_lock_err:
     if (rpm_dev->irq_need_lock)
-        spin_unlock_irqrestore(&rpm_dev->irq_lock, irq_lock_flags);
+        spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
 
     /* enable dma */
     ret = universal_rpm_enable_dma(uni_dev);

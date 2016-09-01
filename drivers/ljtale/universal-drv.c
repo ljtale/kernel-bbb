@@ -288,7 +288,7 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
 
     if (of_property_read_bool(of_node, "irq_need_lock")) {
         rpm_dev->irq_need_lock = true;
-        spin_lock_init(&rpm_dev->irq_lock);
+        spin_lock_init(&uni_dev->irq_lock);
         LJTALE_LEVEL_DEBUG(4 ,"IRQ need lock read bool true: %s\n",
                 uni_dev->name);
     } else

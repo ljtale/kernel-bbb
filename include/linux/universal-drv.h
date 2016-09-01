@@ -307,7 +307,6 @@ struct universal_rpm_dev {
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
 
-    spinlock_t irq_lock;
     struct universal_rpm_ctx rpm_context;
     spinlock_t rpm_lock;
     int context_loss_cnt;
@@ -417,6 +416,7 @@ struct universal_device {
         };
     };
 #endif
+    spinlock_t irq_lock;
     struct universal_probe_dev probe_dev;
     struct universal_rpm_dev rpm_dev;
     struct universal_pm_dev pm_dev;

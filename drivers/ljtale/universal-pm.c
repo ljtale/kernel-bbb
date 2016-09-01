@@ -41,9 +41,17 @@ int universal_suspend(struct device *dev) {
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system suspend...%s\n", uni_dev->name);
 
+    /* determine if the rpm is enabled for this device */
+    if (pm_runtime_enabled(dev))
+        /* bring up the device if it is runtime suspended */
+        pm_runtime_get_sync(dev);
+
     if (pm_ops->local_suspend)
         ret = pm_ops->local_suspend(dev);
 
+    /* drop the reference */
+    if (pm_runtime_enabled(dev))
+        pm_runtime_put_sync(dev);
     return ret;
 }
 
@@ -61,7 +69,19 @@ int universal_resume(struct device *dev) {
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system resume...%s\n", uni_dev->name);
 
+    /* select pin states at first */
+
+    /* probably rely on the runtime resume to restore the context */
+    if (pm_runtime_enabled(dev))
+        pm_runtime_get_sync(dev);
+
     if (pm_ops->local_resume)
         ret = pm_ops->local_resume(dev);
+
+    /* lastly mark the device last busy and allow defered runtime suspend */
+    if (pm_runtime_enabled(dev)) {
+        pm_runtime_mark_last_busy(dev);
+        pm_runtime_put_autosuspend(dev);
+    }
     return ret;
 }
