@@ -1753,8 +1753,8 @@ static struct universal_enable_irq omap_i2c_enable_irq = {
 };
 
 static struct universal_pin_control omap_i2c_pinctrl = {
-    .suspend_state = RPM_PINCTRL_SLEEP,
-    .resume_state = RPM_PINCTRL_DEFAULT,
+    .suspend_state = PM_PINCTRL_SLEEP,
+    .resume_state = PM_PINCTRL_DEFAULT,
 };
 /* ljtale ends */
 static int omap_i2c_runtime_suspend(struct device *dev)

@@ -324,11 +324,13 @@ int __universal_drv_probe(struct universal_device *dev) {
     struct universal_driver *drv;
     struct universal_probe_dev *probe_dev;
     struct universal_rpm_dev *rpm_dev;
+    struct universal_pm_dev *pm_dev;
     struct register_accessor *regacc;
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
     struct clk_config_num *clk_config_num;
     struct universal_rpm *rpm;
+    struct universal_pm *pm;
     int i;
     
     if (!dev || !dev->drv) {
@@ -342,6 +344,8 @@ int __universal_drv_probe(struct universal_device *dev) {
     probe_dev = &dev->probe_dev;
     rpm_dev = &dev->rpm_dev;
     rpm = &dev->drv->rpm;
+    pm_dev = &dev->pm_dev;
+    pm = &dev->drv->pm;
     /* do a set of initialization */
     mutex_init(&dev->probe_dev.lock);
     /* The lock should be consistent to the lock in the conventional driver */
@@ -410,6 +414,20 @@ int __universal_drv_probe(struct universal_device *dev) {
         if (ret < 0)
             goto rpm_error;
     }
+    /* system PM should share the same reg context table with runtime PM,
+     * thus we could reuse the same allocated memory
+     * FIXME: if there is contention issues, we should allcoate separate
+     * reg context table for system PM and runtiem PM */
+    if (pm->ref_ctx.array) {
+        if (rpm_dev->rpm_context.array) {
+            pm_dev->pm_context.array = rpm_dev->rpm_context.array;
+            pm_dev->pm_context.size = rpm_dev->rpm_context.size;
+        } else {
+            ret = universal_pm_create_reg_context(dev);
+            if (ret < 0)
+                goto pm_err;
+        }
+    }
 
     /* ... */
     /* do a local probe */
@@ -446,6 +464,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     /* TODO: error handling */
 irq_config_err:
 local_probe_err:
+pm_err:
 rpm_error:
 clk_config_err:
 dma_config_err:

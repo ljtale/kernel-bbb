@@ -3050,8 +3050,8 @@ static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
 
 
 static struct universal_pin_control omap_hsmcc_pinctrl = {
-    .suspend_state = RPM_PINCTRL_IDLE,
-    .resume_state = RPM_PINCTRL_DEFAULT,
+    .suspend_state = PM_PINCTRL_IDLE,
+    .resume_state = PM_PINCTRL_DEFAULT,
 };
 
 static struct universal_reg_entry omap_hsmmc_check_ctx_loss_reg_tbl[] = {

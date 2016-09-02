@@ -1517,10 +1517,30 @@ static int omap2_mcspi_remove(struct platform_device *pdev)
 /* work with hotplug and coldplug */
 MODULE_ALIAS("platform:omap2_mcspi");
 
+/* ljtale start */
+
+enum {
+    OMAP2_MCSPI_UNI_ZERO = 0,
+};
+
+static u32 omap2_mcspi_reg_context[] = {
+    [OMAP2_MCSPI_UNI_ZERO] = 0,
+};
+
+static struct universal_pin_control omap2_mcspi_pinctrl = {
+    .suspend_state = PM_PINCTRL_IDLE,
+    .resume_state = PM_PINCTRL_DEFAULT,
+};
+
+
+
+/* ljtale ends*/
+
+
+
 #ifdef	CONFIG_SUSPEND
 static int omap2_mcspi_suspend(struct device *dev)
 {
-    LJTALE_LEVEL_DEBUG(3, "mcspi suspend...\n");
 	pinctrl_pm_select_sleep_state(dev);
 
 	return 0;
@@ -1615,8 +1635,12 @@ static struct universal_driver omap2_mcspi_universal_driver = {
 
     .rpm = {
 
+        /*
         .ref_ctx = {
+            .array = omap2_mcspi_reg_context,
+            .size = ARRAY_SIZE(omap2_mcspi_reg_context),
         },
+        */
     },
     .rpm_ops = {
         .local_runtime_resume = omap_mcspi_runtime_resume,
@@ -1624,6 +1648,12 @@ static struct universal_driver omap2_mcspi_universal_driver = {
     },
 #ifdef CONFIG_SUSPEND
     .pm = {
+
+//        .pin_control = &omap2_mcspi_pinctrl,
+        .ref_ctx = {
+            .array = omap2_mcspi_reg_context,
+            .size = ARRAY_SIZE(omap2_mcspi_reg_context),
+        },
     },
     .pm_ops = {
         .local_suspend = omap2_mcspi_suspend,

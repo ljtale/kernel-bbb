@@ -81,17 +81,17 @@ enum reg_context_op {
 
 #if 0
 enum rpm_pinctrl_state {
-    RPM_PINCTRL_DEFAULT,
-    RPM_PINCTRL_SLEEP,
-    RPM_PINCTRL_IDLE,
+    PM_PINCTRL_DEFAULT,
+    PM_PINCTRL_SLEEP,
+    PM_PINCTRL_IDLE,
 };
 #endif
 
-enum rpm_device_call {
+enum pm_device_call {
     RPM_MARK_LAST_BUSY,
-    RPM_PINCTRL_DEFAULT,
-    RPM_PINCTRL_SLEEP,
-    RPM_PINCTRL_IDLE,
+    PM_PINCTRL_DEFAULT,
+    PM_PINCTRL_SLEEP,
+    PM_PINCTRL_IDLE,
 };
 
 /* start and stop nodes could be only dummy nodes */
@@ -116,7 +116,7 @@ struct rpm_return_node {
 };
 
 struct rpm_device_call_node {
-    enum rpm_device_call call;
+    enum pm_device_call call;
 };
 
 /* assignment node */
@@ -390,8 +390,8 @@ struct universal_enable_irq {
 };
 
 struct universal_pin_control {
-    enum rpm_device_call suspend_state;
-    enum rpm_device_call resume_state;
+    enum pm_device_call suspend_state;
+    enum pm_device_call resume_state;
 };
 
 struct universal_save_context {

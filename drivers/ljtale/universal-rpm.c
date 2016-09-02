@@ -27,13 +27,13 @@ static inline int rpm_device_call(struct universal_device *uni_dev,
     int ret = 0;
     struct rpm_device_call_node *device_call_node = node->op_args;
     switch (device_call_node->call) {
-        case RPM_PINCTRL_DEFAULT:
+        case PM_PINCTRL_DEFAULT:
             pinctrl_pm_select_default_state(uni_dev->dev);
             break;
-        case RPM_PINCTRL_SLEEP:
+        case PM_PINCTRL_SLEEP:
             pinctrl_pm_select_sleep_state(uni_dev->dev);
             break;
-        case RPM_PINCTRL_IDLE:
+        case PM_PINCTRL_IDLE:
             pinctrl_pm_select_idle_state(uni_dev->dev);
             break;
         case RPM_MARK_LAST_BUSY:
@@ -404,7 +404,7 @@ static int universal_pin_control(struct universal_device *uni_dev,
         enum rpm_action action) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_pin_control *pin_control = rpm->pin_control;
-    enum rpm_device_call pin_state = RPM_PINCTRL_DEFAULT;
+    enum pm_device_call pin_state = PM_PINCTRL_DEFAULT;
     if (!pin_control)
         return 0;
     switch(action) {
@@ -415,7 +415,7 @@ static int universal_pin_control(struct universal_device *uni_dev,
             pin_state = pin_control->resume_state;
             break;
         case IDLE:
-            pin_state = RPM_PINCTRL_IDLE;
+            pin_state = PM_PINCTRL_IDLE;
             break;
         case AUTOSUSPEND:
             pin_state = pin_control->suspend_state;
@@ -424,13 +424,13 @@ static int universal_pin_control(struct universal_device *uni_dev,
             break;
     }
     switch (pin_state) {
-        case RPM_PINCTRL_DEFAULT:
+        case PM_PINCTRL_DEFAULT:
             pinctrl_pm_select_default_state(uni_dev->dev);
             break;
-        case RPM_PINCTRL_SLEEP:
+        case PM_PINCTRL_SLEEP:
             pinctrl_pm_select_sleep_state(uni_dev->dev);
             break;
-        case RPM_PINCTRL_IDLE:
+        case PM_PINCTRL_IDLE:
             pinctrl_pm_select_idle_state(uni_dev->dev);
             break;
         default:
@@ -719,7 +719,6 @@ int universal_runtime_suspend(struct device *dev) {
     /* select pinctrl state */
     universal_pin_control(uni_dev, SUSPEND);
 
-irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
     
@@ -734,6 +733,16 @@ irq_lock_err:
     /* in case local suspend does not need a lock */
     if (!rpm_dev->local_suspend_lock && rpm_ops->local_runtime_suspend)
         ret = rpm_ops->local_runtime_suspend(uni_dev->dev);
+
+    if (rpm_dev->dev_access_needs_spinlock)
+        spin_unlock_irqrestore(&uni_dev->probe_dev.spinlock, dev_lock_flags);
+    else if (rpm_dev->dev_access_needs_raw_spinlock)
+        raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
+                dev_lock_flags);
+    return ret;
+irq_lock_err:
+    if (rpm_dev->irq_need_lock)
+        spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
 lock_err:
 
     if (rpm_dev->dev_access_needs_spinlock)
@@ -805,8 +814,6 @@ int universal_runtime_resume(struct device *dev) {
         goto irq_lock_err;
 
     /* TODO: device-specific configuration logic */
-
-irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
 
@@ -820,14 +827,24 @@ irq_lock_err:
     /* in case the local resume does not need lock */
     if (!rpm_dev->local_resume_lock && rpm_ops->local_runtime_resume)
         ret = rpm_ops->local_runtime_resume(uni_dev->dev);
-lock_err:
 
     if (rpm_dev->dev_access_needs_spinlock)
         spin_unlock_irqrestore(&uni_dev->probe_dev.spinlock, dev_lock_flags);
     else if (rpm_dev->dev_access_needs_raw_spinlock)
         raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
                 dev_lock_flags);
+    return ret;
 
+irq_lock_err:
+    if (rpm_dev->irq_need_lock)
+        spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
+
+lock_err:
+    if (rpm_dev->dev_access_needs_spinlock)
+        spin_unlock_irqrestore(&uni_dev->probe_dev.spinlock, dev_lock_flags);
+    else if (rpm_dev->dev_access_needs_raw_spinlock)
+        raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
+                dev_lock_flags);
     return ret;
 }
 
