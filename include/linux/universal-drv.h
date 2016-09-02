@@ -347,6 +347,9 @@ struct universal_pm_dev {
     /* per-device power managment lock */
     spinlock_t pm_lock;
     struct universal_pm_ctx pm_context;
+
+    bool dev_access_needs_spinlock:1;
+    bool dev_access_needs_raw_spinlock:1;
 };
 
 /*

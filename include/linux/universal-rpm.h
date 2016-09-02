@@ -297,11 +297,24 @@ struct rpm_condition_node {
 
 
 /* ====== data structure for generic logic ====== */
-enum rpm_action {
+enum pm_action {
+    PREPARE,
+    COMPLETE,
     SUSPEND,
     RESUME,
-    IDLE,
-    AUTOSUSPEND,
+    FREEZE,
+    THAW,
+    SUSPEND_LATE,
+    RESUME_EARLY,
+    FREEZE_LATE,
+    THAW_EARLY,
+    SUSPEND_NOIRQ,
+    RESUME_NOIRQ,
+    FREEZE_NOIRQ,
+    THAW_NOIRQ,
+    RUNTIME_SUSPEND,
+    RUNTIME_RESUME,
+    RUNTIME_IDLE,
 };
 
 #define INVALID_INDEX -1
@@ -392,6 +405,11 @@ struct universal_enable_irq {
 struct universal_pin_control {
     enum pm_device_call suspend_state;
     enum pm_device_call resume_state;
+    enum pm_device_call idle_state;
+    enum pm_device_call freeze_state;
+    enum pm_device_call thaw_state;
+    enum pm_device_call suspend_noirq_state;
+    enum pm_device_call resume_noirq_state;
 };
 
 struct universal_save_context {

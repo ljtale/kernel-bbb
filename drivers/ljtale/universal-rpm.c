@@ -400,25 +400,22 @@ static int universal_enable_irq(struct universal_device *uni_dev) {
 };
 
 
-static int universal_pin_control(struct universal_device *uni_dev,
-        enum rpm_action action) {
+static int universal_rpm_pin_control(struct universal_device *uni_dev,
+        enum pm_action action) {
     struct universal_rpm *rpm = &uni_dev->drv->rpm;
     struct universal_pin_control *pin_control = rpm->pin_control;
     enum pm_device_call pin_state = PM_PINCTRL_DEFAULT;
     if (!pin_control)
         return 0;
     switch(action) {
-        case SUSPEND:
+        case RUNTIME_SUSPEND:
             pin_state = pin_control->suspend_state;
             break;
-        case RESUME:
+        case RUNTIME_RESUME:
             pin_state = pin_control->resume_state;
             break;
-        case IDLE:
+        case RUNTIME_IDLE:
             pin_state = PM_PINCTRL_IDLE;
-            break;
-        case AUTOSUSPEND:
-            pin_state = pin_control->suspend_state;
             break;
         default:
             break;
@@ -717,7 +714,7 @@ int universal_runtime_suspend(struct device *dev) {
         goto irq_lock_err;
     }
     /* select pinctrl state */
-    universal_pin_control(uni_dev, SUSPEND);
+    universal_rpm_pin_control(uni_dev, RUNTIME_SUSPEND);
 
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
@@ -807,7 +804,7 @@ int universal_runtime_resume(struct device *dev) {
     if (rpm_dev->irq_need_lock)
         spin_lock_irqsave(&uni_dev->irq_lock, irq_lock_flags);
     /* select pinctrl state */
-    ret = universal_pin_control(uni_dev, RESUME);
+    ret = universal_rpm_pin_control(uni_dev, RUNTIME_RESUME);
     /* enable irq */
     ret = universal_enable_irq(uni_dev);
     if (ret)

@@ -272,7 +272,7 @@ err:
 }
 
 /* populate device knowledge from device tree for serving runtime pm */
-void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
+static void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     struct device_node *of_node = uni_dev->dev->of_node;
     BUG_ON(!of_node);
@@ -301,13 +301,13 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     else
         rpm_dev->support_dma = false;
 
-    if (of_property_read_bool(of_node, "dev_access_spinlock") ||
-            of_property_read_bool(of_node, "dev_access_raw_spinlock"))
+    if (of_property_read_bool(of_node, "rpm_dev_access_spinlock") ||
+            of_property_read_bool(of_node, "rpm_dev_access_raw_spinlock"))
         rpm_dev->dev_access_needs_spinlock = true;
     else
         rpm_dev->dev_access_needs_spinlock = false;
 
-    if (of_property_read_bool(of_node, "dev_access_raw_spinlock"))
+    if (of_property_read_bool(of_node, "rpm_dev_access_raw_spinlock"))
         rpm_dev->dev_access_needs_raw_spinlock = true;
     else
         rpm_dev->dev_access_needs_raw_spinlock = false;
@@ -318,6 +318,12 @@ void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
         rpm_dev->save_context_once = false;
     rpm_dev->context_saved = false;
 }
+
+static void inline pm_knowledge_from_dt(struct universal_device *uni_dev) {
+    struct universal_pm_dev *pm_dev = &uni_dev->pm_dev;
+    struct device_node *of_node = uni_dev->dev->of_node;
+    BUG_ON(!of_node);
+} 
  
 int __universal_drv_probe(struct universal_device *dev) {
     int ret = 0;
@@ -400,6 +406,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     /* get properties from device tree to populate the device knowledge */
     if (dev->dev->of_node) {
         rpm_knowledge_from_dt(dev);
+        pm_knowledge_from_dt(dev);
     } else {
         /* FIXME: we assume there is a device tree node for the device
          * in this prototype */

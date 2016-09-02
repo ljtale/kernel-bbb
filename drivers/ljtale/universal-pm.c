@@ -27,6 +27,45 @@ int universal_pm_create_reg_context(struct universal_device *uni_dev) {
     return 0;
 }
 
+static int universal_pm_pin_control(struct universal_device *uni_dev,
+        enum pm_action action) {
+    struct universal_pm *pm = &uni_dev->drv->pm;
+    struct universal_pin_control *pin_control = pm->pin_control;
+    enum pm_device_call pin_state = PM_PINCTRL_DEFAULT;
+    if (!pin_control)
+        return 0;
+    switch(action) {
+        case SUSPEND:
+            pin_state = pin_control->suspend_state;
+            break;
+        case RESUME:
+            pin_state = pin_control->resume_state;
+        case SUSPEND_NOIRQ:
+            pin_state = pin_control->suspend_noirq_state;
+            break;
+        case RESUME_NOIRQ:
+            pin_state = pin_control->resume_noirq_state;
+            break;
+        /* TODO: more system PM actions */
+        default:
+            break;
+    }
+    switch(pin_state) {
+        case PM_PINCTRL_DEFAULT:
+            pinctrl_pm_select_default_state(uni_dev->dev);
+            break;
+        case PM_PINCTRL_SLEEP:
+            pinctrl_pm_select_sleep_state(uni_dev->dev);
+            break;
+        case PM_PINCTRL_IDLE:
+            pinctrl_pm_select_idle_state(uni_dev->dev);
+            break;
+        default:
+            return -EINVAL;
+    }
+    return 0;
+}
+
 int universal_suspend(struct device *dev) {
     struct universal_device *uni_dev;
     struct universal_pm_dev *pm_dev;
@@ -49,6 +88,7 @@ int universal_suspend(struct device *dev) {
     if (pm_ops->local_suspend)
         ret = pm_ops->local_suspend(dev);
 
+    universal_pm_pin_control(uni_dev, SUSPEND);
     /* drop the reference */
     if (pm_runtime_enabled(dev))
         pm_runtime_put_sync(dev);
@@ -70,6 +110,7 @@ int universal_resume(struct device *dev) {
     LJTALE_LEVEL_DEBUG(2, "universal system resume...%s\n", uni_dev->name);
 
     /* select pin states at first */
+    universal_pm_pin_control(uni_dev, RESUME);
 
     /* probably rely on the runtime resume to restore the context */
     if (pm_runtime_enabled(dev))

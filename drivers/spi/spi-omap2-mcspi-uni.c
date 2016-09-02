@@ -1558,7 +1558,7 @@ static int omap2_mcspi_resume(struct device *dev)
 	struct omap2_mcspi_regs	*ctx = &mcspi->ctx;
 	struct omap2_mcspi_cs	*cs;
 
-	pinctrl_pm_select_default_state(dev);
+//	pinctrl_pm_select_default_state(dev);
 
 	pm_runtime_get_sync(mcspi->dev);
 	list_for_each_entry(cs, &ctx->cs, node) {
@@ -1649,14 +1649,13 @@ static struct universal_driver omap2_mcspi_universal_driver = {
 #ifdef CONFIG_SUSPEND
     .pm = {
 
-//        .pin_control = &omap2_mcspi_pinctrl,
+        .pin_control = &omap2_mcspi_pinctrl,
         .ref_ctx = {
             .array = omap2_mcspi_reg_context,
             .size = ARRAY_SIZE(omap2_mcspi_reg_context),
         },
     },
     .pm_ops = {
-        .local_suspend = omap2_mcspi_suspend,
         .local_resume = omap2_mcspi_resume,
     },
 #endif
