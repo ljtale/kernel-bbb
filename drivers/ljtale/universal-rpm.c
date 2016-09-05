@@ -212,7 +212,7 @@ int universal_rpm_create_reg_context(struct universal_device *uni_dev) {
 }
 EXPORT_SYMBOL(universal_rpm_create_reg_context);
 
-static int inline process_reg_table(struct universal_device *uni_dev,
+int process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size) {
     struct universal_reg_entry *tbl_entry;
     struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_dev.rpm_context;
@@ -311,7 +311,29 @@ static int inline process_reg_table(struct universal_device *uni_dev,
                     goto timeout_check;
                 }
                 break;
-
+            case PM_REG_WRITE_BITS:
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                        (reg_ctx->array[tbl_entry->ctx_index] | 
+                         tbl_entry->write_augment));
+                if (ret)
+                    goto reg_end;
+                if (tbl_entry->timeout.check_timeout) {
+                    timeout_compare = 
+                        reg_ctx->array[tbl_entry->ctx_index] |
+                        tbl_entry->write_augment;
+                    goto timeout_check;
+                }
+                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
+                        (reg_ctx->array[tbl_entry->ctx_index] & 
+                         ~tbl_entry->write_augment));
+                if (ret)
+                    goto reg_end;
+                if (tbl_entry->timeout.check_timeout) {
+                    timeout_compare = 
+                        reg_ctx->array[tbl_entry->ctx_index] &
+                        ~tbl_entry->write_augment;
+                    goto timeout_check;
+                }
             default:
                 /* unsupported yet */
                 LJTALE_LEVEL_DEBUG(3, "unsupported op for %s\n",
@@ -329,6 +351,7 @@ timeout_check:
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
                         &timeout_read);
         }
+reg_end:
         if (ret) {
             LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
             break;
@@ -336,6 +359,7 @@ timeout_check:
     }
     return ret;
 }
+EXPORT_SYMBOL(process_reg_table);
 
 /* Disable IRQ for runtime suspend, the logic is:
  * Disable IRQ =>
@@ -783,7 +807,11 @@ int universal_runtime_resume(struct device *dev) {
         return ret;
     }
     /* not the first time, do generic procedures */
-    /* FIXME: assume the first assume provides its own lock, but this lock
+
+    /* select pinctrl state */
+    ret = universal_rpm_pin_control(uni_dev, RUNTIME_RESUME);
+
+    /* FIXME: assume the first resume provides its own lock, but this lock
      * should be the same ones defined in uni_dev or rpm_dev. */
     if (rpm_dev->dev_access_needs_spinlock)
         spin_lock_irqsave(&uni_dev->probe_dev.spinlock, dev_lock_flags);
@@ -803,8 +831,6 @@ int universal_runtime_resume(struct device *dev) {
 
     if (rpm_dev->irq_need_lock)
         spin_lock_irqsave(&uni_dev->irq_lock, irq_lock_flags);
-    /* select pinctrl state */
-    ret = universal_rpm_pin_control(uni_dev, RUNTIME_RESUME);
     /* enable irq */
     ret = universal_enable_irq(uni_dev);
     if (ret)

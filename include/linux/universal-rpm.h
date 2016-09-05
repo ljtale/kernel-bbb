@@ -52,6 +52,7 @@ enum pm_reg_op {
     PM_REG_READ_WRITE_AND, /* write value = read value & value */
     PM_REG_WRITE_AUG_OR,
     PM_REG_WRITE_AUG_AND,
+    PM_REG_WRITE_BITS, /* write value | aug, then write value & ~aug */
 };
 
 enum rpm_op {
@@ -424,6 +425,7 @@ struct universal_restore_context {
     struct universal_restore_context_tbl *check_ctx_loss_tbl;
     struct universal_restore_context_tbl *restore_tbl;
     int (*rpm_local_restore_context)(struct universal_device *uni_dev);
+    int (*pm_local_restore_context)(struct universal_device *uni_dev);
 };
 
 struct universal_setup_wakeup {

@@ -66,6 +66,29 @@ static int universal_pm_pin_control(struct universal_device *uni_dev,
     return 0;
 }
 
+static int universal_pm_save_context(struct universal_device *uni_dev) {
+    return 0;
+};
+
+
+static int universal_pm_restore_context(struct universal_device *uni_dev) {
+    int ret = 0;
+    struct universal_pm *pm = &uni_dev->drv->pm;
+    struct universal_restore_context *restore_context = &pm->restore_context;
+    struct universal_restore_context_tbl *tbl = 
+        restore_context->restore_tbl;
+    /* for system PM, usually no context loss will be counted, directly
+     * restore context from the restore table */
+    if (!tbl)
+        return 0;
+    ret = process_reg_table(uni_dev, tbl->table, tbl->table_size);
+    if (ret)
+        return ret;
+    if (restore_context->pm_local_restore_context)
+        ret = restore_context->pm_local_restore_context(uni_dev);
+    return ret;
+}
+
 int universal_suspend(struct device *dev) {
     struct universal_device *uni_dev;
     struct universal_pm_dev *pm_dev;
@@ -84,6 +107,13 @@ int universal_suspend(struct device *dev) {
     if (pm_runtime_enabled(dev))
         /* bring up the device if it is runtime suspended */
         pm_runtime_get_sync(dev);
+    /* save context */
+    ret = universal_pm_save_context(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3, "universal PM save context failed: %d\n", ret);
+        goto lock_err;
+    }
+
 
     if (pm_ops->local_suspend)
         ret = pm_ops->local_suspend(dev);
@@ -92,6 +122,9 @@ int universal_suspend(struct device *dev) {
     /* drop the reference */
     if (pm_runtime_enabled(dev))
         pm_runtime_put_sync(dev);
+    return ret;
+/* TODO: device lock */
+lock_err:
     return ret;
 }
 
@@ -116,6 +149,13 @@ int universal_resume(struct device *dev) {
     if (pm_runtime_enabled(dev))
         pm_runtime_get_sync(dev);
 
+    /* restore the context */
+    ret = universal_pm_restore_context(uni_dev);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3, "universal PM restore context failed: %d\n", ret);
+        goto lock_err;
+    }
+
     if (pm_ops->local_resume)
         ret = pm_ops->local_resume(dev);
 
@@ -124,5 +164,7 @@ int universal_resume(struct device *dev) {
         pm_runtime_mark_last_busy(dev);
         pm_runtime_put_autosuspend(dev);
     }
+    return ret;
+lock_err:
     return ret;
 }

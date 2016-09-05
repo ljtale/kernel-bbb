@@ -1518,21 +1518,65 @@ static int omap2_mcspi_remove(struct platform_device *pdev)
 MODULE_ALIAS("platform:omap2_mcspi");
 
 /* ljtale start */
+#define OMAP2_MCSPI_UNI_CHCONF0_REG 0x2c
+#define OMAP2_MCSPI_UNI_CHCONF1_REG 0x40
+#define OMAP2_MCSPI_UNI_CHCONF2_REG 0x54
+#define OMAP2_MCSPI_UNI_CHCONF3_REG 0x68
 
 enum {
     OMAP2_MCSPI_UNI_ZERO = 0,
+    OMAP2_MCSPI_UNI_CHCONF0,
+    OMAP2_MCSPI_UNI_CHCONF1,
+    OMAP2_MCSPI_UNI_CHCONF2,
+    OMAP2_MCSPI_UNI_CHCONF3,
 };
 
 static u32 omap2_mcspi_reg_context[] = {
     [OMAP2_MCSPI_UNI_ZERO] = 0,
+    [OMAP2_MCSPI_UNI_CHCONF0] = 0,
+    [OMAP2_MCSPI_UNI_CHCONF1] = 0,
+    [OMAP2_MCSPI_UNI_CHCONF2] = 0,
+    [OMAP2_MCSPI_UNI_CHCONF3] = 0,
+};
+
+/* TODO: in our high-level DSL we should define register operations loop 
+ * as well*/
+static struct universal_reg_entry omap2_mcspi_pm_restore_ctx_reg_tbl[] ={
+    {
+        .reg_op = PM_REG_WRITE_BITS,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF0_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF0,
+        .write_augment = BIT(20),
+    },
+    {
+        .reg_op = PM_REG_WRITE_BITS,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF1_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF1,
+        .write_augment = BIT(20),
+    },
+    {
+        .reg_op = PM_REG_WRITE_BITS,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF2_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF2,
+        .write_augment = BIT(20),
+    },
+    {
+        .reg_op = PM_REG_WRITE_BITS,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF3_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF3,
+        .write_augment = BIT(20),
+    },
+};
+
+static struct universal_restore_context_tbl omap2_mcspi_pm_restore_ctx_tbl = {
+    .table = omap2_mcspi_pm_restore_ctx_reg_tbl,
+    .table_size = ARRAY_SIZE(omap2_mcspi_pm_restore_ctx_reg_tbl),
 };
 
 static struct universal_pin_control omap2_mcspi_pinctrl = {
     .suspend_state = PM_PINCTRL_IDLE,
     .resume_state = PM_PINCTRL_DEFAULT,
 };
-
-
 
 /* ljtale ends*/
 
@@ -1560,7 +1604,7 @@ static int omap2_mcspi_resume(struct device *dev)
 
 //	pinctrl_pm_select_default_state(dev);
 
-	pm_runtime_get_sync(mcspi->dev);
+//	pm_runtime_get_sync(mcspi->dev);
 	list_for_each_entry(cs, &ctx->cs, node) {
 		if ((cs->chconf0 & OMAP2_MCSPI_CHCONF_FORCE) == 0) {
 			/*
@@ -1573,8 +1617,8 @@ static int omap2_mcspi_resume(struct device *dev)
 			writel_relaxed(cs->chconf0, cs->base + OMAP2_MCSPI_CHCONF0);
 		}
 	}
-	pm_runtime_mark_last_busy(mcspi->dev);
-	pm_runtime_put_autosuspend(mcspi->dev);
+//	pm_runtime_mark_last_busy(mcspi->dev);
+//	pm_runtime_put_autosuspend(mcspi->dev);
 	return 0;
 }
 #endif /* CONFIG_SUSPEND */
@@ -1648,15 +1692,18 @@ static struct universal_driver omap2_mcspi_universal_driver = {
     },
 #ifdef CONFIG_SUSPEND
     .pm = {
+        .restore_context = {
+            .check_context_loss = false,
+            .restore_tbl = &omap2_mcspi_pm_restore_ctx_tbl,
+        },
 
-        .pin_control = &omap2_mcspi_pinctrl,
+       .pin_control = &omap2_mcspi_pinctrl,
         .ref_ctx = {
             .array = omap2_mcspi_reg_context,
             .size = ARRAY_SIZE(omap2_mcspi_reg_context),
         },
     },
     .pm_ops = {
-        .local_resume = omap2_mcspi_resume,
     },
 #endif
 };

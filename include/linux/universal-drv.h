@@ -334,6 +334,10 @@ struct universal_rpm_dev {
 
 struct universal_pm {
 
+    struct universal_save_context save_context;
+
+    struct universal_restore_context  restore_context;
+
     struct universal_pin_control *pin_control;
     struct universal_pm_ctx ref_ctx;
 };

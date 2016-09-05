@@ -23,6 +23,9 @@ int universal_suspend(struct device *dev);
 int universal_resume(struct device *dev);
 int universal_pm_create_reg_context(struct universal_device *uni_dev);
 
+extern int process_reg_table(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl, int table_size);
+
 struct universal_reg_entry;
 
 struct universal_pm_ctx {
