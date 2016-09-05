@@ -9,6 +9,7 @@
 #include <linux/dmaengine.h>
 #include <linux/omap-dmaengine.h>
 #include <linux/clk.h>
+#include <linux/timer.h>
 
 #include <linux/i2c.h>
 #include <linux/regulator/driver.h>
@@ -222,11 +223,34 @@ struct clk_config_num {
 struct clk_config_dev {
     struct clk *clk;
     bool clock_flag;
+    /* TODO: possibly we need this flag to coordinate the clock
+     * disable/enable order in the universal RPM/PM functions */
+    bool clock_enabled;
 };
 
 struct clk_config_dev_num {
     struct clk_config_dev *clk_config_dev;
     int clk_num;
+};
+
+struct timer_config {
+    void (*timer_timeout_fn)(unsigned long data);
+    /* data is by default passed as device pointer */
+    unsigned long data;
+};
+
+struct timer_config_num {
+    struct timer_config *timer_config;
+    int timer_num;
+};
+
+struct timer_config_dev {
+    struct timer_list timer;
+    bool timer_setup;
+};
+struct timer_config_dev_num {
+    struct timer_config_dev *timer_config_dev;
+    int timer_num;
 };
 
 /*
@@ -251,6 +275,7 @@ struct universal_probe {
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
     struct clk_config_num *clk_config_num;
+    struct timer_config_num *timer_config_num;
 };
 
 struct universal_probe_ops {
@@ -271,6 +296,7 @@ struct universal_probe_dev {
     struct dma_config_dev_num dma_config_dev_num;
     struct irq_config_dev_num irq_config_dev_num;
     struct clk_config_dev_num clk_config_dev_num;
+    struct timer_config_dev_num timer_config_dev_num;
 };
 
 struct universal_rpm {
@@ -379,6 +405,8 @@ struct universal_driver {
     struct dma_config_num *dma_config_num;
     /* Clock configuration */
     struct clk_config_num *clk_config_num;
+    /* Timer configuration */
+    struct timer_config_num *timer_config_num;
 
     /* the universal driver provides a universal probe function for the 
      * device driver to call upon a device-driver binding, but there

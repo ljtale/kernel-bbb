@@ -89,6 +89,10 @@ static int universal_pm_restore_context(struct universal_device *uni_dev) {
     return ret;
 }
 
+static int universal_del_timer_sync(struct universal_device *uni_dev) {
+    return 0;
+}
+
 int universal_suspend(struct device *dev) {
     struct universal_device *uni_dev;
     struct universal_pm_dev *pm_dev;
@@ -117,6 +121,14 @@ int universal_suspend(struct device *dev) {
 
     if (pm_ops->local_suspend)
         ret = pm_ops->local_suspend(dev);
+    /* disable clock */
+    ret = universal_disable_clk(uni_dev);
+    if (ret)
+        goto lock_err;
+    /* deactive timer and wait for the hanlder to finish */
+    ret = universal_del_timer_sync(uni_dev);
+    if (ret)
+        goto lock_err;
 
     universal_pm_pin_control(uni_dev, SUSPEND);
     /* drop the reference */
@@ -142,12 +154,17 @@ int universal_resume(struct device *dev) {
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system resume...%s\n", uni_dev->name);
 
-    /* select pin states at first */
-    universal_pm_pin_control(uni_dev, RESUME);
-
     /* probably rely on the runtime resume to restore the context */
     if (pm_runtime_enabled(dev))
         pm_runtime_get_sync(dev);
+
+    /* select pin states at first */
+    universal_pm_pin_control(uni_dev, RESUME);
+
+    /* enable clock */
+    ret = universal_enable_clk(uni_dev);
+    if (ret)
+       goto lock_err;
 
     /* restore the context */
     ret = universal_pm_restore_context(uni_dev);

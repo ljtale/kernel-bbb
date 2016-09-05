@@ -271,6 +271,28 @@ err:
     return 0;
 }
 
+static int universal_timer_config(struct universal_device *uni_dev,
+        struct timer_config_num *timer_config_num) {
+    struct timer_config_dev_num *timer_config_dev_num = 
+        &uni_dev->probe_dev.timer_config_dev_num;
+    struct timer_config *timer_config;
+    struct timer_config_dev *timer_config_dev;
+    int i;
+    timer_config_dev_num->timer_config_dev = devm_kzalloc(uni_dev->dev,
+            sizeof(struct timer_config_dev) * timer_config_num->timer_num,
+            GFP_KERNEL);
+    if (!timer_config_dev_num->timer_config_dev)
+        return -ENOMEM;
+    timer_config_dev_num->timer_num = timer_config_num->timer_num;
+    for (i = 0; i < timer_config_dev_num->timer_num; i++) {
+        timer_config = &timer_config_num->timer_config[i];
+        timer_config_dev = &timer_config_dev_num->timer_config_dev[i];
+        setup_timer(&timer_config_dev->timer, timer_config->timer_timeout_fn,
+                (unsigned long)uni_dev->dev);
+    }
+    return 0;
+}
+
 /* populate device knowledge from device tree for serving runtime pm */
 static void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
     struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
@@ -335,6 +357,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     struct irq_config_num *irq_config_num;
     struct dma_config_num *dma_config_num;
     struct clk_config_num *clk_config_num;
+    struct timer_config_num *timer_config_num;
     struct universal_rpm *rpm;
     struct universal_pm *pm;
     int i;
@@ -390,7 +413,17 @@ int __universal_drv_probe(struct universal_device *dev) {
         rpm_dev->dma_channel_requested = true;
     }
 
-    /* TODO: runtime pm configuration and clock configuration */
+    /* timer setup */
+    timer_config_num = drv->timer_config_num;
+    if (timer_config_num) {
+        ret = universal_timer_config(dev, timer_config_num);
+        if (ret) {
+            LJTALE_LEVEL_DEBUG(3, "timer setup failed: %s\n", dev->name);
+            goto timer_config_err;
+        }
+    }
+
+    /* TODO: runtime pm configuration */
     clk_config_num = drv->clk_config_num;
     if (clk_config_num) {
         ret = universal_clk_config(dev, clk_config_num);
@@ -474,6 +507,7 @@ local_probe_err:
 pm_err:
 rpm_error:
 clk_config_err:
+timer_config_err:
 dma_config_err:
 regacc_err:
     return ret;

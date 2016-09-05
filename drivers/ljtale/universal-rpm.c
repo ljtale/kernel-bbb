@@ -638,56 +638,81 @@ static int universal_setup_wakeup(struct universal_device *uni_dev) {
     return process_reg_table(uni_dev, reg_tbl, table_size);
 }
 
-static int universal_disable_clk(struct universal_device *uni_dev) {
+int universal_disable_clk(struct universal_device *uni_dev) {
    struct universal_rpm *rpm = &uni_dev->drv->rpm;
    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
    struct universal_reg_entry *reg_tbl;
    int table_size;
-   struct clk_config_dev_num *clk_num = &probe_dev->clk_config_dev_num;
+   struct clk_config_num *clk_num = uni_dev->drv->clk_config_num;
+   struct clk_config_dev_num *clk_dev_num = &probe_dev->clk_config_dev_num;
    int ret;
    int i;
    if (!rpm->disable_clk)
-       return 0;
+       goto no_reg_disable;
    reg_tbl = rpm->disable_clk->reg_table;
    table_size = rpm->disable_clk->table_size;
    ret = process_reg_table(uni_dev, reg_tbl, table_size);
    if (ret)
        return ret;
-   else {
-       for (i = 0; i < clk_num->clk_num; i++) {
-           if (clk_num->clk_config_dev[i].clock_flag)
-               /* FIXME: clk_core_disable will check if the enable count for 
-                * this clock is 0, it will throw a warning and return if the
-                * enable count is 0. Here we have to check if the clock is
-                * valid or not, which is different from the clk_core_disable */
-               clk_disable(clk_num->clk_config_dev[i].clk);
+no_reg_disable:
+   for (i = 0; i < clk_dev_num->clk_num; i++) {
+       if (clk_dev_num->clk_config_dev[i].clock_flag) {
+           /* FIXME: clk_core_disable will check if the enable count for 
+            * this clock is 0, it will throw a warning and return if the
+            * enable count is 0. Here we have to check if the clock is
+            * valid or not, which is different from the clk_core_disable */
+           if (clk_num->clk_config[i].clock_enable &&
+                   clk_num->clk_config[i].clock_prepare)
+               clk_disable_unprepare(clk_dev_num->clk_config_dev[i].clk);
+           else if (clk_num->clk_config[i].clock_enable &&
+                   !clk_num->clk_config[i].clock_prepare)
+               clk_disable(clk_dev_num->clk_config_dev[i].clk);
+           else if (!clk_num->clk_config[i].clock_enable &&
+                   clk_num->clk_config[i].clock_prepare)
+               clk_unprepare(clk_dev_num->clk_config_dev[i].clk);
        }
    }
    return 0;
 }
+EXPORT_SYMBOL(universal_disable_clk);
 
-static int universal_enable_clk(struct universal_device *uni_dev) {
+int universal_enable_clk(struct universal_device *uni_dev) {
    struct universal_rpm *rpm = &uni_dev->drv->rpm;
    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
-   struct clk_config_dev_num *clk_num = &probe_dev->clk_config_dev_num;
+   struct clk_config_dev_num *clk_dev_num = &probe_dev->clk_config_dev_num;
+   struct clk_config_num *clk_num = uni_dev->drv->clk_config_num;
    struct universal_reg_entry *reg_tbl;
    int table_size;
    int ret;
    int i;
+   for (i = 0; i < clk_dev_num->clk_num; i++) {
+       if (clk_dev_num->clk_config_dev[i].clock_flag) {
+           /* FIXME: clk_core_disable will check if the enable count for 
+            * this clock is 0, it will throw a warning and return if the
+            * enable count is 0. Here we have to check if the clock is
+            * valid or not, which is different from the clk_core_disable */
+           if (clk_num->clk_config[i].clock_enable &&
+                   clk_num->clk_config[i].clock_prepare)
+               clk_disable_unprepare(clk_dev_num->clk_config_dev[i].clk);
+           else if (clk_num->clk_config[i].clock_enable &&
+                   !clk_num->clk_config[i].clock_prepare)
+               clk_disable(clk_dev_num->clk_config_dev[i].clk);
+           else if (!clk_num->clk_config[i].clock_enable &&
+                   clk_num->clk_config[i].clock_prepare)
+               clk_unprepare(clk_dev_num->clk_config_dev[i].clk);
+       }
+   }
    if (!rpm->enable_clk)
        return 0;
    reg_tbl = rpm->enable_clk->reg_table;
    table_size = rpm->enable_clk->table_size;
-   for (i = 0; i < clk_num->clk_num; i++) {
-       if (clk_num->clk_config_dev[i].clock_flag)
-           clk_enable(clk_num->clk_config_dev[i].clk);
-   }
    ret = process_reg_table(uni_dev, reg_tbl, table_size);
    if (ret)
        return ret;
    return 0;
 
 }
+EXPORT_SYMBOL(universal_enable_clk);
 
 int universal_runtime_suspend(struct device *dev) {
     struct universal_device *uni_dev;

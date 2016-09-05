@@ -1358,7 +1358,8 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
 
 static void omap_hsmmc_soft_timeout(unsigned long data)
 {
-	struct omap_hsmmc_host *host = (struct omap_hsmmc_host *)data;
+    struct device *dev = (struct device *)data;
+	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
 	bool end_trans;
 
 	omap_hsmmc_disable_irq(host);
@@ -3049,7 +3050,7 @@ static struct universal_disable_irq omap_hsmmc_disable_irq_uni = {
 
 
 
-static struct universal_pin_control omap_hsmcc_pinctrl = {
+static struct universal_pin_control omap_hsmmc_pinctrl = {
     .suspend_state = PM_PINCTRL_IDLE,
     .resume_state = PM_PINCTRL_DEFAULT,
 };
@@ -3327,6 +3328,17 @@ static struct clk_config_num omap_hsmmc_clk_config_num = {
     .clk_num = ARRAY_SIZE(omap_hsmmc_clk_config),
 };
 
+static struct timer_config omap_hsmmc_timer_config[] = {
+    {
+        .timer_timeout_fn = omap_hsmmc_soft_timeout,
+    },
+};
+
+static struct timer_config_num omap_hsmmc_timer_config_num = {
+    .timer_config = omap_hsmmc_timer_config,
+    .timer_num = ARRAY_SIZE(omap_hsmmc_timer_config),
+};
+
 static struct universal_driver omap_hsmmc_universal_driver = {
     .name = "omap-hsmmc-universal-driver",
     .driver = &omap_hsmmc_driver.driver,
@@ -3334,6 +3346,7 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     .irq_config_num = NULL,
     .dma_config_num = &omap_hsmmc_dma_config_num,
     .clk_config_num = &omap_hsmmc_clk_config_num,
+    .timer_config_num = &omap_hsmmc_timer_config_num,
     .local_probe = omap_hsmmc_universal_local_probe,
 
     .rpm = {
@@ -3341,8 +3354,6 @@ static struct universal_driver omap_hsmmc_universal_driver = {
             .save_tbl = &omap_hsmmc_save_context_tbl,
         },
         .disable_irq = &omap_hsmmc_disable_irq_uni,
-        .pin_control = &omap_hsmcc_pinctrl,
-
 
         .restore_context = {
             .check_context_loss = true,
@@ -3353,7 +3364,7 @@ static struct universal_driver omap_hsmmc_universal_driver = {
         },
         .enable_irq = &omap_hsmmc_enable_irq_uni,
 
-
+        .pin_control = &omap_hsmmc_pinctrl,
         .ref_ctx = {
             .array = omap_hsmmc_reg_context,
             .size = ARRAY_SIZE(omap_hsmmc_reg_context),
@@ -3364,6 +3375,15 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     },
 
     .pm = {
+
+//        .pin_control = &omap_hsmmc_pinctrl,
+        .ref_ctx = {
+            .array = omap_hsmmc_reg_context,
+            .size = ARRAY_SIZE(omap_hsmmc_reg_context),
+        },
+    },
+
+    .pm_ops = {
     },
 };
 

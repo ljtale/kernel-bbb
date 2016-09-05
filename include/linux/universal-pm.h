@@ -25,6 +25,8 @@ int universal_pm_create_reg_context(struct universal_device *uni_dev);
 
 extern int process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size);
+extern int universal_disable_clk(struct universal_device *uni_dev);
+extern int universal_enable_clk(struct universal_device *uni_dev);
 
 struct universal_reg_entry;
 
@@ -48,11 +50,14 @@ struct universal_pin_control;
 struct universal_disable_clk;
 struct universal_enabled_clk;
 
-
+/* if we move timer initialization to the universal driver, we
+ * will not need to pass the timer variable here. */
 struct universal_deactivate_timer {
+    struct timer_list timer;
 };
 
 struct universal_reactivate_timer {
+    struct timer_list timer;
 };
 
 #endif /* _LINUX_UNIVERSAL_PM_H */
