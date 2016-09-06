@@ -289,6 +289,8 @@ static int universal_timer_config(struct universal_device *uni_dev,
         timer_config_dev = &timer_config_dev_num->timer_config_dev[i];
         setup_timer(&timer_config_dev->timer, timer_config->timer_timeout_fn,
                 (unsigned long)uni_dev->dev);
+        timer_config_dev->timer_setup = true;
+        timer_config_dev->sync = timer_config->sync;
     }
     return 0;
 }

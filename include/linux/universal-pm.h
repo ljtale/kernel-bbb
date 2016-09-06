@@ -50,14 +50,16 @@ struct universal_pin_control;
 struct universal_disable_clk;
 struct universal_enabled_clk;
 
-/* if we move timer initialization to the universal driver, we
- * will not need to pass the timer variable here. */
-struct universal_deactivate_timer {
-    struct timer_list timer;
+/* a series of register operations disable the device */
+struct universal_pm_shutdown {
+    struct universal_reg_entry *reg_table;
+    int table_size;
 };
 
-struct universal_reactivate_timer {
-    struct timer_list timer;
+struct universal_pm_powerup {
+    struct universal_reg_entry *reg_table;
+    int table_size;
 };
+
 
 #endif /* _LINUX_UNIVERSAL_PM_H */

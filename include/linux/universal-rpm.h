@@ -48,8 +48,8 @@ enum pm_reg_op {
     PM_REG_WRITE,
     PM_REG_READ,
     PM_REG_WRITE_READ, /* read after write, flushing read */
-    PM_REG_READ_WRITE_OR, /* write value =  read value | value */
-    PM_REG_READ_WRITE_AND, /* write value = read value & value */
+    PM_REG_READ_WRITE_OR, /* write value =  read value | write_augment */
+    PM_REG_READ_WRITE_AND, /* write value = read value & write_augment */
     PM_REG_WRITE_AUG_OR,
     PM_REG_WRITE_AUG_AND,
     PM_REG_WRITE_BITS, /* write value | aug, then write value & ~aug */

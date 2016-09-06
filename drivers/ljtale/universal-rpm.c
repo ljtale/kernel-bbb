@@ -277,7 +277,7 @@ int process_reg_table(struct universal_device *uni_dev,
                 if (ret)
                     break;
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        reg_ctx->array[tbl_entry->ctx_index] | temp_value);
+                        tbl_entry->write_augment | temp_value);
                 break;
 
             case PM_REG_READ_WRITE_AND:
@@ -287,7 +287,7 @@ int process_reg_table(struct universal_device *uni_dev,
                 if (ret)
                     break;
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        reg_ctx->array[tbl_entry->ctx_index] & temp_value);
+                        tbl_entry->write_augment & temp_value);
                 break;
             case PM_REG_WRITE_AUG_OR:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,

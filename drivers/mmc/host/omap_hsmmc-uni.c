@@ -255,7 +255,8 @@ struct omap_hsmmc_host {
 	bool                    transfer_incomplete;
 
 
-	struct timer_list	timer;
+//	struct timer_list	timer;
+    struct timer_list  *timer;
 	unsigned long		data_timeout;
 	unsigned int		need_i834_errata:1;
 
@@ -1340,7 +1341,7 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
 	 * interrupts (transfer complete or error)
 	 */
 	if (host->need_i834_errata && (status & (~CC_EN)))
-		del_timer(&host->timer);
+		del_timer(host->timer);
 
 	while (status & (INT_EN_MASK | CIRQ_EN)) {
 		if (host->req_in_progress)
@@ -1712,7 +1713,7 @@ static void omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host)
 		unsigned long timeout;
 
 		timeout = jiffies + nsecs_to_jiffies(host->data_timeout);
-		mod_timer(&host->timer, timeout);
+		mod_timer(host->timer, timeout);
 	}
 }
 
@@ -2574,6 +2575,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     struct regacc_dev *regacc_dev;
     struct dma_config_dev *dma_config_dev;
     struct clk_config_dev *clk_config_dev;
+    struct timer_config_dev *timer_config_dev;
     int dma_num;
     uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev) {
@@ -2585,6 +2587,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     regacc_dev = &probe_dev->regacc_dev;
     dma_config_dev = probe_dev->dma_config_dev_num.dma_config_dev;
     clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
+    timer_config_dev = probe_dev->timer_config_dev_num.timer_config_dev;
     dma_num = probe_dev->dma_config_dev_num.dma_num;
     /* ljtale ends */
 
@@ -2673,8 +2676,11 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		mmc->f_max = OMAP_MMC_MAX_CLOCK;
 
 	spin_lock_init(&host->irq_lock);
-	setup_timer(&host->timer, omap_hsmmc_soft_timeout,
+#if 0
+	setup_timer(host->timer, omap_hsmmc_soft_timeout,
 		    (unsigned long)host);
+#endif
+    host->timer = &timer_config_dev[0].timer; 
 #if 0
 	host->fclk = devm_clk_get(&pdev->dev, "fck");
 	if (IS_ERR(host->fclk)) {
@@ -2883,7 +2889,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 	dma_release_channel(host->tx_chan);
 	dma_release_channel(host->rx_chan);
 
-	del_timer_sync(&host->timer);
+	del_timer_sync(host->timer);
 
 	pm_runtime_put_sync(host->dev);
 	pm_runtime_disable(host->dev);
@@ -2917,7 +2923,7 @@ static int omap_hsmmc_suspend(struct device *dev)
 	if (host->dbclk)
 		clk_disable_unprepare(host->dbclk);
 
-	del_timer_sync(&host->timer);
+	del_timer_sync(host->timer);
 
 	pm_runtime_put_sync(host->dev);
 	return 0;
@@ -2932,18 +2938,18 @@ static int omap_hsmmc_resume(struct device *dev)
 	if (!host)
 		return 0;
 
-	pm_runtime_get_sync(host->dev);
+//	pm_runtime_get_sync(host->dev);
 
-	if (host->dbclk)
-		clk_prepare_enable(host->dbclk);
+//	if (host->dbclk)
+//		clk_prepare_enable(host->dbclk);
 
 	ios = &host->mmc->ios;
 	if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER))
 		omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
 
 	omap_hsmmc_protect_card(host);
-	pm_runtime_mark_last_busy(host->dev);
-	pm_runtime_put_autosuspend(host->dev);
+//	pm_runtime_mark_last_busy(host->dev);
+//	pm_runtime_put_autosuspend(host->dev);
 	return 0;
 }
 #endif
@@ -3164,6 +3170,35 @@ static struct universal_enable_irq omap_hsmmc_enable_irq_uni = {
     },
 }; 
 
+static struct universal_reg_entry omap_hsmmc_pm_shutdown_reg_tbl[] = {
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_ISE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ZERO,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_IE_REG,
+        .ctx_index = OMAP_HSMMC_UNI_ZERO,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP_HSMMC_UNI_STAT_REG,
+        .ctx_index = OMAP_HSMMC_UNI_STAT_CLEAR,
+    },
+    {
+        .reg_op = PM_REG_READ_WRITE_AND,
+        .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
+        // ctx index not needed here
+        .write_augment = ~(1 << 8),
+    },
+};
+
+static struct universal_pm_shutdown omap_hsmmc_pm_shutdown = {
+    .reg_table = omap_hsmmc_pm_shutdown_reg_tbl,
+    .table_size = ARRAY_SIZE(omap_hsmmc_pm_shutdown_reg_tbl),
+};
+
 /* ljtale ends */
 static int omap_hsmmc_runtime_suspend(struct device *dev)
 {
@@ -3245,12 +3280,13 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 }
 
 static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
+#if 0
 	SET_SYSTEM_SLEEP_PM_OPS(omap_hsmmc_suspend, omap_hsmmc_resume)
     /* ljtale starts */
-#if 0
 	.runtime_suspend = omap_hsmmc_runtime_suspend,
 	.runtime_resume = omap_hsmmc_runtime_resume,
 #endif
+    SET_SYSTEM_SLEEP_PM_OPS(universal_suspend, universal_resume)
     .runtime_suspend = universal_runtime_suspend,
     .runtime_resume = universal_runtime_resume,
     /* ljtale ends */
@@ -3331,6 +3367,7 @@ static struct clk_config_num omap_hsmmc_clk_config_num = {
 static struct timer_config omap_hsmmc_timer_config[] = {
     {
         .timer_timeout_fn = omap_hsmmc_soft_timeout,
+        .sync = true,
     },
 };
 
@@ -3375,15 +3412,16 @@ static struct universal_driver omap_hsmmc_universal_driver = {
     },
 
     .pm = {
+        .shutdown = &omap_hsmmc_pm_shutdown,
 
-//        .pin_control = &omap_hsmmc_pinctrl,
+        .pin_control = &omap_hsmmc_pinctrl,
         .ref_ctx = {
             .array = omap_hsmmc_reg_context,
             .size = ARRAY_SIZE(omap_hsmmc_reg_context),
         },
     },
-
     .pm_ops = {
+        .local_resume = omap_hsmmc_resume,
     },
 };
 

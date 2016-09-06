@@ -237,6 +237,7 @@ struct timer_config {
     void (*timer_timeout_fn)(unsigned long data);
     /* data is by default passed as device pointer */
     unsigned long data;
+    bool sync;
 };
 
 struct timer_config_num {
@@ -247,6 +248,9 @@ struct timer_config_num {
 struct timer_config_dev {
     struct timer_list timer;
     bool timer_setup;
+    /* sync option for multiprocessing */
+    bool sync;
+
 };
 struct timer_config_dev_num {
     struct timer_config_dev *timer_config_dev;
@@ -361,8 +365,12 @@ struct universal_rpm_dev {
 struct universal_pm {
 
     struct universal_save_context save_context;
+    struct universal_disable_irq *disable_irq;
+    struct universal_pm_shutdown *shutdown;
 
     struct universal_restore_context  restore_context;
+    struct universal_enable_irq *enable_irq;
+    struct unviersal_pm_powerup *powerup;
 
     struct universal_pin_control *pin_control;
     struct universal_pm_ctx ref_ctx;

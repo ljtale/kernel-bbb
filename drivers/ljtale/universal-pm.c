@@ -32,6 +32,8 @@ static int universal_pm_pin_control(struct universal_device *uni_dev,
     struct universal_pm *pm = &uni_dev->drv->pm;
     struct universal_pin_control *pin_control = pm->pin_control;
     enum pm_device_call pin_state = PM_PINCTRL_DEFAULT;
+    LJTALE_LEVEL_DEBUG(3, "pm pin configuration: %s - %d\n",
+            uni_dev->name, pin_control ? 1 : 0);
     if (!pin_control)
         return 0;
     switch(action) {
@@ -66,10 +68,37 @@ static int universal_pm_pin_control(struct universal_device *uni_dev,
     return 0;
 }
 
+
+static int universal_pm_shutdown(struct universal_device *uni_dev) {
+    struct universal_pm_shutdown *shutdown = uni_dev->drv->pm.shutdown;
+    struct universal_reg_entry *table = shutdown->reg_table;
+    int table_size = shutdown->table_size;
+    int ret;
+    LJTALE_LEVEL_DEBUG(3, "pm shut down: %s - %d\n",
+            uni_dev->name, shutdown ? 1 : 0);
+    if (!shutdown)
+        return 0;
+    ret = process_reg_table(uni_dev, table, table_size);
+    if (ret) {
+        LJTALE_LEVEL_DEBUG(3,"universal shutdown failed: %s\n", uni_dev->name);
+        return ret;
+    }
+    return 0;
+}
+
+static int universal_pm_powerup(struct universal_device *uni_dev) {
+    return 0;
+}
+
 static int universal_pm_save_context(struct universal_device *uni_dev) {
+    struct universal_save_context *save_context = 
+        &uni_dev->drv->pm.save_context;
+    struct universal_save_context_tbl *tbl = 
+        save_context->save_tbl;
+    LJTALE_LEVEL_DEBUG(3, "pm save context: %s - %d\n",
+            uni_dev->name, tbl ? 1 : 0);
     return 0;
 };
-
 
 static int universal_pm_restore_context(struct universal_device *uni_dev) {
     int ret = 0;
@@ -77,6 +106,8 @@ static int universal_pm_restore_context(struct universal_device *uni_dev) {
     struct universal_restore_context *restore_context = &pm->restore_context;
     struct universal_restore_context_tbl *tbl = 
         restore_context->restore_tbl;
+    LJTALE_LEVEL_DEBUG(3, "pm restore context: %s - %d\n",
+            uni_dev->name, tbl ? 1 : 0);
     /* for system PM, usually no context loss will be counted, directly
      * restore context from the restore table */
     if (!tbl)
@@ -90,6 +121,20 @@ static int universal_pm_restore_context(struct universal_device *uni_dev) {
 }
 
 static int universal_del_timer_sync(struct universal_device *uni_dev) {
+    struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
+    struct timer_config_dev_num *timer_config_dev_num = 
+        &probe_dev->timer_config_dev_num;
+    struct timer_config_dev *timer_config_dev;
+    int i;
+    for (i = 0; i < timer_config_dev_num->timer_num; i++) {
+        timer_config_dev = &timer_config_dev_num->timer_config_dev[i];
+        if (timer_config_dev->timer_setup) {
+            if (timer_config_dev->sync)
+                del_timer_sync(&timer_config_dev->timer);
+            else
+                del_timer(&timer_config_dev->timer);
+        }
+    }
     return 0;
 }
 
@@ -118,9 +163,11 @@ int universal_suspend(struct device *dev) {
         goto lock_err;
     }
 
+    /* shut down the device */
+    ret = universal_pm_shutdown(uni_dev);
+    if (ret)
+        goto lock_err;
 
-    if (pm_ops->local_suspend)
-        ret = pm_ops->local_suspend(dev);
     /* disable clock */
     ret = universal_disable_clk(uni_dev);
     if (ret)
@@ -131,6 +178,11 @@ int universal_suspend(struct device *dev) {
         goto lock_err;
 
     universal_pm_pin_control(uni_dev, SUSPEND);
+
+    /* local suspend activities */
+    if (pm_ops->local_suspend)
+        ret = pm_ops->local_suspend(dev);
+
     /* drop the reference */
     if (pm_runtime_enabled(dev))
         pm_runtime_put_sync(dev);
@@ -166,6 +218,8 @@ int universal_resume(struct device *dev) {
     if (ret)
        goto lock_err;
 
+    /* power up the device */
+    ret = universal_pm_powerup(uni_dev);
     /* restore the context */
     ret = universal_pm_restore_context(uni_dev);
     if (ret) {
