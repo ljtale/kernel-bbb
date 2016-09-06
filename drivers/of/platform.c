@@ -24,7 +24,7 @@
 #include <linux/platform_device.h>
 
 /* ljtale starts */
-#include <linux/universal-utils.h>
+#include <linux/universal-drv.h>
 /* ljtale ends */
 
 const struct of_device_id of_default_bus_match_table[] = {
@@ -178,6 +178,7 @@ static struct platform_device *of_platform_device_create_pdata(
 					struct device *parent)
 {
 	struct platform_device *dev;
+    struct universal_device *uni_dev;
 
 	if (!of_device_is_available(np) ||
 	    of_node_test_and_set_flag(np, OF_POPULATED))
@@ -191,7 +192,7 @@ static struct platform_device *of_platform_device_create_pdata(
 	dev->dev.platform_data = platform_data;
     /* ljtale: there is alreay a dma configuration from device tree */
 	of_dma_configure(&dev->dev, dev->dev.of_node);
-#if 0
+
     /* ljtale starts */
     /* ljtale: after creating the platform device and before the the device
      * is added to the device hierarchy, this is the place where the universal
@@ -214,7 +215,6 @@ static struct platform_device *of_platform_device_create_pdata(
         dev_err(&dev->dev, "universal device creation failed: %s\n",
                 dev_name(&dev->dev));
     /* ljtale ends */
-#endif
 	if (of_device_add(dev) != 0) {
 		of_dma_deconfigure(&dev->dev);
         /* ljtale: platform_device_put is used to destory platform device 

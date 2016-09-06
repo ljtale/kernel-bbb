@@ -31,8 +31,6 @@
 #include "base.h"
 #include "power/power.h"
 
-#include <linux/universal-utils.h>
-
 #ifdef CONFIG_SYSFS_DEPRECATED
 #ifdef CONFIG_SYSFS_DEPRECATED_V2
 long sysfs_deprecated = 1;
@@ -1027,35 +1025,10 @@ int device_add(struct device *dev)
 	struct kobject *kobj;
 	struct class_interface *class_intf;
 	int error = -EINVAL;
-    struct universal_device *uni_dev;
-    int status = 0;
 
 	dev = get_device(dev);
 	if (!dev)
 		goto done;
-    /* ljtale starts */
-    /* Here we provide an opportunity to create a unviersal device instance
-     * for all the devices, but to reduce the overhead of creating universal
-     * devices, we add a filter to create a universal device for only platform
-     * bus. The I2C core will has its own implementation to create universal
-     * devices.*/
-    /* FIXME: the created but unused universal device could be massive, 
-     * mute it if necessary */
-    if (!strcmp(dev->bus->name, "platform")) {
-        LJTALE_LEVEL_DEBUG(3, "created a platform device for: %s\n",
-                dev_name(dev));
-        uni_dev = new_universal_device(dev);
-        if (uni_dev) {
-            status = universal_device_register(uni_dev);
-            if (status < 0)
-                LJTALE_MSG(KERN_ERR, "uni_dev registration failed: %s\n",
-                        dev_name(dev));
-        }
-        else
-            LJTALE_MSG(KERN_ERR, "universal device creation failed: %s\n",
-                    dev_name(dev));
-    }
-    /* ljtale ends */
 
 	if (!dev->p) {
 		error = device_private_init(dev);
