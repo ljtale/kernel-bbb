@@ -27,7 +27,7 @@
 #include <linux/clk/clk-conf.h>
 #include <linux/limits.h>
 
-#include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 
 #include "base.h"
 #include "power/power.h"
