@@ -27,7 +27,7 @@
 #include <linux/clk/clk-conf.h>
 #include <linux/limits.h>
 
-#include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 
 #include "base.h"
 #include "power/power.h"
@@ -312,6 +312,8 @@ EXPORT_SYMBOL_GPL(platform_device_add_data);
 int platform_device_add(struct platform_device *pdev)
 {
 	int i, ret;
+    struct universal_device *uni_dev;
+    int status = 0;
 
 	if (!pdev)
 		return -EINVAL;
@@ -343,6 +345,21 @@ int platform_device_add(struct platform_device *pdev)
 		break;
 	}
 
+    /* ljtale starts */
+    LJTALE_LEVEL_DEBUG(3, "created a platform device for: %s\n",
+            dev_name(&pdev->dev));
+    uni_dev = new_universal_device(&pdev->dev);
+    if (uni_dev) {
+        int status = universal_device_register(uni_dev);
+        if (status < 0)
+            dev_err(&pdev->dev, "universal device registration failed: %s\n",
+                    dev_name(&pdev->dev));
+    }
+    else
+        dev_err(&pdev->dev, "universal device creation failed: %s\n",
+                dev_name(&pdev->dev));
+    /* ljtale ends */
+
 	for (i = 0; i < pdev->num_resources; i++) {
 		struct resource *p, *r = &pdev->resource[i];
 
@@ -368,7 +385,9 @@ int platform_device_add(struct platform_device *pdev)
 		 dev_name(&pdev->dev), dev_name(pdev->dev.parent));
 
     /* ljtale: if universal device supports all general devices, the universal
-     * device creation and addition should be moved to device_add function */
+     * device creation and addition should be moved to device_add function 
+     * FIXME: adding new_universal_driver in the device_add function causes
+     * the kernel to faile booting */
 	ret = device_add(&pdev->dev);
 	if (ret == 0)
 		return ret;

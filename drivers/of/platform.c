@@ -24,7 +24,7 @@
 #include <linux/platform_device.h>
 
 /* ljtale starts */
-#include <linux/universal-drv.h>
+#include <linux/universal-utils.h>
 /* ljtale ends */
 
 const struct of_device_id of_default_bus_match_table[] = {
@@ -201,7 +201,7 @@ static struct platform_device *of_platform_device_create_pdata(
      * calling device probe, this makes sure when a driver
      * is bound to a device the universal driver probe could be called if it
      * is available. */
-    LJTALE_LEVEL_DEBUG(3, "created a platform device: %s\n",
+    LJTALE_LEVEL_DEBUG(3, "created a platform device for: %s\n",
             dev_name(&dev->dev));
     /* FIXME: the above print information could be massive, mute it if necess */
     uni_dev = new_universal_device(&dev->dev);
