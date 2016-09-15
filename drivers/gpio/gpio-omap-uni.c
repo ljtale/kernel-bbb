@@ -2061,6 +2061,7 @@ static struct register_accessor omap_gpio_regacc = {
     .mmio_support = true,
     .mb = false,
     .reg_offset = 0,
+    .res_index = 0,
 };
 
 static struct irq_config omap_gpio_irq_config[] = {

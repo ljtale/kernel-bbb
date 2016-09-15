@@ -3321,6 +3321,7 @@ static struct register_accessor omap_hsmmc_regacc = {
     .mmio_support = true,
     .mb = false,
     .reg_offset = 0x100,
+    .res_index = 0,
 };
 
 static struct dma_config omap_hsmmc_dma_config[] = {

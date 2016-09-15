@@ -917,6 +917,7 @@ static struct register_accessor omap_rtc_regacc = {
     .mmio_support = true,
     .mb = true,
     .reg_offset = 0,
+    .res_index = 0,
 };
 
 static struct irq_config omap_rtc_irq_config[] = {

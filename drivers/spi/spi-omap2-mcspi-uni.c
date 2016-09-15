@@ -1666,6 +1666,7 @@ static struct register_accessor omap2_mcspi_regacc = {
     .mmio_support = true,
     .mb = false,
     .reg_offset = 0x100,
+    .res_index = 0,
 };
 
 static struct universal_driver omap2_mcspi_universal_driver = {

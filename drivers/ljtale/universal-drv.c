@@ -112,7 +112,9 @@ static int universal_regacc_config(struct universal_device *uni_dev,
          /* the device must be platform device */
          BUG_ON(strcmp("platform", regacc->bus_name));
          pdev = to_platform_device(dev);
-         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+         /* FIXME: default memory resource index is zero, it could be
+          * different */
+         res = platform_get_resource(pdev, IORESOURCE_MEM, regacc->res_index);
          if (!res)
              return -ENODEV;
          res->start += regacc->reg_offset;

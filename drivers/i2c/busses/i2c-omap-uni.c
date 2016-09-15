@@ -1859,6 +1859,7 @@ static struct register_accessor omap_i2c_regacc = {
     .mmio_support = true,
     .mb = false,
     .reg_offset = 0,
+    .res_index = 0,
 };
 
 /* FIXME: There could be something that can be extracted from the IRQ handlers*/

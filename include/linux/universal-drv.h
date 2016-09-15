@@ -102,6 +102,9 @@ struct register_accessor {
      * This wierd issue is caused by driver developers to have one
      * set  of register offsets suitable for various devices */
     u32 reg_offset;
+    /* if the platform memory resource by name instead of by index */
+    unsigned int res_index;
+    char *res_name;
     /* for memory mapped I/O, using the read/write instructions directly
      * would be faster than using indirect universal read/write. But anyway
      * we provide */
