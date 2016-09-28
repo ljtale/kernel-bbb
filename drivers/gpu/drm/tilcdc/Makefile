@@ -11,6 +11,8 @@ tilcdc-y := \
 	tilcdc_tfp410.o \
 	tilcdc_panel.o \
 	tilcdc_external.o \
-	tilcdc_drv.o
+	tilcdc_drv-uni.o	\
+# 	ljtale				\
+#	tilcdc_drv.o	\
 
 obj-$(CONFIG_DRM_TILCDC)	+= tilcdc.o

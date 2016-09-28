@@ -104,6 +104,8 @@ struct register_accessor {
     u32 reg_offset;
     /* if the platform memory resource by name instead of by index */
     unsigned int res_index;
+    bool ioremap_nodevice;
+    bool ioremap_nocache;
     char *res_name;
     /* for memory mapped I/O, using the read/write instructions directly
      * would be faster than using indirect universal read/write. But anyway

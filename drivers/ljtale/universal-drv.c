@@ -119,7 +119,14 @@ static int universal_regacc_config(struct universal_device *uni_dev,
              return -ENODEV;
          res->start += regacc->reg_offset;
          res->end   += regacc->reg_offset;
-         regacc_dev->base = devm_ioremap_resource(dev, res);
+         if (regacc->ioremap_nodevice && regacc->ioremap_nocache) {
+             regacc_dev->base = 
+                 ioremap_nocache(res->start, resource_size(res));
+         } else if (regacc->ioremap_nodevice && !regacc->ioremap_nocache) {
+             regacc_dev->base = ioremap(res->start, resource_size(res));
+         } else {
+             regacc_dev->base = devm_ioremap_resource(dev, res);
+         }
          if (IS_ERR(regacc_dev->base))
              return PTR_ERR(regacc_dev->base);
          regacc_dev->phys_base = res->start;
