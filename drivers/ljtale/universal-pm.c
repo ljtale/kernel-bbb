@@ -71,13 +71,15 @@ static int universal_pm_pin_control(struct universal_device *uni_dev,
 
 static int universal_pm_shutdown(struct universal_device *uni_dev) {
     struct universal_pm_shutdown *shutdown = uni_dev->drv->pm.shutdown;
-    struct universal_reg_entry *table = shutdown->reg_table;
-    int table_size = shutdown->table_size;
+    struct universal_reg_entry *table;
+    int table_size;
     int ret;
     LJTALE_LEVEL_DEBUG(3, "pm shut down: %s - %d\n",
             uni_dev->name, shutdown ? 1 : 0);
     if (!shutdown)
         return 0;
+    table = shutdown->reg_table;
+    table_size = shutdown->table_size;
     ret = process_reg_table(uni_dev, table, table_size);
     if (ret) {
         LJTALE_LEVEL_DEBUG(3,"universal shutdown failed: %s\n", uni_dev->name);

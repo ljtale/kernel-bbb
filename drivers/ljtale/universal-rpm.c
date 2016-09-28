@@ -647,6 +647,8 @@ int universal_disable_clk(struct universal_device *uni_dev) {
    struct clk_config_dev_num *clk_dev_num = &probe_dev->clk_config_dev_num;
    int ret;
    int i;
+   if (!clk_num)
+      return 0;
    if (!rpm->disable_clk)
        goto no_reg_disable;
    reg_tbl = rpm->disable_clk->reg_table;
@@ -685,6 +687,8 @@ int universal_enable_clk(struct universal_device *uni_dev) {
    int table_size;
    int ret;
    int i;
+   if (!clk_num)
+        return 0;
    for (i = 0; i < clk_dev_num->clk_num; i++) {
        if (clk_dev_num->clk_config_dev[i].clock_flag) {
            /* FIXME: clk_core_disable will check if the enable count for 

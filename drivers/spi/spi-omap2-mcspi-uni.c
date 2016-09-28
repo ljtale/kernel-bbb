@@ -1623,17 +1623,18 @@ static int omap2_mcspi_resume(struct device *dev)
 }
 #endif /* CONFIG_SUSPEND */
 
+#if 0
 static const struct dev_pm_ops omap2_mcspi_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(omap2_mcspi_suspend, omap2_mcspi_resume)
 	.runtime_resume	= omap_mcspi_runtime_resume,
 };
-#if 0
+#endif
+
 static const struct dev_pm_ops omap2_mcspi_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(universal_suspend, universal_resume)
-    .runtime_suspend = universal_runtime_suspend,
+//    .runtime_suspend = universal_runtime_suspend,
 	.runtime_resume	= omap_mcspi_runtime_resume,
 };
-#endif
 
 static struct platform_driver omap2_mcspi_driver = {
 	.driver = {
