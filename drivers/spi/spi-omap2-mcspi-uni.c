@@ -1693,7 +1693,7 @@ static struct universal_driver omap2_mcspi_universal_driver = {
     },
 #ifdef CONFIG_SUSPEND
     .pm = {
-#if 0
+
         .restore_context = {
             .check_context_loss = false,
             .restore_tbl = &omap2_mcspi_pm_restore_ctx_tbl,
@@ -1704,11 +1704,10 @@ static struct universal_driver omap2_mcspi_universal_driver = {
             .size = ARRAY_SIZE(omap2_mcspi_reg_context),
         },
 
-#endif
     },
     .pm_ops = {
-        .local_suspend = omap2_mcspi_suspend,
-        .local_resume = omap2_mcspi_resume,
+//        .local_suspend = omap2_mcspi_suspend,
+//        .local_resume = omap2_mcspi_resume,
     },
 #endif
 };
