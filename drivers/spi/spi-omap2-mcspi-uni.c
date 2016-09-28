@@ -1407,6 +1407,7 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 		mcspi->pin_dir = pdata->pin_dir;
 	}
 	regs_offset = pdata->regs_offset;
+#if 0
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (r == NULL) {
 		status = -ENODEV;
@@ -1422,10 +1423,9 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 		status = PTR_ERR(mcspi->base);
 		goto free_master;
 	}
-#if 0
+#endif
     mcspi->phys = regacc_dev->phys_base; 
     mcspi->base = regacc_dev->base;
-#endif
 	mcspi->dev = &pdev->dev;
 
 	INIT_LIST_HEAD(&mcspi->ctx.cs);
@@ -1671,7 +1671,7 @@ static struct register_accessor omap2_mcspi_regacc = {
 static struct universal_driver omap2_mcspi_universal_driver = {
     .name = "omap2-mcspi-universal-driver",
     .driver = &omap2_mcspi_driver.driver,
-//    .regacc = &omap2_mcspi_regacc,
+    .regacc = &omap2_mcspi_regacc,
     .irq_config_num = NULL,
     .dma_config_num = NULL,
     .clk_config_num = NULL,
