@@ -353,7 +353,7 @@ static void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
 }
 
 static void inline pm_knowledge_from_dt(struct universal_device *uni_dev) {
-    struct universal_pm_dev *pm_dev = &uni_dev->pm_dev;
+//    struct universal_pm_dev *pm_dev = &uni_dev->pm_dev;
     struct device_node *of_node = uni_dev->dev->of_node;
     BUG_ON(!of_node);
 } 

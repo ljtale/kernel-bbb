@@ -164,6 +164,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
     struct universal_device *uni_dev;
     struct universal_probe_dev *probe_dev;
     struct regacc_dev *regacc_dev;
+    struct clk_config_dev *clk_config_dev;
 
     uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev) {
@@ -173,6 +174,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
     }
     probe_dev = &uni_dev->probe_dev;
     regacc_dev = &probe_dev->regacc_dev;
+    clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
     /* ljtale ends */
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
@@ -216,7 +218,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
     if (!regacc_dev->base)
         goto fail_free_wq;
     priv->mmio = regacc_dev->base;
-/* ljtale ends */
+#if 0
 	// priv->clk = clk_get(dev->dev, "fck");
 	priv->clk = devm_clk_get(dev->dev, "fck");
 	if (IS_ERR(priv->clk)) {
@@ -224,7 +226,11 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
 		ret = -ENODEV;
 		goto fail_iounmap;
 	}
-
+#endif
+    if (!clk_config_dev)
+        goto fail_iounmap;
+    priv->clk = clk_config_dev[0].clk;
+/* ljtale ends */
 #ifdef CONFIG_CPU_FREQ
 	priv->lcd_fck_rate = clk_get_rate(priv->clk);
 	priv->freq_transition.notifier_call = cpufreq_transition;
@@ -777,6 +783,19 @@ static struct register_accessor tilcdc_regacc = {
     .ioremap_nocache = true,
 };
 
+static struct clk_config tilcdc_clk_config[] = {
+    {
+        .clock_name = "fck",
+        .optional = false,
+        .clock_prepare = false,
+        .clock_enable = false,
+    },
+};
+static struct clk_config_num tilcdc_clk_config_num = {
+    .clk_config = tilcdc_clk_config,
+    .clk_num = ARRAY_SIZE(tilcdc_clk_config),
+};
+
 static int tilcdc_universal_local_probe(struct universal_device *uni_dev) {
     struct platform_device *pdev = to_platform_device(uni_dev->dev);
     LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device :%s\n",
@@ -789,7 +808,7 @@ static struct universal_driver tilcdc_universal_driver = {
     .driver = &tilcdc_platform_driver.driver,
     .regacc = &tilcdc_regacc,
     .dma_config_num = NULL,
-    .clk_config_num = NULL,
+    .clk_config_num = &tilcdc_clk_config_num,
     .local_probe = tilcdc_universal_local_probe,
 
     .rpm = {
