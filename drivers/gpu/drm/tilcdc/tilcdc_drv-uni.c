@@ -156,9 +156,24 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
 	struct device_node *node = pdev->dev.of_node;
 	struct tilcdc_drm_private *priv;
 	struct tilcdc_module *mod;
-	struct resource *res;
+//	struct resource *res;
 	u32 bpp = 0;
-	int ret;
+    int ret = 0;
+
+    /* ljtale starts */
+    struct universal_device *uni_dev;
+    struct universal_probe_dev *probe_dev;
+    struct regacc_dev *regacc_dev;
+
+    uni_dev = check_universal_driver(&pdev->dev);
+    if (!uni_dev) {
+        LJTALE_MSG(KERN_ERR, "universal driver not available for: %s\n",
+                pdev->name);
+        return -EINVAL;
+    }
+    probe_dev = &uni_dev->probe_dev;
+    regacc_dev = &probe_dev->regacc_dev;
+    /* ljtale ends */
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
 	if (priv)
@@ -182,7 +197,8 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
 		ret = -ENOMEM;
 		goto fail_free_priv;
 	}
-
+/* ljtale starts */
+#if 0
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(dev->dev, "failed to get memory resource\n");
@@ -196,7 +212,11 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
 		ret = -ENOMEM;
 		goto fail_free_wq;
 	}
-
+#endif
+    if (!regacc_dev->base)
+        goto fail_free_wq;
+    priv->mmio = regacc_dev->base;
+/* ljtale ends */
 	// priv->clk = clk_get(dev->dev, "fck");
 	priv->clk = devm_clk_get(dev->dev, "fck");
 	if (IS_ERR(priv->clk)) {
@@ -741,6 +761,59 @@ static struct platform_driver tilcdc_platform_driver = {
 		.of_match_table = tilcdc_of_match,
 	},
 };
+
+/* ljtale starts */
+
+static struct register_accessor tilcdc_regacc = {
+    .bus_name = "platform",
+    .reg_addr_bits = 32,
+    .reg_val_bits = 32,
+
+    .mmio_support = true,
+    .mb = true,
+    .reg_offset = 0,
+    .res_index = 0,
+    .ioremap_nodevice = true,
+    .ioremap_nocache = true,
+};
+
+static int tilcdc_universal_local_probe(struct universal_device *uni_dev) {
+    struct platform_device *pdev = to_platform_device(uni_dev->dev);
+    LJTALE_LEVEL_DEBUG(1, "universal local probe on driver: %s - device :%s\n",
+            uni_dev->drv->name, uni_dev->name);
+    return tilcdc_pdev_probe(pdev);
+}
+
+static struct universal_driver tilcdc_universal_driver = {
+    .name = "tilcdc-universal-driver",
+    .driver = &tilcdc_platform_driver.driver,
+    .regacc = &tilcdc_regacc,
+    .dma_config_num = NULL,
+    .clk_config_num = NULL,
+    .local_probe = tilcdc_universal_local_probe,
+
+    .rpm = {
+    },
+
+    .rpm_ops = {
+    },
+
+    .pm = {
+    },
+
+    .pm_ops = {
+    },
+};
+
+static int __init universal_tilcdc_init(void) {
+    int ret = universal_driver_register(&tilcdc_universal_driver);
+    if (ret < 0)
+        LJTALE_MSG(KERN_ERR, "universal driver register failed: %d\n", ret);
+    return ret;
+}
+arch_initcall(universal_tilcdc_init);
+
+/* ljtale ends */
 
 static int __init tilcdc_drm_init(void)
 {

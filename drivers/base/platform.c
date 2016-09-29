@@ -350,7 +350,7 @@ int platform_device_add(struct platform_device *pdev)
             dev_name(&pdev->dev));
     uni_dev = new_universal_device(&pdev->dev);
     if (uni_dev) {
-        int status = universal_device_register(uni_dev);
+        status = universal_device_register(uni_dev);
         if (status < 0)
             dev_err(&pdev->dev, "universal device registration failed: %s\n",
                     dev_name(&pdev->dev));
