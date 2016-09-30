@@ -175,6 +175,9 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
     probe_dev = &uni_dev->probe_dev;
     regacc_dev = &probe_dev->regacc_dev;
     clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
+    if (&pdev->dev.pm_domain->ops)
+        LJTALE_LEVEL_DEBUG(1, "I have pm domain: %s - %x\n", pdev->name,
+                (unsigned int)pdev->dev.pm_domain->ops.runtime_suspend);
     /* ljtale ends */
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
@@ -636,10 +639,11 @@ static int tilcdc_pm_suspend(struct device *dev)
 	struct tilcdc_drm_private *priv = ddev->dev_private;
 	unsigned i, n = 0;
 
+    // this is a generic call for drm devices
 	drm_kms_helper_poll_disable(ddev);
 
 	/* Select sleep pin state */
-	pinctrl_pm_select_sleep_state(dev);
+//	pinctrl_pm_select_sleep_state(dev);
 
 	if (pm_runtime_suspended(dev)) {
 		priv->ctx_valid = false;
@@ -666,7 +670,7 @@ static int tilcdc_pm_resume(struct device *dev)
 	unsigned i, n = 0;
 
 	/* Select default pin state */
-	pinctrl_pm_select_default_state(dev);
+//	pinctrl_pm_select_default_state(dev);
 
 	if (priv->ctx_valid == true) {
 		/* Restore register state: */
@@ -690,8 +694,13 @@ static int tilcdc_pm_resume(struct device *dev)
 }
 #endif
 
+#if 0
 static const struct dev_pm_ops tilcdc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(tilcdc_pm_suspend, tilcdc_pm_resume)
+};
+#endif
+static const struct dev_pm_ops tilcdc_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(universal_suspend, universal_resume)
 };
 
 /*
@@ -803,6 +812,11 @@ static int tilcdc_universal_local_probe(struct universal_device *uni_dev) {
     return tilcdc_pdev_probe(pdev);
 }
 
+static struct universal_pin_control tilcdc_pinctrl = {
+    .suspend_state = PM_PINCTRL_SLEEP,
+    .resume_state = PM_PINCTRL_DEFAULT,
+};
+
 static struct universal_driver tilcdc_universal_driver = {
     .name = "tilcdc-universal-driver",
     .driver = &tilcdc_platform_driver.driver,
@@ -818,9 +832,11 @@ static struct universal_driver tilcdc_universal_driver = {
     },
 
     .pm = {
+        .pin_control = &tilcdc_hsmmc_pinctrl,
     },
-
     .pm_ops = {
+        .local_suspend = tilcdc_pm_suspend,
+        .local_resume = tilcdc_pm_resume,
     },
 };
 

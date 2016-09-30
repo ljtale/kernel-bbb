@@ -158,6 +158,13 @@ int universal_suspend(struct device *dev) {
     if (pm_runtime_enabled(dev))
         /* bring up the device if it is runtime suspended */
         pm_runtime_get_sync(dev);
+
+    /* local suspend activities */
+    if (pm_ops->local_suspend)
+        ret = pm_ops->local_suspend(dev);
+    if (ret)
+        goto lock_err;
+
     /* save context */
     ret = universal_pm_save_context(uni_dev);
     if (ret) {
@@ -181,9 +188,6 @@ int universal_suspend(struct device *dev) {
 
     universal_pm_pin_control(uni_dev, SUSPEND);
 
-    /* local suspend activities */
-    if (pm_ops->local_suspend)
-        ret = pm_ops->local_suspend(dev);
 
     /* drop the reference */
     if (pm_runtime_enabled(dev))

@@ -1390,16 +1390,10 @@ omap_i2c_probe(struct platform_device *pdev)
     rpm_dev = &uni_dev->rpm_dev;
     regacc_dev = &probe_dev->regacc_dev;
     irq_config_num = uni_dev->drv->irq_config_num;
-    if (!rpm_dev->rpm_data_dev) {
-        omap_i2c_rpm_reg_values = devm_kzalloc(uni_dev->dev, 
-                sizeof(struct omap_i2c_rpm_reg_value), GFP_KERNEL);
-        if (!omap_i2c_rpm_reg_values)
-            return -ENOMEM;
-        rpm_dev->rpm_data_dev = omap_i2c_rpm_reg_values;
-    } else 
-        omap_i2c_rpm_reg_values = rpm_dev->rpm_data_dev;
     /* FIXME: not all the device need to call first resume in probe */
 //    rpm_dev->first_resume_called = true;
+    LJTALE_LEVEL_DEBUG(1, "I have pm domain: %s - %x\n", pdev->name,
+            (unsigned int)pdev->dev.pm_domain->ops.suspend);
     /* ljtale ends */
 
 #if 0

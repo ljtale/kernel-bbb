@@ -1185,6 +1185,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
     regacc_dev = &probe_dev->regacc_dev;
     clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
     rpm_dev->first_resume_called = false;
+    LJTALE_LEVEL_DEBUG(1, "I have pm domain: %s - %x\n", pdev->name,
+            (unsigned int)pdev->dev.pm_domain->ops.suspend);
+
     /* ljtale ends */
 
 	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
