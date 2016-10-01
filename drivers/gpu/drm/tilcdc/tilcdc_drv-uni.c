@@ -636,8 +636,8 @@ static struct drm_driver tilcdc_driver = {
 static int tilcdc_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
-	struct tilcdc_drm_private *priv = ddev->dev_private;
-	unsigned i, n = 0;
+//	struct tilcdc_drm_private *priv = ddev->dev_private;
+//	unsigned i, n = 0;
 
     // this is a generic call for drm devices
 	drm_kms_helper_poll_disable(ddev);
@@ -645,33 +645,33 @@ static int tilcdc_pm_suspend(struct device *dev)
 	/* Select sleep pin state */
 //	pinctrl_pm_select_sleep_state(dev);
 
-	if (pm_runtime_suspended(dev)) {
-		priv->ctx_valid = false;
-		return 0;
-	}
+//	if (pm_runtime_suspended(dev)) {
+//		priv->ctx_valid = false;
+//		return 0;
+//	}
 
 	/* Disable the LCDC controller, to avoid locking up the PRCM */
-	tilcdc_crtc_dpms(priv->crtc, DRM_MODE_DPMS_OFF);
-
+//	tilcdc_crtc_dpms(priv->crtc, DRM_MODE_DPMS_OFF);
+#if 0
 	/* Save register state: */
 	for (i = 0; i < ARRAY_SIZE(registers); i++)
 		if (registers[i].save && (priv->rev >= registers[i].rev))
 			priv->saved_register[n++] = tilcdc_read(ddev, registers[i].reg);
 
 	priv->ctx_valid = true;
-
+#endif
 	return 0;
 }
 
 static int tilcdc_pm_resume(struct device *dev)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
-	struct tilcdc_drm_private *priv = ddev->dev_private;
-	unsigned i, n = 0;
+//	struct tilcdc_drm_private *priv = ddev->dev_private;
+//	unsigned i, n = 0;
 
 	/* Select default pin state */
 //	pinctrl_pm_select_default_state(dev);
-
+#if 0
 	if (priv->ctx_valid == true) {
 		/* Restore register state: */
 		for (i = 0; i < ARRAY_SIZE(registers); i++)
@@ -680,7 +680,7 @@ static int tilcdc_pm_resume(struct device *dev)
 				tilcdc_write(ddev, registers[i].reg,
 					     priv->saved_register[n++]);
 	}
-
+#endif
 	/*
 	 * if this call isn't here, the display is blank on return from
 	 * suspend.  With this call here the contents of the framebuffer
@@ -886,6 +886,12 @@ static struct universal_reg_entry tilcdc_save_context_reg_tbl[] = {
         .reg_offset = TILCDC_UNI_INT_ENABLE_SET_REG,
         .ctx_index = TILCDC_UNI_INT_ENABLE_SET,
     },
+    /* this belongs to configure table */
+    {
+        .reg_op = PM_REG_READ_WRITE_AND,
+        .reg_offset = TILCDC_UNI_RASTER_CTRL_REG,
+        .write_augment = ~(BIT(0)),
+    },
 };
 
 static struct universal_save_context_tbl tilcdc_save_context_tbl = {
@@ -1009,11 +1015,16 @@ static struct universal_driver tilcdc_universal_driver = {
     .local_probe = tilcdc_universal_local_probe,
 
     .rpm = {
+        .pin_control = &tilcdc_pinctrl,
+        .ref_ctx = {
+            .array = tilcdc_reg_context,
+            .size = ARRAY_SIZE(tilcdc_reg_context),
+        },
     },
 
     .rpm_ops = {
     },
-
+#ifdef CONFIG_PM_SLEEP
     .pm = {
         .save_context = {
             .save_tbl = &tilcdc_save_context_tbl,
@@ -1033,6 +1044,7 @@ static struct universal_driver tilcdc_universal_driver = {
         .local_suspend = tilcdc_pm_suspend,
         .local_resume = tilcdc_pm_resume,
     },
+#endif
 };
 
 static int __init universal_tilcdc_init(void) {
