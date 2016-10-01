@@ -1803,6 +1803,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
 	return 0;
 }
 static struct dev_pm_ops omap_i2c_pm_ops = {
+    .suspend = universal_suspend,
+    .resume = universal_resume,
     SET_RUNTIME_PM_OPS(universal_runtime_suspend,
             universal_runtime_resume, NULL)
 };
@@ -1905,8 +1907,17 @@ static struct universal_driver omap_i2c_universal_driver = {
     },
     .rpm_ops = {
         .first_runtime_resume = omap_i2c_runtime_resume,
-    }
+    },
 #endif
+    .pm = {
+        .pin_control = &omap_i2c_pinctrl,
+        .ref_ctx = {
+            .array = omap_i2c_reg_context,
+            .size = ARRAY_SIZE(omap_i2c_reg_context),
+        },
+    },
+    .pm_ops = {
+    },
 };
 
 static int __init universal_omap_i2c_init(void)

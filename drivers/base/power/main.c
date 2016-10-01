@@ -805,7 +805,7 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 	}
 
  End:
-    LJTALE_LEVEL_DEBUG(2, "dpm resume...%s\n", dev_name(dev));
+    LJTALE_LEVEL_DEBUG(5, "dpm resume...%s\n", dev_name(dev));
 	error = dpm_run_callback(callback, dev, state, info);
 	dev->power.is_suspended = false;
 
@@ -1434,7 +1434,7 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 		callback = pm_op(dev->driver->pm, state);
 	}
 
-    LJTALE_LEVEL_DEBUG(2, "dpm suspend...%s\n", dev_name(dev));
+    LJTALE_LEVEL_DEBUG(5, "dpm suspend...%s\n", dev_name(dev));
 	error = dpm_run_callback(callback, dev, state, info);
 
  End:

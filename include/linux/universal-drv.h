@@ -393,6 +393,8 @@ struct universal_pm_dev {
 
     bool dev_access_needs_spinlock:1;
     bool dev_access_needs_raw_spinlock:1;
+    /* for devices in wakeup domain or similar hardware domains */
+    bool system_pm_escape:1;
 };
 
 /*

@@ -155,6 +155,8 @@ int universal_suspend(struct device *dev) {
     pm_dev = &uni_dev->pm_dev;
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system suspend...%s\n", uni_dev->name);
+    if (pm_dev->system_pm_escape)
+        return 0;
 
     /* determine if the rpm is enabled for this device */
     if (pm_runtime_enabled(dev))
