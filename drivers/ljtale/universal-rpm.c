@@ -217,12 +217,14 @@ int process_reg_table(struct universal_device *uni_dev,
     struct universal_reg_entry *tbl_entry;
     struct universal_rpm_ctx *reg_ctx = &uni_dev->rpm_dev.rpm_context;
     int ret = 0;
+    unsigned long flags;
     int i;
     u32 temp_value;
     u32 timeout_compare = 0, timeout_read;
     unsigned long timeout;
     if (!tbl || !reg_ctx->array)
         return 0;
+    spin_lock_irqsave(&uni_dev->ctx_array_lock, flags);
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
         if (tbl_entry->reg_op == PM_REG_WRITE_AUG_OR ||
@@ -357,6 +359,7 @@ reg_end:
             break;
         }
     }
+    spin_unlock_irqrestore(&uni_dev->ctx_array_lock, flags);
     return ret;
 }
 EXPORT_SYMBOL(process_reg_table);

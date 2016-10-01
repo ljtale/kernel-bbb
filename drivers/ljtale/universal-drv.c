@@ -391,6 +391,8 @@ int __universal_drv_probe(struct universal_device *dev) {
     /* The lock should be consistent to the lock in the conventional driver */
     spin_lock_init(&dev->probe_dev.spinlock);
     raw_spin_lock_init(&dev->probe_dev.raw_spinlock);
+    /* ctx array spinlock */
+    spin_lock_init(&dev->ctx_array_lock);
 
     /* do a series of universal driver probe */
     /* for register accessors */

@@ -465,6 +465,7 @@ struct universal_device {
     };
 #endif
     spinlock_t irq_lock;
+    spinlock_t ctx_array_lock;
     struct universal_probe_dev probe_dev;
     struct universal_rpm_dev rpm_dev;
     struct universal_pm_dev pm_dev;

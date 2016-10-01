@@ -201,6 +201,7 @@
 			interrupts = <98>;
             rpm_dev_access_raw_spinlock;
             save_context_once;
+            support_pm;
 		};
 
 		gpio2: gpio@481ac000 {
@@ -214,6 +215,7 @@
 			interrupts = <32>;
             rpm_dev_access_raw_spinlock;
             save_context_once;
+            support_pm;
 		};
 
 		gpio3: gpio@481ae000 {
@@ -227,6 +229,7 @@
 			interrupts = <62>;
             rpm_dev_access_raw_spinlock;
             save_context_once;
+            support_pm;
 		};
 
 		uart0: serial@44e09000 {
@@ -310,6 +313,7 @@
 			interrupts = <71>;
 			status = "disabled";
             support_irq;
+            support_pm;
 		};
 
 		i2c2: i2c@4819c000 {
@@ -322,6 +326,7 @@
 			status = "disabled";
             reset_all = <0>;
             support_irq;
+            support_pm;
 		};
 
 		mmc1: mmc@48060000 {
