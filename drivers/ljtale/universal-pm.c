@@ -99,7 +99,9 @@ static int universal_pm_save_context(struct universal_device *uni_dev) {
         save_context->save_tbl;
     LJTALE_LEVEL_DEBUG(3, "pm save context: %s - %d\n",
             uni_dev->name, tbl ? 1 : 0);
-    return 0;
+    if (!tbl)
+        return 0;
+    return process_reg_table(uni_dev, tbl->table, tbl->table_size);
 };
 
 static int universal_pm_restore_context(struct universal_device *uni_dev) {
