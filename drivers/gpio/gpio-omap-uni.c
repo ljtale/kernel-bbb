@@ -1848,6 +1848,8 @@ static const struct dev_pm_ops gpio_pm_ops = {
 static const struct dev_pm_ops gpio_pm_ops = {
 	SET_RUNTIME_PM_OPS(universal_runtime_suspend, universal_runtime_resume,
             NULL)
+        .suspend = universal_suspend,
+        .resume = universal_resume,
 };
 
 /* ljtale ends */
@@ -2134,6 +2136,14 @@ static struct universal_driver omap_gpio_universal_driver = {
         .local_runtime_suspend = omap_gpio_local_runtime_suspend,
         .local_runtime_resume = omap_gpio_local_runtime_resume,
         .first_runtime_resume = omap_gpio_runtime_resume,
+    },
+
+    .pm = {
+        .pin_control = NULL,
+        .ref_ctx = {
+            .array = omap_gpio_reg_context,
+            .size = ARRAY_SIZE(omap_gpio_reg_context),
+        },
     },
 };
 

@@ -700,6 +700,8 @@ static const struct dev_pm_ops tilcdc_pm_ops = {
 };
 #endif
 static const struct dev_pm_ops tilcdc_pm_ops = {
+    .runtime_suspend = universal_runtime_suspend,
+    .runtime_resume = universal_runtime_resume,
 	SET_SYSTEM_SLEEP_PM_OPS(universal_suspend, universal_resume)
 };
 
@@ -1001,6 +1003,10 @@ static int tilcdc_universal_local_probe(struct universal_device *uni_dev) {
     return tilcdc_pdev_probe(pdev);
 }
 
+static int tilcdc_first_runtime_resume(struct device *dev) {
+    return 0;
+}
+
 static struct universal_pin_control tilcdc_pinctrl = {
     .suspend_state = PM_PINCTRL_SLEEP,
     .resume_state = PM_PINCTRL_DEFAULT,
@@ -1023,6 +1029,7 @@ static struct universal_driver tilcdc_universal_driver = {
     },
 
     .rpm_ops = {
+        .first_runtime_resume = tilcdc_first_runtime_resume,
     },
 #ifdef CONFIG_PM_SLEEP
     .pm = {
