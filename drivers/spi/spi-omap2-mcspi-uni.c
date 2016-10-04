@@ -1341,7 +1341,7 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
 	struct spi_master	*master;
 	const struct omap2_mcspi_platform_config *pdata;
 	struct omap2_mcspi	*mcspi;
-	struct resource		*r;
+//	struct resource		*r;
 	int			status = 0, i;
 	u32			regs_offset = 0;
 	static int		bus_num = 1;
@@ -1522,6 +1522,8 @@ MODULE_ALIAS("platform:omap2_mcspi");
 #define OMAP2_MCSPI_UNI_CHCONF1_REG 0x40
 #define OMAP2_MCSPI_UNI_CHCONF2_REG 0x54
 #define OMAP2_MCSPI_UNI_CHCONF3_REG 0x68
+#define OMAP2_MCSPI_UNI_MODULECTRL_REG  0x28
+#define OMAP2_MCSPI_UNI_WAKEUPENABLE_REG 0x120
 
 enum {
     OMAP2_MCSPI_UNI_ZERO = 0,
@@ -1529,6 +1531,9 @@ enum {
     OMAP2_MCSPI_UNI_CHCONF1,
     OMAP2_MCSPI_UNI_CHCONF2,
     OMAP2_MCSPI_UNI_CHCONF3,
+    OMAP2_MCSPI_UNI_MODULECTRL,
+    OMAP2_MCSPI_UNI_WAKEUPENABLE,
+
 };
 
 static u32 omap2_mcspi_reg_context[] = {
@@ -1537,6 +1542,80 @@ static u32 omap2_mcspi_reg_context[] = {
     [OMAP2_MCSPI_UNI_CHCONF1] = 0,
     [OMAP2_MCSPI_UNI_CHCONF2] = 0,
     [OMAP2_MCSPI_UNI_CHCONF3] = 0,
+    [OMAP2_MCSPI_UNI_MODULECTRL] = 0,
+    [OMAP2_MCSPI_UNI_WAKEUPENABLE] = BIT(0),
+};
+
+static struct universal_reg_entry omap2_mcspi_rpm_save_context_reg_tbl[] = {
+    {
+        .reg_op = PM_REG_READ,
+        .reg_offset = OMAP2_MCSPI_UNI_MODULECTRL_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_MODULECTRL,
+    },
+    {
+        .reg_op = PM_REG_READ,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF0_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF0,
+    },
+    {
+        .reg_op = PM_REG_READ,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF1_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF1,
+    },
+    {
+        .reg_op = PM_REG_READ,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF2_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF2,
+    },
+    {
+        .reg_op = PM_REG_READ,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF3_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF3,
+    },
+};
+
+static struct universal_save_context_tbl omap2_mcspi_rpm_save_context_tbl = {
+    .table = omap2_mcspi_rpm_save_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap2_mcspi_rpm_save_context_reg_tbl),
+};
+
+static struct universal_reg_entry omap2_mcspi_rpm_restore_context_reg_tbl[] = {
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP2_MCSPI_UNI_MODULECTRL_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_MODULECTRL,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP2_MCSPI_UNI_WAKEUPENABLE_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_WAKEUPENABLE,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF0_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF0,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF1_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF1,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF2_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF2,
+    },
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = OMAP2_MCSPI_UNI_CHCONF3_REG,
+        .ctx_index = OMAP2_MCSPI_UNI_CHCONF3,
+    },
+};
+
+static struct universal_restore_context_tbl
+omap2_mcspi_rpm_restore_context_tbl = {
+    .table = omap2_mcspi_rpm_restore_context_reg_tbl,
+    .table_size = ARRAY_SIZE(omap2_mcspi_rpm_restore_context_reg_tbl),
 };
 
 /* TODO: in our high-level DSL we should define register operations loop 
@@ -1632,8 +1711,9 @@ static const struct dev_pm_ops omap2_mcspi_pm_ops = {
 
 static const struct dev_pm_ops omap2_mcspi_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(universal_suspend, universal_resume)
-//    .runtime_suspend = universal_runtime_suspend,
-	.runtime_resume	= omap_mcspi_runtime_resume,
+//	.runtime_resume	= omap_mcspi_runtime_resume,
+    .runtime_suspend = universal_runtime_suspend,
+    .runtime_resume = universal_runtime_resume,
 };
 
 static struct platform_driver omap2_mcspi_driver = {
@@ -1679,16 +1759,20 @@ static struct universal_driver omap2_mcspi_universal_driver = {
     .local_probe = omap2_mcspi_universal_local_probe,
 
     .rpm = {
+        .save_context = {
+            .save_tbl = &omap2_mcspi_rpm_save_context_tbl,
+        },
+        .pin_control = &omap2_mcspi_pinctrl,
 
-        /*
+        .restore_context = {
+            .restore_tbl = &omap2_mcspi_rpm_restore_context_tbl,
+        },
         .ref_ctx = {
             .array = omap2_mcspi_reg_context,
             .size = ARRAY_SIZE(omap2_mcspi_reg_context),
         },
-        */
     },
     .rpm_ops = {
-        .local_runtime_resume = omap_mcspi_runtime_resume,
         .first_runtime_resume = omap_mcspi_runtime_resume,
     },
 #ifdef CONFIG_SUSPEND

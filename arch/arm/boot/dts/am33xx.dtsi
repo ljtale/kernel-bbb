@@ -505,6 +505,7 @@
 				&edma 19>;
 			dma-names = "tx0", "rx0", "tx1", "rx1";
 			status = "disabled";
+            save_context_once;
 		};
 
 		spi1: spi@481a0000 {
@@ -521,6 +522,7 @@
 				&edma 45>;
 			dma-names = "tx0", "rx0", "tx1", "rx1";
 			status = "disabled";
+            save_context_once;
 		};
 
 		usb: usb@47400000 {
