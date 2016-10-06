@@ -99,8 +99,8 @@ obj-$(CONFIG_RTC_DRV_MV)	+= rtc-mv.o
 obj-$(CONFIG_RTC_DRV_NUC900)	+= rtc-nuc900.o
 obj-$(CONFIG_RTC_DRV_OPAL)	+= rtc-opal.o
 # ljtale starts  
-# obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap.o
-obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap-uni.o
+ obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap.o
+# obj-$(CONFIG_RTC_DRV_OMAP)	+= rtc-omap-uni.o
 # ljtale ends 
 obj-$(CONFIG_RTC_DRV_PALMAS)	+= rtc-palmas.o
 obj-$(CONFIG_RTC_DRV_PCAP)	+= rtc-pcap.o

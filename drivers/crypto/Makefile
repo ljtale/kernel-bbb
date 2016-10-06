@@ -15,8 +15,8 @@ n2_crypto-y := n2_core.o n2_asm.o
 obj-$(CONFIG_CRYPTO_DEV_NX) += nx/
 obj-$(CONFIG_CRYPTO_DEV_OMAP_AES) += omap-aes-driver.o
 # ljtale 
-# omap-aes-driver-objs := omap-aes.o omap-aes-gcm.o
-omap-aes-driver-objs := omap-aes-uni.o omap-aes-gcm.o
+omap-aes-driver-objs := omap-aes.o omap-aes-gcm.o
+# omap-aes-driver-objs := omap-aes-uni.o omap-aes-gcm.o
 obj-$(CONFIG_CRYPTO_DEV_OMAP_DES) += omap-des.o
 obj-$(CONFIG_CRYPTO_DEV_OMAP_SHAM) += omap-sham.o
 obj-$(CONFIG_CRYPTO_DEV_PADLOCK_AES) += padlock-aes.o

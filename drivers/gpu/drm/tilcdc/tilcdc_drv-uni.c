@@ -969,6 +969,33 @@ static struct universal_restore_context_tbl tilcdc_restore_context_tbl = {
     .table_size = ARRAY_SIZE(tilcdc_restore_context_reg_tbl),
 };
 
+static struct universal_reg_entry tilcdc_rpm_disable_clk_reg_tbl[] = {
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = TILCDC_UNI_CLK_ENABLE_REG,
+        .ctx_index = TILCDC_UNI_ZERO,
+    },
+};
+
+static struct universal_disable_clk tilcdc_disable_clk = {
+    .reg_table = tilcdc_rpm_disable_clk_reg_tbl,
+    .table_size = ARRAY_SIZE(tilcdc_rpm_disable_clk_reg_tbl),
+};
+
+static struct universal_reg_entry tilcdc_rpm_disable_irq_reg_tbl[] = {
+    {
+        .reg_op = PM_REG_WRITE,
+        .reg_offset = TILCDC_UNI_INT_ENABLE_SET_REG,
+        .ctx_index = TILCDC_UNI_ZERO,
+    },
+};
+
+static struct universal_disable_irq tilcdc_disable_irq = {
+    .disable_table = {
+        .table = tilcdc_rpm_disable_irq_reg_tbl,
+        .table_size = ARRAY_SIZE(tilcdc_rpm_disable_irq_reg_tbl),
+    },
+};
 
 static struct register_accessor tilcdc_regacc = {
     .bus_name = "platform",
@@ -1021,13 +1048,22 @@ static struct universal_driver tilcdc_universal_driver = {
     .local_probe = tilcdc_universal_local_probe,
 
     .rpm = {
+        .save_context = {
+            .save_tbl = &tilcdc_save_context_tbl,
+        },
+        .disable_clk = &tilcdc_disable_clk,
+        .disable_irq = &tilcdc_disable_irq,
+
+        .restore_context = {
+            .restore_tbl = &tilcdc_restore_context_tbl,
+            .pm_local_restore_context = NULL,
+        },
         .pin_control = &tilcdc_pinctrl,
         .ref_ctx = {
             .array = tilcdc_reg_context,
             .size = ARRAY_SIZE(tilcdc_reg_context),
         },
     },
-
     .rpm_ops = {
         .first_runtime_resume = tilcdc_first_runtime_resume,
     },
