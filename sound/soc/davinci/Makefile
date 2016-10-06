@@ -4,8 +4,8 @@ snd-soc-davinci-i2s-objs := davinci-i2s.o
 # ljtale
 # objs: is just used to combine multiple objects, redundant for single-file
 # module 
-# snd-soc-davinci-mcasp-objs:= davinci-mcasp.o
-snd-soc-davinci-mcasp-objs:= davinci-mcasp-uni.o
+snd-soc-davinci-mcasp-objs:= davinci-mcasp.o
+# snd-soc-davinci-mcasp-objs:= davinci-mcasp-uni.o
 snd-soc-davinci-vcif-objs:= davinci-vcif.o
 
 obj-$(CONFIG_SND_EDMA_SOC) += snd-soc-edma.o
