@@ -175,9 +175,6 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
     probe_dev = &uni_dev->probe_dev;
     regacc_dev = &probe_dev->regacc_dev;
     clk_config_dev = probe_dev->clk_config_dev_num.clk_config_dev;
-    if (&pdev->dev.pm_domain->ops)
-        LJTALE_LEVEL_DEBUG(1, "I have pm domain: %s - %x\n", pdev->name,
-                (unsigned int)pdev->dev.pm_domain->ops.runtime_suspend);
     /* ljtale ends */
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);

@@ -591,7 +591,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
 
-    LJTALE_MSG(KERN_INFO, "at24_probe get called: %s\n", client->name);
+    LJTALE_LEVEL_DEBUG(2, "at24_probe get called: %s\n", client->name);
 
     /* ljtale: who sets up the platform data for the device? */
 	if (client->dev.platform_data) {
@@ -599,7 +599,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		chip = *(struct at24_platform_data *)client->dev.platform_data;
 	} else {
 
-        LJTALE_MSG(KERN_INFO, "at24 chooses the id table to get data\n");
+        LJTALE_LEVEL_DEBUG(2, "at24 chooses the id table to get data\n");
 		if (!id->driver_data)
 			return -ENODEV;
 
@@ -665,11 +665,11 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
     /* ljtale starts */
     /* device knowledge about chip should be static, I'll do an ad-hoc print */
-    LJTALE_MSG(KERN_INFO, "chip byte len: %d\n", chip.byte_len);
-    LJTALE_MSG(KERN_INFO, "chip page size: %d\n", chip.page_size);
-    LJTALE_MSG(KERN_INFO, "chip flag: %x\n", chip.flags);
-    LJTALE_MSG(KERN_INFO, "use smbus: %d\n", use_smbus);
-    LJTALE_MSG(KERN_INFO, "use smbus write: %d\n", use_smbus_write);
+    LJTALE_LEVEL_DEBUG(2, "chip byte len: %d\n", chip.byte_len);
+    LJTALE_LEVEL_DEBUG(2, "chip page size: %d\n", chip.page_size);
+    LJTALE_LEVEL_DEBUG(2, "chip flag: %x\n", chip.flags);
+    LJTALE_LEVEL_DEBUG(2, "use smbus: %d\n", use_smbus);
+    LJTALE_LEVEL_DEBUG(2, "use smbus write: %d\n", use_smbus_write);
     /* ljtale ends */
 #if 0
 	regmap_config = devm_kzalloc(&client->dev, sizeof(*regmap_config),
@@ -693,7 +693,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
 
-    LJTALE_MSG(KERN_INFO, "eeprom num addresses %d\n", num_addresses); 
+    LJTALE_LEVEL_DEBUG(2, "eeprom num addresses %d\n", num_addresses); 
 
 #if 0
 	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
@@ -797,7 +797,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			err = -EADDRINUSE;
 			goto err_clients;
 		}
-        LJTALE_MSG(KERN_INFO, "eeprom num addresses %d:%dth\n", 
+        LJTALE_LEVEL_DEBUG(2, "eeprom num addresses %d:%dth\n", 
             num_addresses, i);
 	}
     /* ljtale starts */
@@ -842,7 +842,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 
 err_clients:
-    LJTALE_MSG(KERN_INFO, "client: %s created error dummy\n", client->name);
+    LJTALE_LEVEL_DEBUG(2, "client: %s created error dummy\n", client->name);
 	for (i = 1; i < num_addresses; i++)
 		if (at24->client[i])
 			i2c_unregister_device(at24->client[i]);
@@ -888,7 +888,7 @@ static int at24_universal_local_probe(struct universal_device *uni_dev) {
     struct i2c_client *client;
     const struct i2c_device_id *i2c_id;
 
-    LJTALE_MSG(KERN_INFO, "universal local probe for: %s\n",
+    LJTALE_LEVEL_DEBUG(2, "universal local probe for: %s\n",
             uni_dev->drv->name);
     client = to_i2c_client(uni_dev->dev);
     i2c_id = i2c_match_id_general(at24_ids, client);

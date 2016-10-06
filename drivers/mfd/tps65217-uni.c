@@ -400,8 +400,6 @@ static int tps65217_probe(struct i2c_client *client,
      * implement will require population of the device knowledge at runtime */
     struct universal_device *uni_dev;
     struct irq_config_num *irq_config_num;
-    LJTALE_MSG(KERN_INFO,"ljtale: tps65217 probe get called\n");
-
     uni_dev = check_universal_driver(&client->dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
@@ -524,8 +522,6 @@ static int tps65217_universal_local_probe(struct universal_device *uni_dev) {
     struct i2c_client *client;
     const struct i2c_device_id *i2c_id;
 
-    LJTALE_MSG(KERN_INFO, "universal local probe for driver: %s\n",
-            uni_dev->drv->name);
     client = to_i2c_client(uni_dev->dev);
     i2c_id = i2c_match_id_general(tps65217_id_table, client);
     return tps65217_probe(client, i2c_id); 

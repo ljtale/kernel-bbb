@@ -697,17 +697,17 @@ static int i2c_device_probe(struct device *dev)
         /* ljtale starts */
         universal_dev = check_universal_driver(dev);
         if (universal_dev) {
-            LJTALE_MSG(KERN_INFO, 
+            LJTALE_LEVEL_DEBUG(2, 
                     "universal driver probe should be called for %s\n",
                     client->name);
             status = universal_driver_probe(universal_dev);
         } else {
-            LJTALE_MSG(KERN_INFO, 
+            LJTALE_LEVEL_DEBUG(2, 
                     "universal driver not available for device: %s\n",
                     client->name);
             status = driver->probe(client, i2c_match_id(driver->id_table,
                        client)); 
-            LJTALE_MSG(KERN_INFO, "conventional driver probe for device: %s "
+            LJTALE_LEVEL_DEBUG(2, "conventional driver probe for device: %s "
                     "return status: %d\n", client->name, status);
         }
 #if 0
@@ -1043,7 +1043,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
      * driver. Therefore when the I2C bus tries to call probe for that device,
      * it can check there has already been a universal device that is supported
      * by a registered universal driver data */
-    LJTALE_MSG(KERN_INFO, "created an I2C device: %s\n", client->name);
+    LJTALE_LEVEL_DEBUG(2, "created an I2C device: %s\n", client->name);
     uni_dev = new_universal_device(&client->dev);
     if (uni_dev) {
         status = universal_device_register(uni_dev);
@@ -1067,7 +1067,7 @@ i2c_new_device(struct i2c_adapter *adap, struct i2c_board_info const *info)
 	dev_dbg(&adap->dev, "client [%s] registered with bus id %s\n",
 		client->name, dev_name(&client->dev));
     if (client->dev.driver)
-        LJTALE_MSG(KERN_INFO, "i2c device: %s bound to driver: %s\n",
+        LJTALE_LEVEL_DEBUG(2, "i2c device: %s bound to driver: %s\n",
                 client->name, client->dev.driver->name);
 
 	return client;
@@ -1142,8 +1142,6 @@ struct i2c_client *i2c_new_dummy(struct i2c_adapter *adapter, u16 address)
 	struct i2c_board_info info = {
 		I2C_BOARD_INFO("dummy", address),
 	};
-    LJTALE_MSG(KERN_INFO, "i2c_new_dummy...newed dummy i2c device\n");
-
 	return i2c_new_device(adapter, &info);
 }
 EXPORT_SYMBOL_GPL(i2c_new_dummy);

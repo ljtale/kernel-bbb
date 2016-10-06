@@ -1392,8 +1392,6 @@ omap_i2c_probe(struct platform_device *pdev)
     irq_config_num = uni_dev->drv->irq_config_num;
     /* FIXME: not all the device need to call first resume in probe */
 //    rpm_dev->first_resume_called = true;
-    LJTALE_LEVEL_DEBUG(1, "I have pm domain: %s - %x\n", pdev->name,
-            (unsigned int)pdev->dev.pm_domain->ops.suspend);
     /* ljtale ends */
 
 #if 0
