@@ -1377,9 +1377,6 @@ omap_i2c_probe(struct platform_device *pdev)
     struct universal_rpm_dev *rpm_dev;
     struct regacc_dev  *regacc_dev;
     struct irq_config_num *irq_config_num;
-    struct omap_i2c_rpm_reg_value *omap_i2c_rpm_reg_values;
-    LJTALE_LEVEL_DEBUG(3, "omap i2c local probe get called\n");
-
     uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
@@ -1532,12 +1529,6 @@ omap_i2c_probe(struct platform_device *pdev)
             (unsigned int)dev->pscstate, (unsigned int)dev->scllstate, 
             (unsigned int)dev->sclhstate); 
     LJTALE_LEVEL_DEBUG(2, "ljtale-i2c: westate: 0x%x\n", dev->westate); 
-
-    omap_i2c_rpm_reg_values->iestate = dev->iestate;
-    omap_i2c_rpm_reg_values->westate = dev->westate;
-    omap_i2c_rpm_reg_values->pscstate = dev->pscstate;
-    omap_i2c_rpm_reg_values->scllstate = dev->scllstate;
-    omap_i2c_rpm_reg_values->sclhstate = dev->sclhstate;
 
     /* ljtale ends */
 
