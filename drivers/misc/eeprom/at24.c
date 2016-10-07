@@ -28,10 +28,6 @@
 #include <linux/nvmem-provider.h>
 #include <linux/io.h>
 
-/* ljtale starts */
-#include <linux/universal-drv.h>
-/* ljtale ends */
-
 /*
  * I2C EEPROMs from most vendors are inexpensive and mostly interchangeable.
  * Differences between different vendor product lines (like Atmel AT24C or
@@ -569,17 +565,6 @@ static struct regmap_bus regmap_at24_bus = {
 	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
 };
 
-#if 0
-/* ljtale starts */
-static struct universal_drv at24_universal_driver = {
-    .name = "at24-universal",
-    .config = {
-        .regmap_bus = &regmap_at24_bus,
-    },
-}; 
-/* ljtale ends */
-#endif
-
 static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct at24_platform_data chip;
@@ -595,11 +580,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	struct nvmem_config *nvmem_config;
 	struct nvmem_device *nvmem_dev;
 
-    LJTALE_MSG(KERN_INFO, "at24_probe get called: %s\n", client->name);
-
-    /* ljtale: who sets up the platform data for the device? */
 	if (client->dev.platform_data) {
-        /* ljtale: struct direct assignment? not type safe */
 		chip = *(struct at24_platform_data *)client->dev.platform_data;
 	} else {
 		if (!id->driver_data)
@@ -685,19 +666,7 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	else
 		num_addresses =	DIV_ROUND_UP(chip.byte_len,
 			(chip.flags & AT24_FLAG_ADDR16) ? 65536 : 256);
-#if 0
-    /* ljtale starts */
-    /* populate the universal driver fields for at24 */
-    at24_universal_driver.dev = &client->dev;
-    at24_universal_driver.config.regmap_bus_context = client;
-    at24_universal_driver.config.regmap_config = regmap_config;
-    universal_drv_init(&at24_universal_driver);
-    /* FIXME: the regmap pointer for this driver should be put into a data 
-     * structure for the driver's use, but the data structure format 
-     * needs more thinking 
-     */
-    regmap = at24_universal_driver.config.regmap;
-#endif
+
 	/* we can't use devm_regmap_init_i2c due to the many i2c clients */
 	regmap = devm_regmap_init(&client->dev, &regmap_at24_bus,
 			client, regmap_config);
@@ -735,8 +704,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err_out;
 	}
 
-    /* ljtale: num_addresses * sizeof(struct i2c_client *) is the
-     * i2c_client pointer for all the eeprom devices */
 	at24 = devm_kzalloc(&client->dev, sizeof(struct at24_data) +
 		num_addresses * sizeof(struct i2c_client *), GFP_KERNEL);
 	if (!at24) {
@@ -752,7 +719,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	mutex_init(&at24->lock);
 	at24->use_smbus = use_smbus;
 	at24->use_smbus_write = use_smbus_write;
-    /* ljtale: another chip copy... */
 	at24->chip = chip;
 	at24->num_addresses = num_addresses;
 
@@ -799,8 +765,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		}
 	}
 
-    /* ljtale: this is just a wrapper for the generic driver data set
-     * function: dev_set_drvdata()  */
 	i2c_set_clientdata(client, at24);
 
 	dev_info(&client->dev, "%zu byte %s EEPROM, %s, %u bytes/write\n",
@@ -860,22 +824,12 @@ static struct i2c_driver at24_driver = {
 
 static int __init at24_init(void)
 {
-//     int ret;
 	if (!io_limit) {
 		pr_err("at24: io_limit must not be 0!\n");
 		return -EINVAL;
 	}
 
 	io_limit = rounddown_pow_of_two(io_limit);
-#if 0
-    /* ljtale starts */
-    ret = universal_drv_register(&at24_universal_driver);
-    if (ret < 0) {
-        LJTALE_MSG(KERN_ERR, "universal driver registration failed: %d\n", ret);
-        return ret;
-    }
-    /* ljtale ends */
-#endif
 	return i2c_add_driver(&at24_driver);
 }
 module_init(at24_init);

@@ -27,8 +27,6 @@
 #include <linux/regulator/machine.h>
 #include <linux/mfd/tps65217.h>
 
-#include <linux/universal-drv.h>
-
 #define TPS65217_REGULATOR(_name, _id, _of_match, _ops, _n, _vr, _vm, _em, \
 			   _t, _lr, _nlr,  _sr, _sm)	\
 	{						\
@@ -81,7 +79,7 @@ static int tps65217_pmic_enable(struct regulator_dev *dev)
 		return -EINVAL;
 
 	/* Enable the regulator and password protection is level 1 */
-	return tps65217_set_bits(tps->dev, TPS65217_REG_ENABLE,
+	return tps65217_set_bits(tps, TPS65217_REG_ENABLE,
 				 dev->desc->enable_mask, dev->desc->enable_mask,
 				 TPS65217_PROTECT_L1);
 }
@@ -95,7 +93,7 @@ static int tps65217_pmic_disable(struct regulator_dev *dev)
 		return -EINVAL;
 
 	/* Disable the regulator and password protection is level 1 */
-	return tps65217_clear_bits(tps->dev, TPS65217_REG_ENABLE,
+	return tps65217_clear_bits(tps, TPS65217_REG_ENABLE,
 				   dev->desc->enable_mask, TPS65217_PROTECT_L1);
 }
 
@@ -107,13 +105,13 @@ static int tps65217_pmic_set_voltage_sel(struct regulator_dev *dev,
 	unsigned int rid = rdev_get_id(dev);
 
 	/* Set the voltage based on vsel value and write protect level is 2 */
-	ret = tps65217_set_bits(tps->dev, dev->desc->vsel_reg, dev->desc->vsel_mask,
+	ret = tps65217_set_bits(tps, dev->desc->vsel_reg, dev->desc->vsel_mask,
 				selector, TPS65217_PROTECT_L2);
 
 	/* Set GO bit for DCDCx to initiate voltage transistion */
 	switch (rid) {
 	case TPS65217_DCDC_1 ... TPS65217_DCDC_3:
-		ret = tps65217_set_bits(tps->dev, TPS65217_REG_DEFSLEW,
+		ret = tps65217_set_bits(tps, TPS65217_REG_DEFSLEW,
 				       TPS65217_DEFSLEW_GO, TPS65217_DEFSLEW_GO,
 				       TPS65217_PROTECT_L2);
 		break;
@@ -136,7 +134,7 @@ static int tps65217_pmic_set_suspend_enable(struct regulator_dev *dev)
 	if (rid < TPS65217_DCDC_1 || rid > TPS65217_LDO_4)
 		return -EINVAL;
 
-	return tps65217_clear_bits(tps->dev, dev->desc->bypass_reg,
+	return tps65217_clear_bits(tps, dev->desc->bypass_reg,
 				   dev->desc->bypass_mask,
 				   TPS65217_PROTECT_L1);
 }
@@ -152,7 +150,7 @@ static int tps65217_pmic_set_suspend_disable(struct regulator_dev *dev)
 	if (!regulator_data[rid].strobe)
 		return -EINVAL;
 
-	return tps65217_set_bits(tps->dev, dev->desc->bypass_reg,
+	return tps65217_set_bits(tps, dev->desc->bypass_reg,
 				 dev->desc->bypass_mask,
 				 regulator_data[rid].strobe,
 				 TPS65217_PROTECT_L1);
@@ -235,15 +233,6 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
 	int i, ret;
 	unsigned int val;
 
-    /* ljtale starts */
-    struct universal_device *uni_dev;
-    struct regacc_dev *regacc_dev;
-    uni_dev = check_universal_driver(pdev->dev.parent);
-    if (uni_dev)
-        LJTALE_LEVEL_DEBUG(2,"no universal driver for device: %s\n",
-                dev_name(pdev->dev.parent));
-    regacc_dev = &uni_dev->probe_dev.regacc_dev;
-    /* ljtale ends */
 	if (tps65217_chip_id(tps) != TPS65217) {
 		dev_err(&pdev->dev, "Invalid tps chip version\n");
 		return -ENODEV;
@@ -257,18 +246,13 @@ static int tps65217_regulator_probe(struct platform_device *pdev)
 		if (pdata)
 			config.init_data = pdata->tps65217_init_data[i];
 		config.driver_data = tps;
-        /* FIXME: not critical to use regmap here? */
-		// config.regmap = tps->regmap;
-        config.regmap = regacc_dev->regmap;
+		config.regmap = tps->regmap;
 
 		rdev = devm_regulator_register(&pdev->dev, &regulators[i],
 					       &config);
 
 		/* Store default strobe info */
-        /* ljtale starts */
-		ret = tps65217_reg_read(tps->dev, regulators[i].bypass_reg, &val);
-		// ret = tps65217_reg_read(tps, regulators[i].bypass_reg, &val);
-        /* ljtale ends */
+		ret = tps65217_reg_read(tps, regulators[i].bypass_reg, &val);
 
 		regulator_data[i].strobe = val & regulators[i].bypass_mask;
 
