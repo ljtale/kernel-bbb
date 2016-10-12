@@ -42,6 +42,21 @@
     status = "okay";
     ljtale-add;
 };
+&spi1 {
+    status = "okay";
+    ljtale-add;
+};
+&mmc3 {
+    vmmc-supply = <&vmmcsd_fixed>;
+    bus-width = <8>;
+    status = "okay";
+    ljtale-add;
+};
+&i2c1 {
+    status = "okay";
+    clock-frequency = <100000>;
+};
+
 /* ljtale ends */
 
 &am33xx_pinmux {
