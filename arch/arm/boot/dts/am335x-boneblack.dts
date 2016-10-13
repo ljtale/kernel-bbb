@@ -57,6 +57,32 @@
     clock-frequency = <100000>;
 };
 
+/*
+&uart1 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart2 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart3 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart4 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart5 {
+    status = "okay";
+    ljtale-add;
+};
+*/
 /* ljtale ends */
 
 &am33xx_pinmux {

@@ -1598,7 +1598,7 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 
 	tx->callback = omap_hsmmc_dma_callback;
 	tx->callback_param = host;
-
+#if 0
     /* ljtale starts */
     /* let me figure out somethign special */
     uni_dev = check_universal_driver(host->dev);
@@ -1628,7 +1628,7 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
     }
 skip_universal_dma:
     /* ljtale ends */
-
+#endif
 	/* Does not fail */
 	dmaengine_submit(tx);
 
@@ -2694,8 +2694,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		goto err1;
 	}
 #endif
-    host->fclk = clk_config_dev[0].clk;
-    host->dbclk = clk_config_dev[1].clk;
+    if (clk_config_dev) {
+        host->fclk = clk_config_dev[0].clk;
+        host->dbclk = clk_config_dev[1].clk;
+    }
 	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
 		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
 		omap_hsmmc_ops.multi_io_quirk = omap_hsmmc_multi_io_quirk;
@@ -2791,8 +2793,14 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     /* FIXME: the conventional driver will never use dma channel directly,
      * instead DMA transfer functions needs to change the API to use
      * universal driver */
-    host->tx_chan = dma_config_dev[0].channel;
-    host->rx_chan = dma_config_dev[1].channel;
+    if (uni_dev->support_dma && dma_config_dev) {
+        host->tx_chan = dma_config_dev[0].channel;
+        host->rx_chan = dma_config_dev[1].channel;
+    } else {
+        dev_err(uni_dev->dev, "%s does not support DMA\n", uni_dev->name);
+        ret = -ENXIO;
+        goto err_irq;
+    }
     /* ljtale ends */
 	/* Request IRQ for MMC operations */
 	ret = devm_request_irq(&pdev->dev, host->irq, omap_hsmmc_irq, 0,
