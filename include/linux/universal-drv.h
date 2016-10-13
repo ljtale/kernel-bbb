@@ -351,9 +351,6 @@ struct universal_rpm_dev {
     bool support_irq:1;
     bool irq_need_lock:1;
 
-    bool support_dma:1;
-    bool dma_channel_requested:1;
-
     bool local_suspend_lock:1;
     bool local_resume_lock:1;
 
@@ -451,7 +448,9 @@ struct universal_driver {
 struct universal_device {
     const char *name;
     struct device *dev;
-    bool ljtale_add;
+    bool ljtale_add:1;
+    bool support_dma:1;
+    bool dma_channel_requested:1;
 
     struct universal_driver *drv;   
      /* lock protects against concurrent access to this device, used by

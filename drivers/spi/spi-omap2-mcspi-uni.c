@@ -1653,7 +1653,7 @@ static struct universal_restore_context_tbl omap2_mcspi_pm_restore_ctx_tbl = {
 };
 
 static struct universal_pin_control omap2_mcspi_pinctrl = {
-    .suspend_state = PM_PINCTRL_IDLE,
+    .suspend_state = PM_PINCTRL_SLEEP,
     .resume_state = PM_PINCTRL_DEFAULT,
 };
 
