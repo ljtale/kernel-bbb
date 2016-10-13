@@ -38,8 +38,11 @@
 };
 
 /* ljtale starts */
-
 /*
+&edma {
+    ti,edma-xbar-event-map = /bits/ 16 <1 12
+                        2 13>;
+};
 &spi0 {
     status = "okay";
     ljtale-add;
@@ -48,8 +51,12 @@
     status = "okay";
     ljtale-add;
 };
+
 &mmc3 {
     vmmc-supply = <&vmmcsd_fixed>;
+    dmas = <&edma 12
+        &edma 13>;
+    dma-names = "tx", "rx";
     bus-width = <8>;
     status = "okay";
     ljtale-add;

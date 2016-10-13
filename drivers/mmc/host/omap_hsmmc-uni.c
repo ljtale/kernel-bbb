@@ -2765,6 +2765,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
         host->tx_chan = dma_config_dev[0].channel;
         host->rx_chan = dma_config_dev[1].channel;
     } else {
+        LJTALE_LEVEL_DEBUG(3, "%s does not support DMA\n", uni_dev->name);
         ret = -ENXIO;
         goto err_irq;
     }
