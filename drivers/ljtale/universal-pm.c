@@ -159,7 +159,7 @@ int universal_suspend(struct device *dev) {
         return 0;
 
     /* determine if the rpm is enabled for this device */
-    if (pm_runtime_enabled(dev))
+    if (pm_runtime_suspended(dev))
         /* bring up the device if it is runtime suspended */
         pm_runtime_get_sync(dev);
 
@@ -194,8 +194,7 @@ int universal_suspend(struct device *dev) {
 
 
     /* drop the reference */
-    if (pm_runtime_enabled(dev))
-        pm_runtime_put_sync(dev);
+    pm_runtime_put_sync(dev);
     return ret;
 /* TODO: device lock */
 lock_err:
@@ -217,8 +216,7 @@ int universal_resume(struct device *dev) {
     LJTALE_LEVEL_DEBUG(2, "universal system resume...%s\n", uni_dev->name);
 
     /* probably rely on the runtime resume to restore the context */
-    if (pm_runtime_enabled(dev))
-        pm_runtime_get_sync(dev);
+    pm_runtime_get_sync(dev);
 
     /* select pin states at first */
     universal_pm_pin_control(uni_dev, RESUME);

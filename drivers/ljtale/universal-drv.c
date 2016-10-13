@@ -356,8 +356,10 @@ static void inline pm_knowledge_from_dt(struct universal_device *uni_dev) {
     struct universal_pm_dev *pm_dev = &uni_dev->pm_dev;
     struct device_node *of_node = uni_dev->dev->of_node;
     BUG_ON(!of_node);
-    if (of_property_read_bool(of_node, "system_pm_escape"))
+    if (of_property_read_bool(of_node, "system_pm_escape")) {
         pm_dev->system_pm_escape = true;
+        printk(KERN_INFO "system pm escape: %s\n", uni_dev->name);
+    }
     else
         pm_dev->system_pm_escape = false;
 } 
