@@ -1,7 +1,9 @@
 #ifndef LINUX_LJTLAE_UTILS_H
 #define LINUX_LJTALE_UTILS_H
 
-#define LJTALE_DEBUG_LEVEL 4
+#define LJTALE_DEBUG_LEVEL 1
+
+// #define LJTALE_DEBUG_ENABLE
 
 #define LJTALE_MSG(LEVEL, args...)             \
     do {                                        \
@@ -9,15 +11,16 @@
     }                                           \
     while(0)
 
-
+#ifdef LJTALE_DEBUG_ENABLE
 #define LJTALE_LEVEL_DEBUG(level, args...) \
     do {                                    \
         if (level <= LJTALE_DEBUG_LEVEL) {           \
             printk(KERN_INFO "ljtale-" #level ": " args);  \
         }                                       \
     } while (0)
-
-// #define LJTALE_DEBUG_ENABLE
+#else
+#define LJTALE_LEVEL_DEBUG(level, args...)
+#endif
 
 #ifdef LJTALE_DEBUG_ENABLE
 #define LJTALE_PRINT(LEVEL, args...)           \

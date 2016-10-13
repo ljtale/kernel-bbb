@@ -38,11 +38,6 @@
 };
 
 /* ljtale starts */
-/*
-&edma {
-    ti,edma-xbar-event-map = /bits/ 16 <1 12
-                        2 13>;
-};
 &spi0 {
     status = "okay";
     ljtale-add;
@@ -54,9 +49,6 @@
 
 &mmc3 {
     vmmc-supply = <&vmmcsd_fixed>;
-    dmas = <&edma 12
-        &edma 13>;
-    dma-names = "tx", "rx";
     bus-width = <8>;
     status = "okay";
     ljtale-add;
@@ -67,8 +59,32 @@
     clock-frequency = <100000>;
 };
 
-*/
+/*
+&uart1 {
+    status = "okay";
+    ljtale-add;
+};
 
+&uart2 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart3 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart4 {
+    status = "okay";
+    ljtale-add;
+};
+
+&uart5 {
+    status = "okay";
+    ljtale-add;
+};
+*/
 /* ljtale ends */
 
 &am33xx_pinmux {

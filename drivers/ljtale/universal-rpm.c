@@ -385,7 +385,6 @@ static int universal_restore_context(struct universal_device *uni_dev) {
  * dmaengine_submitt (I demonstrated this a little bit for MMC controller).*/
 
 static int universal_rpm_disable_dma(struct universal_device *uni_dev) {
-    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     /* we rely on the per-device probe states to do runtime PM */
     struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
     struct dma_config_dev_num *dma_config_dev_num = 
@@ -423,7 +422,6 @@ abort:
 }
 
 static int universal_rpm_enable_dma(struct universal_device *uni_dev) {
-    struct universal_rpm_dev *rpm_dev = &uni_dev->rpm_dev;
     struct universal_probe_dev *probe_dev = &uni_dev->probe_dev;
     struct dma_config_dev_num *dma_config_dev_num = 
         &probe_dev->dma_config_dev_num;

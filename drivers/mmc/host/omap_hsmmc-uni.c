@@ -1598,7 +1598,37 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 
 	tx->callback = omap_hsmmc_dma_callback;
 	tx->callback_param = host;
-
+#if 0
+    /* ljtale starts */
+    /* let me figure out somethign special */
+    uni_dev = check_universal_driver(host->dev);
+    if (!uni_dev) {
+        LJTALE_LEVEL_DEBUG(3, "no universal driver found: %s - %s\n",
+                dev_name(host->dev), __func__);
+        goto skip_universal_dma;
+    }
+    struct dma_config_dev_num *dma_config_dev_num = 
+        &uni_dev->probe_dev.dma_config_dev_num;
+    dma_cookie_t *last_cookie = NULL;
+    for (i = 0; i < dma_config_dev_num->dma_num; i++) {
+        if (chan == dma_config_dev_num->dma_config_dev[i].channel) {
+            last_cookie = 
+                &(dma_config_dev_num->dma_config_dev[i].last_dma_cookie);
+            break;
+        }
+    }
+    if (!last_cookie) {
+        LJTALE_LEVEL_DEBUG(3, "channel not found, something is wrong: %s\n",
+                __func__);
+        goto skip_universal_dma;
+    } else {
+        *last_cookie = dmaengine_submit(tx);
+        host->dma_ch = 1;
+        return 0;
+    }
+skip_universal_dma:
+    /* ljtale ends */
+#endif
 	/* Does not fail */
 	dmaengine_submit(tx);
 
@@ -2664,8 +2694,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
 		goto err1;
 	}
 #endif
-    host->fclk = clk_config_dev[0].clk;
-    host->dbclk = clk_config_dev[1].clk;
+    if (clk_config_dev) {
+        host->fclk = clk_config_dev[0].clk;
+        host->dbclk = clk_config_dev[1].clk;
+    }
 	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
 		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
 		omap_hsmmc_ops.multi_io_quirk = omap_hsmmc_multi_io_quirk;
@@ -2765,7 +2797,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
         host->tx_chan = dma_config_dev[0].channel;
         host->rx_chan = dma_config_dev[1].channel;
     } else {
-        LJTALE_LEVEL_DEBUG(3, "%s does not support DMA\n", uni_dev->name);
+        dev_err(uni_dev->dev, "%s does not support DMA\n", uni_dev->name);
         ret = -ENXIO;
         goto err_irq;
     }

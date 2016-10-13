@@ -448,8 +448,7 @@ struct universal_driver {
 struct universal_device {
     const char *name;
     struct device *dev;
-    bool ljtale_add;
-
+    bool ljtale_add:1;
     bool support_dma:1;
     bool dma_channel_requested:1;
 
