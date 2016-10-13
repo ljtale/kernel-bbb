@@ -23,7 +23,7 @@ obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
 obj-$(CONFIG_MMC_OMAP)		+= omap.o
 # ljtale 
 # obj-$(CONFIG_MMC_OMAP_HS)	+= omap_hsmmc.o
-obj-$(CONFIG_MMC_OMAP_HS)	+= omap_hsmmc-uni.o omap_hsmmc-uni-rpm.o
+obj-$(CONFIG_MMC_OMAP_HS)	+= omap_hsmmc-uni.o
 
 obj-$(CONFIG_MMC_ATMELMCI)	+= atmel-mci.o
 obj-$(CONFIG_MMC_TIFM_SD)	+= tifm_sd.o

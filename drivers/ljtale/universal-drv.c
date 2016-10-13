@@ -328,11 +328,11 @@ static void inline rpm_knowledge_from_dt(struct universal_device *uni_dev) {
         rpm_dev->irq_need_lock = false;
 
     if (of_property_read_bool(of_node, "dmas")) {
-        rpm_dev->support_dma = true;
+        uni_dev->support_dma = true;
         LJTALE_LEVEL_DEBUG(4, "DMA is supported: %s\n", uni_dev->name);
     }
     else
-        rpm_dev->support_dma = false;
+        uni_dev->support_dma = false;
 
     if (of_property_read_bool(of_node, "rpm_dev_access_spinlock") ||
             of_property_read_bool(of_node, "rpm_dev_access_raw_spinlock"))
@@ -398,6 +398,18 @@ int __universal_drv_probe(struct universal_device *dev) {
     /* ctx array spinlock */
     spin_lock_init(&dev->ctx_array_lock);
 
+    /* get properties from device tree to populate the device knowledge */
+    if (dev->dev->of_node) {
+        rpm_knowledge_from_dt(dev);
+        pm_knowledge_from_dt(dev);
+    } else {
+        /* FIXME: we assume there is a device tree node for the device
+         * in this prototype */
+        LJTALE_LEVEL_DEBUG(1, "device: %s does not have a device tree node\n",
+                dev->name);
+        return 0;
+    }
+
     /* do a series of universal driver probe */
     /* for register accessors */
     /* Initialize the register accessors for the device. If the device uses
@@ -411,7 +423,7 @@ int __universal_drv_probe(struct universal_device *dev) {
     }
 
     dma_config_num = drv->dma_config_num;
-    if (dma_config_num) {
+    if (dev->support_dma && dma_config_num) {
         struct dma_config_dev_num *dma_config_dev_num = 
             &probe_dev->dma_config_dev_num;
         dma_config_dev_num->dma_config_dev = devm_kzalloc(dev->dev,
@@ -427,7 +439,7 @@ int __universal_drv_probe(struct universal_device *dev) {
             if (ret < 0)
                 goto dma_config_err;
         }
-        rpm_dev->dma_channel_requested = true;
+        dev->dma_channel_requested = true;
     }
 
     /* timer setup */
@@ -453,17 +465,6 @@ int __universal_drv_probe(struct universal_device *dev) {
                     dev->name, ret);
     }
 
-    /* get properties from device tree to populate the device knowledge */
-    if (dev->dev->of_node) {
-        rpm_knowledge_from_dt(dev);
-        pm_knowledge_from_dt(dev);
-    } else {
-        /* FIXME: we assume there is a device tree node for the device
-         * in this prototype */
-        LJTALE_LEVEL_DEBUG(1, "device: %s does not have a device tree node\n",
-                dev->name);
-        return 0;
-    }
     rpm_dev->first_resume_called = false;
     rpm_dev->context_loss_cnt = 0;
     if (rpm->ref_ctx.array) {
@@ -527,6 +528,7 @@ clk_config_err:
 timer_config_err:
 dma_config_err:
 regacc_err:
+    LJTALE_LEVEL_DEBUG(2, "universal probe done: %s -> %d\n", dev->name, ret);
     return ret;
 }
 EXPORT_SYMBOL(__universal_drv_probe);

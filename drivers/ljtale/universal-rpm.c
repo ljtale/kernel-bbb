@@ -394,7 +394,7 @@ static int universal_rpm_disable_dma(struct universal_device *uni_dev) {
     int i;
     /* only when the device supports DMA and DMA channel is requested
      * should we perform DMA pausing */
-    if (!rpm_dev->support_dma || !rpm_dev->dma_channel_requested)
+    if (!uni_dev->support_dma || !uni_dev->dma_channel_requested)
         return 0;
     dma_config_dev = dma_config_dev_num->dma_config_dev;
     for (i = 0; i < dma_config_dev_num->dma_num; i++) {
@@ -431,7 +431,7 @@ static int universal_rpm_enable_dma(struct universal_device *uni_dev) {
     int i;
     /* only when the device supports DMA and DMA channel is requested
      * should we perform DMA pausing */
-    if (!rpm_dev->support_dma || !rpm_dev->dma_channel_requested)
+    if (!uni_dev->support_dma || !uni_dev->dma_channel_requested)
         return 0;
     dma_config_dev = dma_config_dev_num->dma_config_dev;
     for (i = 0; i < dma_config_dev_num->dma_num; i++) {
@@ -518,13 +518,13 @@ int universal_enable_clk(struct universal_device *uni_dev) {
             * valid or not, which is different from the clk_core_disable */
            if (clk_num->clk_config[i].clock_enable &&
                    clk_num->clk_config[i].clock_prepare)
-               clk_disable_unprepare(clk_dev_num->clk_config_dev[i].clk);
+               clk_prepare_enable(clk_dev_num->clk_config_dev[i].clk);
            else if (clk_num->clk_config[i].clock_enable &&
                    !clk_num->clk_config[i].clock_prepare)
-               clk_disable(clk_dev_num->clk_config_dev[i].clk);
+               clk_enable(clk_dev_num->clk_config_dev[i].clk);
            else if (!clk_num->clk_config[i].clock_enable &&
                    clk_num->clk_config[i].clock_prepare)
-               clk_unprepare(clk_dev_num->clk_config_dev[i].clk);
+               clk_prepare(clk_dev_num->clk_config_dev[i].clk);
        }
    }
    if (!rpm->enable_clk)

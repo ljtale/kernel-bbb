@@ -1599,36 +1599,6 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 	tx->callback = omap_hsmmc_dma_callback;
 	tx->callback_param = host;
 
-    /* ljtale starts */
-    /* let me figure out somethign special */
-    uni_dev = check_universal_driver(host->dev);
-    if (!uni_dev) {
-        LJTALE_LEVEL_DEBUG(3, "no universal driver found: %s - %s\n",
-                dev_name(host->dev), __func__);
-        goto skip_universal_dma;
-    }
-    struct dma_config_dev_num *dma_config_dev_num = 
-        &uni_dev->probe_dev.dma_config_dev_num;
-    dma_cookie_t *last_cookie = NULL;
-    for (i = 0; i < dma_config_dev_num->dma_num; i++) {
-        if (chan == dma_config_dev_num->dma_config_dev[i].channel) {
-            last_cookie = 
-                &(dma_config_dev_num->dma_config_dev[i].last_dma_cookie);
-            break;
-        }
-    }
-    if (!last_cookie) {
-        LJTALE_LEVEL_DEBUG(3, "channel not found, something is wrong: %s\n",
-                __func__);
-        goto skip_universal_dma;
-    } else {
-        *last_cookie = dmaengine_submit(tx);
-        host->dma_ch = 1;
-        return 0;
-    }
-skip_universal_dma:
-    /* ljtale ends */
-
 	/* Does not fail */
 	dmaengine_submit(tx);
 
@@ -2791,8 +2761,13 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     /* FIXME: the conventional driver will never use dma channel directly,
      * instead DMA transfer functions needs to change the API to use
      * universal driver */
-    host->tx_chan = dma_config_dev[0].channel;
-    host->rx_chan = dma_config_dev[1].channel;
+    if (uni_dev->support_dma && dma_config_dev) {
+        host->tx_chan = dma_config_dev[0].channel;
+        host->rx_chan = dma_config_dev[1].channel;
+    } else {
+        ret = -ENXIO;
+        goto err_irq;
+    }
     /* ljtale ends */
 	/* Request IRQ for MMC operations */
 	ret = devm_request_irq(&pdev->dev, host->irq, omap_hsmmc_irq, 0,

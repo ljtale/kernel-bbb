@@ -38,6 +38,8 @@
 };
 
 /* ljtale starts */
+
+/*
 &spi0 {
     status = "okay";
     ljtale-add;
@@ -52,10 +54,13 @@
     status = "okay";
     ljtale-add;
 };
+
 &i2c1 {
     status = "okay";
     clock-frequency = <100000>;
 };
+
+*/
 
 /* ljtale ends */
 
