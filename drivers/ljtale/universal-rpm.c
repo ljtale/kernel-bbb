@@ -544,6 +544,9 @@ int universal_runtime_suspend(struct device *dev) {
     unsigned long irq_lock_flags = 0;
     unsigned long dev_lock_flags = 0;
     int ret = 0;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
@@ -613,13 +616,14 @@ irq_lock_err:
     if (rpm_dev->irq_need_lock)
         spin_unlock_irqrestore(&uni_dev->irq_lock, irq_lock_flags);
 lock_err:
-
     if (rpm_dev->dev_access_needs_spinlock)
         spin_unlock_irqrestore(&uni_dev->probe_dev.spinlock, dev_lock_flags);
     else if (rpm_dev->dev_access_needs_raw_spinlock)
         raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
                 dev_lock_flags);
 
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-suspend, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
     return ret;
 }
 
@@ -630,6 +634,9 @@ int universal_runtime_resume(struct device *dev) {
     unsigned long irq_lock_flags = 0;
     unsigned long dev_lock_flags = 0;
     int ret = 0;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
     uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
@@ -716,6 +723,8 @@ lock_err:
     else if (rpm_dev->dev_access_needs_raw_spinlock)
         raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
                 dev_lock_flags);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
     return ret;
 }
 

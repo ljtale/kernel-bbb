@@ -46,4 +46,9 @@
     }                               \
     while(0)
 
+
+void ljtale_perf_init(void);
+
+u32 ljtale_read_pmc(void);
+
 #endif /* LINUX_LJTALE_UTILS_H */
