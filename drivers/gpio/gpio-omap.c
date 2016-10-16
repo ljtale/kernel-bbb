@@ -28,6 +28,7 @@
 #include <linux/bitops.h>
 #include <linux/platform_data/gpio-omap.h>
 
+#include <linux/ljtale-utils.h>
 #define OFF_MODE	1
 #define OMAP4_GPIO_DEBOUNCINGTIME_MASK 0xFF
 
@@ -1294,6 +1295,10 @@ static int omap_gpio_runtime_suspend(struct device *dev)
 	unsigned long flags;
 	u32 wake_low, wake_hi;
 
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+
 	raw_spin_lock_irqsave(&bank->lock, flags);
 
 	/*
@@ -1348,7 +1353,9 @@ update_gpio_context_count:
 
 	omap_gpio_dbck_disable(bank);
 	raw_spin_unlock_irqrestore(&bank->lock, flags);
-
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-suspend, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 
@@ -1361,6 +1368,9 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	u32 l = 0, gen, gen0, gen1;
 	unsigned long flags;
 	int c;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	raw_spin_lock_irqsave(&bank->lock, flags);
 
@@ -1398,12 +1408,18 @@ static int omap_gpio_runtime_resume(struct device *dev)
 			omap_gpio_restore_context(bank);
 		} else {
 			raw_spin_unlock_irqrestore(&bank->lock, flags);
+            second = ljtale_read_pmc();
+            printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 			return 0;
 		}
 	}
 
 	if (!bank->workaround_enabled) {
 		raw_spin_unlock_irqrestore(&bank->lock, flags);
+        second = ljtale_read_pmc();
+        printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n",
+                dev_name(dev), first, second, second - first);
 		return 0;
 	}
 
@@ -1459,6 +1475,9 @@ static int omap_gpio_runtime_resume(struct device *dev)
 
 	bank->workaround_enabled = false;
 	raw_spin_unlock_irqrestore(&bank->lock, flags);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 
 	return 0;
 }

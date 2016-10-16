@@ -40,6 +40,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/pinctrl/consumer.h>
 
+#include <linux/ljtale-utils.h>
+
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
 
@@ -1478,6 +1480,10 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+    printk(KERN_INFO "i2c rpm suspend\n");
 
 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
 
@@ -1498,6 +1504,9 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 
 	pinctrl_pm_select_sleep_state(dev);
 
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-suspend, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 
@@ -1505,6 +1514,10 @@ static int omap_i2c_runtime_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+    printk(KERN_INFO "i2c rpm resume\n");
 
 	if (!_dev->regs)
 		return 0;
@@ -1512,7 +1525,9 @@ static int omap_i2c_runtime_resume(struct device *dev)
 	pinctrl_pm_select_default_state(dev);
 
 	__omap_i2c_init(_dev);
-
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 

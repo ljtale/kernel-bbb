@@ -47,6 +47,8 @@
 #include <linux/pm_wakeirq.h>
 #include <linux/platform_data/hsmmc-omap.h>
 
+#include <linux/ljtale-utils.h>
+
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSSTATUS	0x0014
 #define OMAP_HSMMC_CON		0x002C
@@ -2819,7 +2821,9 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 static int omap_hsmmc_suspend(struct device *dev)
 {
 	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
-
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 	if (!host)
 		return 0;
 
@@ -2839,6 +2843,10 @@ static int omap_hsmmc_suspend(struct device *dev)
 	del_timer_sync(&host->timer);
 
 	pm_runtime_put_sync(host->dev);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-suspend, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
+
 	return 0;
 }
 
@@ -2847,6 +2855,9 @@ static int omap_hsmmc_resume(struct device *dev)
 {
 	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
 	struct mmc_ios *ios;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	if (!host)
 		return 0;
@@ -2863,6 +2874,9 @@ static int omap_hsmmc_resume(struct device *dev)
 	omap_hsmmc_protect_card(host);
 	pm_runtime_mark_last_busy(host->dev);
 	pm_runtime_put_autosuspend(host->dev);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 #endif
@@ -2872,6 +2886,9 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
 	struct omap_hsmmc_host *host;
 	unsigned long flags;
 	int ret = 0;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	host = platform_get_drvdata(to_platform_device(dev));
 	omap_hsmmc_context_save(host);
@@ -2906,6 +2923,9 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
 
 abort:
 	spin_unlock_irqrestore(&host->irq_lock, flags);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-suspend, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return ret;
 }
 
@@ -2914,6 +2934,9 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 	struct omap_hsmmc_host *host;
 	unsigned long flags;
 	int ret;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	host = platform_get_drvdata(to_platform_device(dev));
 	omap_hsmmc_context_restore(host);
@@ -2939,6 +2962,9 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 		}
 	}
 	spin_unlock_irqrestore(&host->irq_lock, flags);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 

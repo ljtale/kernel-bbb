@@ -38,6 +38,8 @@
 
 #include <linux/platform_data/spi-omap2-mcspi.h>
 
+#include <linux/ljtale-utils.h>
+
 #define OMAP2_MCSPI_MAX_FREQ		48000000
 #define OMAP2_MCSPI_MAX_DIVIDER		4096
 #define OMAP2_MCSPI_MAX_FIFODEPTH	64
@@ -1305,11 +1307,17 @@ static int omap_mcspi_runtime_resume(struct device *dev)
 {
 	struct omap2_mcspi	*mcspi;
 	struct spi_master	*master;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	master = dev_get_drvdata(dev);
 	mcspi = spi_master_get_devdata(master);
 	omap2_mcspi_restore_ctx(mcspi);
 
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 
@@ -1499,8 +1507,14 @@ MODULE_ALIAS("platform:omap2_mcspi");
 #ifdef	CONFIG_SUSPEND
 static int omap2_mcspi_suspend(struct device *dev)
 {
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 	pinctrl_pm_select_sleep_state(dev);
 
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-suspend, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 
@@ -1515,6 +1529,10 @@ static int omap2_mcspi_resume(struct device *dev)
 	struct omap2_mcspi	*mcspi = spi_master_get_devdata(master);
 	struct omap2_mcspi_regs	*ctx = &mcspi->ctx;
 	struct omap2_mcspi_cs	*cs;
+
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	pinctrl_pm_select_default_state(dev);
 
@@ -1533,6 +1551,9 @@ static int omap2_mcspi_resume(struct device *dev)
 	}
 	pm_runtime_mark_last_busy(mcspi->dev);
 	pm_runtime_put_autosuspend(mcspi->dev);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 	return 0;
 }
 #endif /* CONFIG_SUSPEND */

@@ -28,6 +28,8 @@
 
 #include "drm_fb_helper.h"
 
+#include <linux/ljtale-utils.h>
+
 static LIST_HEAD(module_list);
 
 void tilcdc_module_init(struct tilcdc_module *mod, const char *name,
@@ -604,6 +606,9 @@ static int tilcdc_pm_suspend(struct device *dev)
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct tilcdc_drm_private *priv = ddev->dev_private;
 	unsigned i, n = 0;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 
 	drm_kms_helper_poll_disable(ddev);
 
@@ -624,6 +629,10 @@ static int tilcdc_pm_suspend(struct device *dev)
 			priv->saved_register[n++] = tilcdc_read(ddev, registers[i].reg);
 
 	priv->ctx_valid = true;
+    
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-suspend, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 
 	return 0;
 }
@@ -634,6 +643,9 @@ static int tilcdc_pm_resume(struct device *dev)
 	struct tilcdc_drm_private *priv = ddev->dev_private;
 	unsigned i, n = 0;
 
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
 	/* Select default pin state */
 	pinctrl_pm_select_default_state(dev);
 
@@ -654,6 +666,9 @@ static int tilcdc_pm_resume(struct device *dev)
 	drm_helper_resume_force_mode(ddev);
 
 	drm_kms_helper_poll_enable(ddev);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-resume, %s, %u, %u, %u\n",
+            dev_name(dev), first, second, second - first);
 
 	return 0;
 }
