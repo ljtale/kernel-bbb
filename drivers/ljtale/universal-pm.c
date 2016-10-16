@@ -152,6 +152,9 @@ int universal_suspend(struct device *dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return ret;
     }
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
     pm_dev = &uni_dev->pm_dev;
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system suspend...%s\n", uni_dev->name);
@@ -196,6 +199,9 @@ int universal_suspend(struct device *dev) {
     /* drop the reference */
     if (pm_runtime_enabled(dev))
         pm_runtime_put_sync(dev);
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-suspend, %s, %u, %u, %u\n", 
+            uni_dev->name, first, second, second-first);
     return ret;
 /* TODO: device lock */
 lock_err:
@@ -212,6 +218,9 @@ int universal_resume(struct device *dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return ret;
     }
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
     pm_dev = &uni_dev->pm_dev;
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system resume...%s\n", uni_dev->name);
@@ -245,6 +254,9 @@ int universal_resume(struct device *dev) {
         pm_runtime_mark_last_busy(dev);
         pm_runtime_put_autosuspend(dev);
     }
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-resume, %s, %u, %u, %u\n", 
+            uni_dev->name, first, second, second-first);
     return ret;
 lock_err:
     return ret;
