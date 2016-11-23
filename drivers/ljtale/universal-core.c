@@ -364,7 +364,7 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
     u32 temp_val;
     if (!val)
        val = &temp_val; 
-    BUG_ON(!uni_dev->drv);
+    // BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {
         case 8:
@@ -411,13 +411,12 @@ int universal_reg_read(struct universal_device *uni_dev, unsigned int reg,
     /* check_universal_driver already make sure the drv pointer for uni_dev
      * is not NULL */
     regacc = uni_dev->drv->regacc;
-    BUG_ON(!regacc);
+    if (regacc->mmio_support)
+        return universal_mmio_reg_read(uni_dev, reg, val);
     if (regacc->regmap_support)
         return regmap_read(regacc_dev->regmap, reg, (unsigned int *)val);
     else if (regacc->regacc_read)
         return regacc->regacc_read(reg, (unsigned int *)val);
-    else if (regacc->mmio_support)
-        return universal_mmio_reg_read(uni_dev, reg, val);
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg read method for device: %s\n",
                 uni_dev->name);
@@ -430,7 +429,7 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
-    BUG_ON(!uni_dev->drv);
+    // BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {
         case 8:
@@ -474,13 +473,12 @@ int universal_reg_write(struct universal_device *uni_dev, unsigned int reg,
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     
     regacc = uni_dev->drv->regacc;
-    BUG_ON(!regacc);
+    if (regacc->mmio_support)
+        return universal_mmio_reg_write(uni_dev, reg, val);
     if (regacc->regmap_support)
         return regmap_write(regacc_dev->regmap, reg, val);
     else if (regacc->regacc_write)
         return regacc->regacc_write(reg, val);
-    else if (regacc->mmio_support)
-        return universal_mmio_reg_write(uni_dev, reg, val);
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg write method for device: %s\n",
                 uni_dev->name);
