@@ -358,6 +358,7 @@ int platform_device_add(struct platform_device *pdev)
     else
         dev_err(&pdev->dev, "universal device creation failed: %s\n",
                 dev_name(&pdev->dev));
+    pdev->dev.uni_dev = uni_dev;
     /* ljtale ends */
 
 	for (i = 0; i < pdev->num_resources; i++) {
@@ -546,7 +547,8 @@ static int platform_drv_probe(struct device *_dev)
          * probe function from the corresponding platform driver. Code should
          * be inserted here to call the universal driver probe */
         /* ljtale starts */
-        uni_dev = check_universal_driver(_dev);
+//        uni_dev = check_universal_driver(_dev);
+        uni_dev = _dev->uni_dev;
         if (uni_dev) {
             LJTALE_LEVEL_DEBUG(3, "universal driver probe for: %s at %s "
                     ,dev->name, __func__);

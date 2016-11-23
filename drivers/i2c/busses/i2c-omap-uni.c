@@ -313,7 +313,8 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
 {
 
     struct universal_device *uni_dev;
-    uni_dev = check_universal_driver(dev->dev);
+    // uni_dev = check_universal_driver(dev->dev);
+    uni_dev = dev->dev->uni_dev;
     BUG_ON(!uni_dev);
     /* ljtale: reset everything, disable the i2c module */
 	// omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
@@ -1377,7 +1378,8 @@ omap_i2c_probe(struct platform_device *pdev)
     struct universal_rpm_dev *rpm_dev;
     struct regacc_dev  *regacc_dev;
     struct irq_config_num *irq_config_num;
-    uni_dev = check_universal_driver(&pdev->dev);
+    // uni_dev = check_universal_driver(&pdev->dev);
+    uni_dev = pdev->dev.uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
                 pdev->name);
@@ -1747,7 +1749,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
 
     /* ljtale starts */
     struct universal_device *uni_dev;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     BUG_ON(!uni_dev);
     /* ljtale ends */
 
