@@ -214,7 +214,6 @@ static struct platform_device *of_platform_device_create_pdata(
     else
         dev_err(&dev->dev, "universal device creation failed: %s\n",
                 dev_name(&dev->dev));
-    dev->dev.uni_dev = uni_dev;
     /* ljtale ends */
 	if (of_device_add(dev) != 0) {
 		of_dma_deconfigure(&dev->dev);

@@ -29,7 +29,6 @@
 #include <linux/gfp.h>
 #include <asm/device.h>
 
-struct universal_device;
 struct device;
 struct device_private;
 struct device_driver;
@@ -742,7 +741,8 @@ struct device {
 	void		*driver_data;	/* Driver data, set and get with
 					   dev_set/get_drvdata */
     /* ljtale starts */
-    struct universal_device *uni_dev;
+    void        *rpm_data;      /* runtime PM data 
+                   FIXME: temporarily accessed directly, add accessors later */
     /* ljtale ends */
 	struct dev_pm_info	power;
 	struct dev_pm_domain	*pm_domain;

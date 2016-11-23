@@ -338,7 +338,7 @@ struct universal_rpm_ops {
 };
 
 struct universal_rpm_dev {
-    // void *rpm_data_dev;
+    void *rpm_data_dev;
     struct rpm_node *rpm_suspend_graph;
     struct rpm_node *rpm_resume_graph;
 

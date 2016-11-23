@@ -182,8 +182,7 @@ int regmap_i2c_eeprom_read(void *context, const void *reg, size_t reg_size,
     unsigned int offset;
     int ret;
     
-    // uni_dev = check_universal_driver(dev);
-    uni_dev = dev->uni_dev;
+    uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver unavailable for device: %s\n",
                 dev_name(dev));
@@ -298,8 +297,7 @@ int regmap_i2c_eeprom_gather_write(void *context, const void *reg,
     unsigned int offset;
     int ret;
     
-    // uni_dev = check_universal_driver(dev);
-    uni_dev = dev->uni_dev;
+    uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver unavailable for device: %s\n",
                 dev_name(dev));
@@ -330,8 +328,7 @@ int regmap_i2c_eeprom_write(void *context, const void *data, size_t count) {
     struct register_accessor *regacc = NULL;
     unsigned int reg_bytes, offset;
 
-    // uni_dev = check_universal_driver(dev);
-    uni_dev = dev->uni_dev;
+    uni_dev = check_universal_driver(dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver unavailable for device: %s\n",
                 dev_name(dev));

@@ -1107,8 +1107,7 @@ static int omap_aes_probe(struct platform_device *pdev)
     struct regacc_dev *regacc_dev;
     struct dma_config_dev *dma_config_dev;
     int dma_num;    /* may not be used */
-    // uni_dev = check_universal_driver(&pdev->dev);
-    uni_dev = pdev->dev.uni_dev;
+    uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev)
         return -EINVAL;
     probe_dev = &uni_dev->probe_dev;

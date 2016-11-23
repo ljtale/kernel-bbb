@@ -166,8 +166,7 @@ static int tilcdc_load(struct drm_device *dev, unsigned long flags)
     struct regacc_dev *regacc_dev;
     struct clk_config_dev *clk_config_dev;
 
-    // uni_dev = check_universal_driver(&pdev->dev);
-    uni_dev = pdev->dev.uni_dev;
+    uni_dev = check_universal_driver(&pdev->dev);
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for: %s\n",
                 pdev->name);
