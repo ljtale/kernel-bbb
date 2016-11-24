@@ -71,7 +71,8 @@ EXPORT_SYMBOL_GPL(tps65217_reg_read);
 int tps65217_reg_read(struct device *dev, unsigned int reg,
         unsigned int *val) {
     struct universal_device *uni_dev;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev)
             return -EINVAL;
     return universal_reg_read(uni_dev, reg, val);
@@ -132,7 +133,8 @@ int tps65217_reg_write(struct device *dev, unsigned int reg,
 	int ret;
 	unsigned int xor_reg_val;
     struct universal_device *uni_dev;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev)
         return -EINVAL;
 
@@ -400,7 +402,8 @@ static int tps65217_probe(struct i2c_client *client,
      * implement will require population of the device knowledge at runtime */
     struct universal_device *uni_dev;
     struct irq_config_num *irq_config_num;
-    uni_dev = check_universal_driver(&client->dev);
+    // uni_dev = check_universal_driver(&client->dev);
+    uni_dev = client->dev.uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
                 client->name);

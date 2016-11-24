@@ -695,7 +695,8 @@ static int i2c_device_probe(struct device *dev)
 	if (status != -EPROBE_DEFER) {
         /* ljtale: this is where to insert code to call universal probe */
         /* ljtale starts */
-        universal_dev = check_universal_driver(dev);
+        // universal_dev = check_universal_driver(dev);
+        universal_dev = dev->uni_dev;
         if (universal_dev) {
             LJTALE_LEVEL_DEBUG(2, 
                     "universal driver probe should be called for %s\n",

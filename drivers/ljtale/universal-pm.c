@@ -147,7 +147,8 @@ int universal_suspend(struct device *dev) {
     struct universal_pm_dev *pm_dev;
     struct universal_pm_ops *pm_ops;
     int ret = 0;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return ret;
@@ -207,7 +208,8 @@ int universal_resume(struct device *dev) {
     struct universal_pm_dev *pm_dev;
     struct universal_pm_ops *pm_ops;
     int ret = 0;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return ret;

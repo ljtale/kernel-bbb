@@ -544,7 +544,8 @@ int universal_runtime_suspend(struct device *dev) {
     unsigned long irq_lock_flags = 0;
     unsigned long dev_lock_flags = 0;
     int ret = 0;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return 0;
@@ -630,7 +631,8 @@ int universal_runtime_resume(struct device *dev) {
     unsigned long irq_lock_flags = 0;
     unsigned long dev_lock_flags = 0;
     int ret = 0;
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "no universal driver for: %s\n", dev_name(dev));
         return 0;

@@ -1353,7 +1353,8 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
     struct universal_probe_dev *probe_dev;
     struct regacc_dev *regacc_dev;
 
-    uni_dev = check_universal_driver(&pdev->dev);
+    // uni_dev = check_universal_driver(&pdev->dev);
+    uni_dev = pdev->dev.uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not availabled for: %s\n",
                 pdev->name);

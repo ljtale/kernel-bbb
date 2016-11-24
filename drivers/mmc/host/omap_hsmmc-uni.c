@@ -1601,7 +1601,8 @@ static int omap_hsmmc_setup_dma_transfer(struct omap_hsmmc_host *host,
 #if 0
     /* ljtale starts */
     /* let me figure out somethign special */
-    uni_dev = check_universal_driver(host->dev);
+    // uni_dev = check_universal_driver(host->dev);
+    uni_dev = host->dev->uni_dev;
     if (!uni_dev) {
         LJTALE_LEVEL_DEBUG(3, "no universal driver found: %s - %s\n",
                 dev_name(host->dev), __func__);
@@ -2577,7 +2578,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
     struct clk_config_dev *clk_config_dev;
     struct timer_config_dev *timer_config_dev;
     int dma_num;
-    uni_dev = check_universal_driver(&pdev->dev);
+    // uni_dev = check_universal_driver(&pdev->dev);
+    uni_dev = pdev->dev.uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for: %s\n",
                 pdev->name);

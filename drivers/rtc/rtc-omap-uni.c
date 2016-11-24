@@ -633,7 +633,8 @@ static int omap_rtc_probe(struct platform_device *pdev)
     struct regacc_dev *regacc_dev;
     struct irq_config_num *irq_config_num;
     LJTALE_LEVEL_DEBUG(2, "omap rtc probe...\n");
-    uni_dev = check_universal_driver(&pdev->dev);
+    // uni_dev = check_universal_driver(&pdev->dev);
+    uni_dev = pdev->dev.uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
                 dev_name(&pdev->dev));

@@ -1174,7 +1174,8 @@ static int omap_gpio_probe(struct platform_device *pdev)
 
     LJTALE_LEVEL_DEBUG(3, "omap gpio local probe get called\n");
 
-    uni_dev = check_universal_driver(dev);
+    // uni_dev = check_universal_driver(dev);
+    uni_dev = dev->uni_dev;
     if (!uni_dev) {
         LJTALE_MSG(KERN_ERR, "universal driver not available for device: %s\n",
                 dev_name(dev));
