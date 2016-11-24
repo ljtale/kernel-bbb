@@ -62,6 +62,7 @@ int __universal_drv_register(struct universal_driver *drv) {
                 ret = dev->dev->bus->match(dev->dev, drv->driver);
                 if (ret) {
                     dev->drv = drv;
+                    dev->dev->uni_dev = dev;
                     /* useless continue line */
                     continue;
                 }
@@ -69,11 +70,9 @@ int __universal_drv_register(struct universal_driver *drv) {
     }
     /* if there is no match for this universal driver, fine, just exit */
     /* power management setup */
-    
     spin_lock_init(&rpm->rpm_graph_lock);
     if (rpm_ops->rpm_graph_build)
         rpm_ops->rpm_graph_build();
-
     return 0;
 }
 EXPORT_SYMBOL(__universal_drv_register);
@@ -554,6 +553,7 @@ int __universal_dev_register(struct universal_device *dev) {
                ret = dev->dev->bus->match(dev->dev, drv->driver);
                if (ret) {
                    dev->drv = drv;
+                   dev->dev->uni_dev = dev;
                    break;
                }
            }

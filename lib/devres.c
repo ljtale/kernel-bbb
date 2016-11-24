@@ -4,8 +4,10 @@
 #include <linux/gfp.h>
 #include <linux/export.h>
 
+#if 0
 /* ljtale */
 #include <linux/central-pm.h>
+#endif
 
 void devm_ioremap_release(struct device *dev, void *res)
 {
@@ -17,6 +19,7 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
 	return *(void **)res == match_data;
 }
 
+#if 0
 /* ljtale starts */
 static void add_ioremap_entry_to_table(struct device *dev,
         resource_size_t offset, void __iomem *addr) {
@@ -32,6 +35,7 @@ static void add_ioremap_entry_to_table(struct device *dev,
     list_add(&(iomap->list), &ioremap_tbl);
 }
 /* ljtale ends */
+#endif
 
 /**
  * devm_ioremap - Managed ioremap()
@@ -55,10 +59,11 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
 		devres_add(dev, ptr);
 	} else
 		devres_free(ptr);
+#if 0
     /* ljtale starts */
     add_ioremap_entry_to_table(dev, offset, addr);
     /* ljtale ends */
-
+#endif
 	return addr;
 }
 EXPORT_SYMBOL(devm_ioremap);
@@ -87,9 +92,11 @@ void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
 		devres_add(dev, ptr);
 	} else
 		devres_free(ptr);
+#if 0
     /* ljtale starts */
     add_ioremap_entry_to_table(dev, offset, addr);
     /* ljtale ends */
+#endif
 	return addr;
 }
 EXPORT_SYMBOL(devm_ioremap_nocache);
