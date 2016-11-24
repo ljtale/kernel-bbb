@@ -39,12 +39,16 @@ int process_reg_table(struct universal_device *uni_dev,
     int i;
     u32 temp_value;
     u32 timeout_compare = 0, timeout_read;
+    void *ctx_ptr;
+    unsigned int ctx_val;
     unsigned long timeout;
     if (!tbl || !reg_ctx->array)
         return 0;
     spin_lock_irqsave(&uni_dev->ctx_array_lock, flags);
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
+        ctx_ptr = &(reg_ctx->array[tbl_entry->ctx_index]);
+        ctx_val = reg_ctx->array[tbl_entry->ctx_index];
         if (tbl_entry->reg_op == PM_REG_WRITE_AUG_OR ||
                 tbl_entry->reg_op == PM_REG_WRITE_AUG_AND) {
             // compute the augment value before continuing
@@ -72,20 +76,20 @@ int process_reg_table(struct universal_device *uni_dev,
         switch(tbl_entry->reg_op) {
             case PM_REG_READ:
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
-                        &(reg_ctx->array[tbl_entry->ctx_index]));
+                        ctx_ptr);
                 break;
             case PM_REG_WRITE:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        reg_ctx->array[tbl_entry->ctx_index]);
+                        ctx_val);
                 if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = reg_ctx->array[tbl_entry->ctx_index];
+                    timeout_compare = ctx_val;
                     goto timeout_check;
                 }
                 break;
             case PM_REG_WRITE_READ:
                 /* a write followed by a read flush */
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        reg_ctx->array[tbl_entry->ctx_index]);
+                        ctx_val);
                 if (ret)
                     break;
                 ret = universal_reg_read(uni_dev, tbl_entry->reg_offset, NULL);
@@ -111,55 +115,41 @@ int process_reg_table(struct universal_device *uni_dev,
                 break;
             case PM_REG_WRITE_AUG_OR:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                    (reg_ctx->array[tbl_entry->ctx_index] | 
-                     tbl_entry->write_augment));
+                    (ctx_val | tbl_entry->write_augment));
                 if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = 
-                        reg_ctx->array[tbl_entry->ctx_index] | 
-                        tbl_entry->write_augment;
+                    timeout_compare = ctx_val | tbl_entry->write_augment;
                     goto timeout_check;
                 }
                 break;
             case PM_REG_WRITE_AUG_AND:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                    (reg_ctx->array[tbl_entry->ctx_index] &
-                     tbl_entry->write_augment));
+                    (ctx_val & tbl_entry->write_augment));
                 if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = 
-                        reg_ctx->array[tbl_entry->ctx_index] & 
-                        tbl_entry->write_augment;
+                    timeout_compare = ctx_val & tbl_entry->write_augment;
                     goto timeout_check;
                 }
                 break;
             case PM_REG_WRITE_BITS:
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        (reg_ctx->array[tbl_entry->ctx_index] | 
-                         tbl_entry->write_augment));
+                        (ctx_val | tbl_entry->write_augment));
                 if (ret)
                     goto reg_end;
-                if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = 
-                        reg_ctx->array[tbl_entry->ctx_index] |
-                        tbl_entry->write_augment;
-                    goto timeout_check;
-                }
                 ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        (reg_ctx->array[tbl_entry->ctx_index] & 
-                         ~tbl_entry->write_augment));
+                        (ctx_val & ~tbl_entry->write_augment));
                 if (ret)
                     goto reg_end;
-                if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = 
-                        reg_ctx->array[tbl_entry->ctx_index] &
-                        ~tbl_entry->write_augment;
-                    goto timeout_check;
-                }
             default:
                 /* unsupported yet */
                 LJTALE_LEVEL_DEBUG(3, "unsupported op for %s\n",
                         uni_dev->name);
                 break;
         }
+
+        if (ret) {
+            LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
+            break;
+        }
+        continue;
 timeout_check:
         if (tbl_entry->timeout.check_timeout) {
             /* assume timeout is microsecond */

@@ -25,7 +25,7 @@ int universal_rpm_create_reg_context(struct universal_device *uni_dev);
 
 /* operation type of each step of runtime pm doing */
 enum pm_reg_op {
-    PM_REG_WRITE,
+    PM_REG_WRITE = 0,
     PM_REG_READ,
     PM_REG_WRITE_READ, /* read after write, flushing read */
     PM_REG_READ_WRITE_OR, /* write value =  read value | write_augment */
