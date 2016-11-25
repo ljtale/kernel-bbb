@@ -26,7 +26,7 @@ EXPORT_SYMBOL(universal_req_type_str);
 extern struct list_head universal_drivers;
 extern struct list_head universal_devices;
 
-#ifdef LJTALE_DEBUG_ENABLE
+#ifdef LJTALE_DEBUG_ENABLE_LIST
 void debug_list_print(void) {
     struct list_head *p;
     struct universal_device *dev;

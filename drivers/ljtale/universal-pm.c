@@ -5,7 +5,6 @@
 #include <linux/universal-utils.h>
 #include <linux/universal-pm.h>
 
-
 int universal_pm_create_reg_context(struct universal_device *uni_dev) {
     struct universal_pm *pm = &uni_dev->drv->pm;
     u32 *array = pm->ref_ctx.array;
@@ -147,6 +146,11 @@ int universal_suspend(struct device *dev) {
     struct universal_pm_dev *pm_dev;
     struct universal_pm_ops *pm_ops;
     int ret = 0;
+#ifdef LJTALE_PERF
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+#endif
     // uni_dev = check_universal_driver(dev);
     uni_dev = dev->uni_dev;
     if (!uni_dev) {
@@ -197,6 +201,11 @@ int universal_suspend(struct device *dev) {
     /* drop the reference */
     if (pm_runtime_enabled(dev))
         pm_runtime_put_sync(dev);
+#ifdef LJTALE_PERF
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-suspend, %s, %u, %u, %u\n",
+            uni_dev->name, first, second, second-first);
+#endif
     return ret;
 /* TODO: device lock */
 lock_err:
@@ -208,6 +217,11 @@ int universal_resume(struct device *dev) {
     struct universal_pm_dev *pm_dev;
     struct universal_pm_ops *pm_ops;
     int ret = 0;
+#ifdef LJTALE_PERF
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+#endif
     // uni_dev = check_universal_driver(dev);
     uni_dev = dev->uni_dev;
     if (!uni_dev) {
@@ -247,6 +261,11 @@ int universal_resume(struct device *dev) {
         pm_runtime_mark_last_busy(dev);
         pm_runtime_put_autosuspend(dev);
     }
+#ifdef LJTALE_PERF
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "system-resume, %s, %u, %u, %u\n",
+            uni_dev->name, first, second, second-first);
+#endif
     return ret;
 lock_err:
     return ret;

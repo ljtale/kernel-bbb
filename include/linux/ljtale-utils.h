@@ -1,9 +1,10 @@
 #ifndef LINUX_LJTLAE_UTILS_H
 #define LINUX_LJTALE_UTILS_H
 
-#define LJTALE_DEBUG_LEVEL 1
+#define LJTALE_DEBUG_LEVEL 3
 
 // #define LJTALE_DEBUG_ENABLE
+// #define LJTALE_DEBUG_ENABLE_LIST
 
 #define LJTALE_MSG(LEVEL, args...)             \
     do {                                        \
@@ -45,5 +46,10 @@
                 __FILE__, __LINE__);                \
     }                               \
     while(0)
+
+#define LJTALE_PERF
+
+void ljtale_perf_init(void);
+u32 ljtale_read_pmc(void);
 
 #endif /* LINUX_LJTALE_UTILS_H */

@@ -634,7 +634,7 @@ static struct drm_driver tilcdc_driver = {
 static int tilcdc_pm_suspend(struct device *dev)
 {
 	struct drm_device *ddev = dev_get_drvdata(dev);
-//	struct tilcdc_drm_private *priv = ddev->dev_private;
+	struct tilcdc_drm_private *priv = ddev->dev_private;
 //	unsigned i, n = 0;
 
     // this is a generic call for drm devices
@@ -649,7 +649,7 @@ static int tilcdc_pm_suspend(struct device *dev)
 //	}
 
 	/* Disable the LCDC controller, to avoid locking up the PRCM */
-//	tilcdc_crtc_dpms(priv->crtc, DRM_MODE_DPMS_OFF);
+	tilcdc_crtc_dpms(priv->crtc, DRM_MODE_DPMS_OFF);
 #if 0
 	/* Save register state: */
 	for (i = 0; i < ARRAY_SIZE(registers); i++)

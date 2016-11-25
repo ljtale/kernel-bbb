@@ -534,6 +534,11 @@ int universal_runtime_suspend(struct device *dev) {
     unsigned long irq_lock_flags = 0;
     unsigned long dev_lock_flags = 0;
     int ret = 0;
+#ifdef LJTALE_PERF
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+#endif
     // uni_dev = check_universal_driver(dev);
     uni_dev = dev->uni_dev;
     if (!uni_dev) {
@@ -599,6 +604,10 @@ int universal_runtime_suspend(struct device *dev) {
     else if (rpm_dev->dev_access_needs_raw_spinlock)
         raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
                 dev_lock_flags);
+#ifdef LJTALE_PERF
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-suspend, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+#endif
     return ret;
 irq_lock_err:
     if (rpm_dev->irq_need_lock)
@@ -610,7 +619,6 @@ lock_err:
     else if (rpm_dev->dev_access_needs_raw_spinlock)
         raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
                 dev_lock_flags);
-
     return ret;
 }
 
@@ -621,6 +629,11 @@ int universal_runtime_resume(struct device *dev) {
     unsigned long irq_lock_flags = 0;
     unsigned long dev_lock_flags = 0;
     int ret = 0;
+#ifdef LJTALE_PERF
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+#endif
     // uni_dev = check_universal_driver(dev);
     uni_dev = dev->uni_dev;
     if (!uni_dev) {
@@ -696,6 +709,10 @@ int universal_runtime_resume(struct device *dev) {
     else if (rpm_dev->dev_access_needs_raw_spinlock)
         raw_spin_unlock_irqrestore(&uni_dev->probe_dev.raw_spinlock, 
                 dev_lock_flags);
+#ifdef LJTALE_PERF
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "rpm-resume, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+#endif
     return ret;
 
 irq_lock_err:
