@@ -30,6 +30,35 @@ int universal_rpm_create_reg_context(struct universal_device *uni_dev) {
 }
 EXPORT_SYMBOL(universal_rpm_create_reg_context);
 
+
+static inline int pm_reg_write_func(struct universal_device *uni_dev,
+        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment) {
+    return universal_reg_write(uni_dev, reg, ctx_val);
+}
+static inline int pm_reg_read_func(struct universal_device *uni_dev,
+        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment) {
+    return universal_reg_read(uni_dev, reg, ctx_ptr);
+}
+
+static inline int pm_reg_write_read_func(struct universal_device *uni_dev,
+        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment) {
+    int ret = 0;
+    ret = universal_reg_write(uni_dev, reg, ctx_val);
+    if (ret)
+        return ret;
+    return universal_reg_read(uni_dev, reg, NULL);
+}
+
+int (*reg_process_func[])(struct universal_device *uni_dev, unsigned int reg,
+        void *ctx_ptr, u32 ctx_val, u32 write_augment) = {
+    [PM_REG_WRITE] = pm_reg_write_func,
+    [PM_REG_READ] = pm_reg_read_func,
+    [PM_REG_WRITE_READ] = pm_reg_write_read_func,
+};
+EXPORT_SYMBOL(reg_process_func);
+
+
+
 int process_reg_table(struct universal_device *uni_dev,
         struct universal_reg_entry *tbl, int table_size) {
     struct universal_reg_entry *tbl_entry;
@@ -41,14 +70,14 @@ int process_reg_table(struct universal_device *uni_dev,
     u32 timeout_compare = 0, timeout_read;
     void *ctx_ptr;
     unsigned int ctx_val;
+    unsigned int ctx_reg;
+    u32 write_aug;
     unsigned long timeout;
     if (!tbl || !reg_ctx->array)
         return 0;
     spin_lock_irqsave(&uni_dev->ctx_array_lock, flags);
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
-        ctx_ptr = &(reg_ctx->array[tbl_entry->ctx_index]);
-        ctx_val = reg_ctx->array[tbl_entry->ctx_index];
         if (tbl_entry->reg_op == PM_REG_WRITE_AUG_OR ||
                 tbl_entry->reg_op == PM_REG_WRITE_AUG_AND) {
             // compute the augment value before continuing
@@ -73,18 +102,23 @@ int process_reg_table(struct universal_device *uni_dev,
                 }
             }
         }
+        ctx_ptr = &(reg_ctx->array[tbl_entry->ctx_index]);
+        ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+        ctx_reg = tbl_entry->reg_offset;
+        write_aug = tbl_entry->write_augment;
         switch(tbl_entry->reg_op) {
             case PM_REG_READ:
-                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
-                        ctx_ptr);
+                ret = reg_process_func[PM_REG_READ](uni_dev, ctx_reg,
+                        ctx_ptr, ctx_val, write_aug); 
                 break;
             case PM_REG_WRITE:
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        ctx_val);
+                ret = reg_process_func[PM_REG_WRITE](uni_dev, ctx_reg,
+                        ctx_ptr, ctx_val, write_aug);
+                /*
                 if (tbl_entry->timeout.check_timeout) {
                     timeout_compare = ctx_val;
                     goto timeout_check;
-                }
+                }*/
                 break;
             case PM_REG_WRITE_READ:
                 /* a write followed by a read flush */

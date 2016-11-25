@@ -33,7 +33,14 @@ enum pm_reg_op {
     PM_REG_WRITE_AUG_OR,
     PM_REG_WRITE_AUG_AND,
     PM_REG_WRITE_BITS, /* write value | aug, then write value & ~aug */
+    /* TODO: for each type of write, there should be a timeout check alternative */
+    PM_REG_WRITE_CHECK_TIMEOUT,
+    PM_REG_WRITE_AUG_OR_CHECK_TIMEOUT,
+    PM_REG_WRITE_AUG_AND_CHECK_TIMEOUT,
 };
+
+extern int (*reg_process_func[])(struct universal_device *uni_dev,
+        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment);
 
 enum reg_context_op {
     REG_BIT_AND,

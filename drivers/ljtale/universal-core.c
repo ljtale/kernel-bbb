@@ -49,7 +49,7 @@ void regacc_unlock_mutex(void *__dev)
     struct universal_device *dev = __dev;
     mutex_unlock(&dev->probe_dev.lock);
 }
-
+#if 0
 /* check if there is a universal device for the existing struct device, also
  * check if there is a universal driver for that device. If both conditions
  * are true, return the universal device pointer, otherwise return NULL */
@@ -72,7 +72,7 @@ struct universal_device *check_universal_driver(struct device *dev) {
     return (exist ? uni_dev : NULL);
 }
 EXPORT_SYMBOL(check_universal_driver);
-
+#endif
 
 struct universal_device *new_universal_device(struct device *dev) {
     struct universal_device *uni_dev;
