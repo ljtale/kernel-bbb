@@ -3112,7 +3112,7 @@ static struct universal_reg_entry omap_hsmmc_restore_context_reg_tbl[] = {
         .ctx_index = OMAP_HSMMC_UNI_CAPA,
     },
     {
-        .reg_op = PM_REG_WRITE_AUG_OR,
+        .reg_op = PM_REG_WRITE_AUG_OR_CHECK_TIMEOUT,
         .reg_offset = OMAP_HSMMC_UNI_HCTL_REG,
         .ctx_index = OMAP_HSMMC_UNI_HCTL,
         .write_augment = 1 << 8,

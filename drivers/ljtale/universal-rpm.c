@@ -32,16 +32,25 @@ EXPORT_SYMBOL(universal_rpm_create_reg_context);
 
 
 static inline int pm_reg_write_func(struct universal_device *uni_dev,
-        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment) {
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    unsigned int reg = tbl_entry->reg_offset;
     return universal_reg_write(uni_dev, reg, ctx_val);
 }
 static inline int pm_reg_read_func(struct universal_device *uni_dev,
-        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment) {
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    void *ctx_ptr = &(reg_ctx->array[tbl_entry->ctx_index]);
+    unsigned int reg = tbl_entry->reg_offset;
     return universal_reg_read(uni_dev, reg, ctx_ptr);
 }
 
 static inline int pm_reg_write_read_func(struct universal_device *uni_dev,
-        unsigned int reg, void *ctx_ptr, u32 ctx_val, u32 write_augment) {
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    unsigned int reg = tbl_entry->reg_offset;
     int ret = 0;
     ret = universal_reg_write(uni_dev, reg, ctx_val);
     if (ret)
@@ -49,11 +58,160 @@ static inline int pm_reg_write_read_func(struct universal_device *uni_dev,
     return universal_reg_read(uni_dev, reg, NULL);
 }
 
-int (*reg_process_func[])(struct universal_device *uni_dev, unsigned int reg,
-        void *ctx_ptr, u32 ctx_val, u32 write_augment) = {
+static inline int pm_reg_read_write_or_func(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset;
+    u32 write_augment = tbl_entry->write_augment;
+    u32 temp = 0;
+    int ret = 0;
+    ret = universal_reg_read(uni_dev, reg, &temp);
+    if (ret)
+        return ret;
+    write_augment |= temp;
+    return universal_reg_write(uni_dev, reg, write_augment);
+}
+
+static inline int pm_reg_read_write_and_func(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset;
+    u32 write_augment = tbl_entry->write_augment;
+    u32 temp = 0xffffffff;
+    int ret = 0;
+    ret = universal_reg_read(uni_dev, reg, &temp);
+    if (ret)
+        return ret;
+    write_augment &= temp;
+    return universal_reg_write(uni_dev, reg, write_augment);
+}
+
+static inline int pm_reg_write_aug_or_func(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset;
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    u32 write_augment = tbl_entry->write_augment;
+    if (tbl_entry->reg_write_augment_flag) {
+        struct reg_write_augment *augment = &tbl_entry->reg_write_augment;
+        switch(augment->op) {
+            case REG_BIT_AND:
+                write_augment = reg_ctx->array[augment->index1] &
+                    reg_ctx->array[augment->index2];
+                break;
+            case REG_BIT_OR:
+                write_augment = reg_ctx->array[augment->index1] |
+                    reg_ctx->array[augment->index2];
+                break;
+            /* TODO: more ops */
+            default:
+                break;
+        }
+    }
+    return universal_reg_write(uni_dev, reg, ctx_val | write_augment);
+}
+
+static inline int pm_reg_write_aug_and_func(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset; 
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    u32 write_augment = tbl_entry->write_augment;
+    if (tbl_entry->reg_write_augment_flag) {
+        struct reg_write_augment *augment = &tbl_entry->reg_write_augment;
+        switch(augment->op) {
+            case REG_BIT_AND:
+                write_augment = reg_ctx->array[augment->index1] &
+                    reg_ctx->array[augment->index2];
+                break;
+            case REG_BIT_OR:
+                write_augment = reg_ctx->array[augment->index1] |
+                    reg_ctx->array[augment->index2];
+                break;
+            /* TODO: more ops */
+            default:
+                break;
+        }
+    }
+    return universal_reg_write(uni_dev, reg, ctx_val & write_augment);
+}
+
+static inline int pm_reg_write_bits_func(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset;
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    u32 write_augment = tbl_entry->write_augment;
+    int ret = 0;
+    u32 temp = ctx_val | write_augment;
+    ret = universal_reg_write(uni_dev, reg, temp);
+    if (ret)
+        return ret;
+    temp = ctx_val & ~write_augment;
+    return universal_reg_write(uni_dev, reg, temp);
+}
+
+static inline int pm_reg_write_aug_or_check_timeout_func(
+        struct universal_device *uni_dev, struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset;
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    u32 write_augment = tbl_entry->write_augment;
+    int ret = 0;
+    u32 timeout_compare = 0, timeout_read;
+    unsigned long timeout;
+    timeout_compare = ctx_val | write_augment;
+    ret = universal_reg_write(uni_dev, reg, timeout_compare);
+    /* check timeout */
+    timeout = jiffies + msecs_to_jiffies(tbl_entry->timeout.timeout);
+    ret = universal_reg_read(uni_dev, reg, &timeout_read);
+    while(time_before(jiffies, timeout) && timeout_read != timeout_compare)
+        ret = universal_reg_read(uni_dev, reg, &timeout_read);
+    return ret;
+}
+
+static inline int pm_reg_write_aug_and_check_timeout_func(
+        struct universal_device *uni_dev, struct universal_reg_entry *tbl_entry,
+        struct universal_rpm_ctx *reg_ctx) {
+    unsigned int reg = tbl_entry->reg_offset;
+    u32 ctx_val = reg_ctx->array[tbl_entry->ctx_index];
+    u32 write_augment = tbl_entry->write_augment;
+    int ret = 0;
+    u32 timeout_compare = 0, timeout_read;
+    unsigned long timeout;
+    timeout_compare = ctx_val & write_augment;
+    ret = universal_reg_write(uni_dev, reg, timeout_compare);
+    /* check timeout */
+    timeout = jiffies + msecs_to_jiffies(tbl_entry->timeout.timeout);
+    ret = universal_reg_read(uni_dev, reg, &timeout_read);
+    while(time_before(jiffies, timeout) && timeout_read != timeout_compare)
+        ret = universal_reg_read(uni_dev, reg, &timeout_read);
+    return ret;
+}
+
+static inline int pm_reg_max_index_func(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl, struct universal_rpm_ctx *reg_ctx) {
+    return 0;
+}
+
+int (*reg_process_func[])(struct universal_device *uni_dev,
+        struct universal_reg_entry *tbl_entry, 
+        struct universal_rpm_ctx *reg_ctx) = {
     [PM_REG_WRITE] = pm_reg_write_func,
     [PM_REG_READ] = pm_reg_read_func,
     [PM_REG_WRITE_READ] = pm_reg_write_read_func,
+    [PM_REG_READ_WRITE_OR] = pm_reg_read_write_or_func,
+    [PM_REG_READ_WRITE_AND] = pm_reg_read_write_and_func,
+    [PM_REG_WRITE_AUG_OR] = pm_reg_write_aug_or_func,
+    [PM_REG_WRITE_AUG_AND] = pm_reg_write_aug_and_func,
+    [PM_REG_WRITE_BITS] = pm_reg_write_bits_func,
+    [PM_REG_WRITE_AUG_OR_CHECK_TIMEOUT] = 
+        pm_reg_write_aug_or_check_timeout_func,
+    [PM_REG_WRITE_AUG_AND_CHECK_TIMEOUT] = 
+        pm_reg_write_aug_and_check_timeout_func,
+
+    [PM_REG_MAX_INDEX] = pm_reg_max_index_func,
+    /* TODO: more reg operations */
 };
 EXPORT_SYMBOL(reg_process_func);
 
@@ -66,136 +224,14 @@ int process_reg_table(struct universal_device *uni_dev,
     int ret = 0;
     unsigned long flags;
     int i;
-    u32 temp_value;
-    u32 timeout_compare = 0, timeout_read;
-    void *ctx_ptr;
-    unsigned int ctx_val;
-    unsigned int ctx_reg;
-    u32 write_aug;
-    unsigned long timeout;
+    int index = 0;
     if (!tbl || !reg_ctx->array)
         return 0;
     spin_lock_irqsave(&uni_dev->ctx_array_lock, flags);
     for (i = 0; i < table_size; i++) {
         tbl_entry = &tbl[i];
-        if (tbl_entry->reg_op == PM_REG_WRITE_AUG_OR ||
-                tbl_entry->reg_op == PM_REG_WRITE_AUG_AND) {
-            // compute the augment value before continuing
-            if (tbl_entry->reg_write_augment_flag) {
-                struct reg_write_augment *augment = 
-                    &tbl_entry->reg_write_augment;
-                /* FIXME: a generic computation method is needed */
-                switch(augment->op) {
-                    case REG_BIT_AND:
-                        tbl_entry->write_augment = 
-                            reg_ctx->array[augment->index1] & 
-                            reg_ctx->array[augment->index2];
-                        break;
-                    case REG_BIT_OR:
-                        tbl_entry->write_augment = 
-                            reg_ctx->array[augment->index1] & 
-                            reg_ctx->array[augment->index2];
-                        break;
-                        /* TODO: more ops */
-                    default:
-                        break;
-                }
-            }
-        }
-        ctx_ptr = &(reg_ctx->array[tbl_entry->ctx_index]);
-        ctx_val = reg_ctx->array[tbl_entry->ctx_index];
-        ctx_reg = tbl_entry->reg_offset;
-        write_aug = tbl_entry->write_augment;
-        switch(tbl_entry->reg_op) {
-            case PM_REG_READ:
-                ret = reg_process_func[PM_REG_READ](uni_dev, ctx_reg,
-                        ctx_ptr, ctx_val, write_aug); 
-                break;
-            case PM_REG_WRITE:
-                ret = reg_process_func[PM_REG_WRITE](uni_dev, ctx_reg,
-                        ctx_ptr, ctx_val, write_aug);
-                /*
-                if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = ctx_val;
-                    goto timeout_check;
-                }*/
-                break;
-            case PM_REG_WRITE_READ:
-                /* a write followed by a read flush */
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        ctx_val);
-                if (ret)
-                    break;
-                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset, NULL);
-                break;
-            case PM_REG_READ_WRITE_OR:
-                temp_value = 0;
-                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
-                        &temp_value);
-                if (ret)
-                    break;
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        tbl_entry->write_augment | temp_value);
-                break;
-
-            case PM_REG_READ_WRITE_AND:
-                temp_value = 0xffffffff;
-                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
-                        &temp_value);
-                if (ret)
-                    break;
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        tbl_entry->write_augment & temp_value);
-                break;
-            case PM_REG_WRITE_AUG_OR:
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                    (ctx_val | tbl_entry->write_augment));
-                if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = ctx_val | tbl_entry->write_augment;
-                    goto timeout_check;
-                }
-                break;
-            case PM_REG_WRITE_AUG_AND:
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                    (ctx_val & tbl_entry->write_augment));
-                if (tbl_entry->timeout.check_timeout) {
-                    timeout_compare = ctx_val & tbl_entry->write_augment;
-                    goto timeout_check;
-                }
-                break;
-            case PM_REG_WRITE_BITS:
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        (ctx_val | tbl_entry->write_augment));
-                if (ret)
-                    goto reg_end;
-                ret = universal_reg_write(uni_dev, tbl_entry->reg_offset,
-                        (ctx_val & ~tbl_entry->write_augment));
-                if (ret)
-                    goto reg_end;
-            default:
-                /* unsupported yet */
-                LJTALE_LEVEL_DEBUG(3, "unsupported op for %s\n",
-                        uni_dev->name);
-                break;
-        }
-
-        if (ret) {
-            LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
-            break;
-        }
-        continue;
-timeout_check:
-        if (tbl_entry->timeout.check_timeout) {
-            /* assume timeout is microsecond */
-            timeout = jiffies + msecs_to_jiffies(tbl_entry->timeout.timeout);
-            ret =  universal_reg_read(uni_dev, 
-                    tbl_entry->reg_offset, &timeout_read);
-            while(time_before(jiffies, timeout) && 
-                  timeout_read != timeout_compare)
-                ret = universal_reg_read(uni_dev, tbl_entry->reg_offset,
-                        &timeout_read);
-        }
-reg_end:
+        index = tbl_entry->reg_op;
+        ret = reg_process_func[index](uni_dev, tbl_entry, reg_ctx);
         if (ret) {
             LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
             break;
@@ -761,4 +797,3 @@ lock_err:
                 dev_lock_flags);
     return ret;
 }
-
