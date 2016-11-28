@@ -379,6 +379,7 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* in case val is NULL, such as when read is used to flush the register
      * written value, we should avoid that */
+    u32 first = 0, second = 0;
     u32 temp_val;
     if (!val)
        val = &temp_val; 
@@ -404,10 +405,16 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
                         *((u16 *) val) = readw_relaxed(regacc_dev->base + reg);
                     break;
                 case 32:
-                    if (regacc->mb)
+                    if (regacc->mb) {
                         *((u32 *) val) = readl(regacc_dev->base + reg);
-                    else
+                    }
+                    else {
+                        ljtale_perf_init();
+                        first = ljtale_read_pmc();
                         *((u32 *) val) = readl_relaxed(regacc_dev->base + reg);
+                        second = ljtale_read_pmc();
+                        printk(KERN_INFO "reg-readl, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+                    }
                     break;
                 default:
                     return -EINVAL;
@@ -447,6 +454,7 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
      * should come from the universal_device instance. */
     struct register_accessor *regacc;
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
+    u32 first = 0, second = 0;
     // BUG_ON(!uni_dev->drv);
     regacc = uni_dev->drv->regacc;
     switch(regacc->reg_addr_bits) {
@@ -469,10 +477,16 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
                         writew_relaxed((u16)val, regacc_dev->base + reg);
                     break;
                 case 32:
-                    if (regacc->mb)
+                    if (regacc->mb) {
                         writel((u32)val, regacc_dev->base + reg);
-                    else
+                    }
+                    else {
+                        ljtale_perf_init();
+                        first = ljtale_read_pmc();
                         writel_relaxed((u32)val, regacc_dev->base + reg);
+                        second = ljtale_read_pmc();
+                        printk(KERN_INFO "reg-writel, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+                    }
                     break;
                 default:
                     return -EINVAL;
