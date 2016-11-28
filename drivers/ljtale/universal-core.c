@@ -424,21 +424,27 @@ int universal_reg_read(struct universal_device *uni_dev, unsigned int reg,
         void *val) {
     struct register_accessor *regacc = NULL;
     struct regacc_dev *regacc_dev;
+    int ret = -EINVAL;
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
     
     regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* check_universal_driver already make sure the drv pointer for uni_dev
      * is not NULL */
     regacc = uni_dev->drv->regacc;
     if (regacc->mmio_support)
-        return universal_mmio_reg_read(uni_dev, reg, val);
-    if (regacc->regmap_support)
-        return regmap_read(regacc_dev->regmap, reg, (unsigned int *)val);
+        ret = universal_mmio_reg_read(uni_dev, reg, val);
+    else if (regacc->regmap_support)
+        ret =  regmap_read(regacc_dev->regmap, reg, (unsigned int *)val);
     else if (regacc->regacc_read)
-        return regacc->regacc_read(reg, (unsigned int *)val);
+        ret = regacc->regacc_read(reg, (unsigned int *)val);
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg read method for device: %s\n",
                 uni_dev->name);
-    return -EINVAL;
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "reg read, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+    return ret;
 }
 
 int universal_mmio_reg_write(struct universal_device *uni_dev,
@@ -489,18 +495,24 @@ int universal_reg_write(struct universal_device *uni_dev, unsigned int reg,
         unsigned int val) {
     struct register_accessor *regacc = NULL;
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
-    
+    int ret = -EINVAL; 
+    u32 first = 0, second = 0;
+    ljtale_perf_init();
+    first = ljtale_read_pmc();
+
     regacc = uni_dev->drv->regacc;
     if (regacc->mmio_support)
-        return universal_mmio_reg_write(uni_dev, reg, val);
-    if (regacc->regmap_support)
-        return regmap_write(regacc_dev->regmap, reg, val);
+        ret = universal_mmio_reg_write(uni_dev, reg, val);
+    else if (regacc->regmap_support)
+        ret = regmap_write(regacc_dev->regmap, reg, val);
     else if (regacc->regacc_write)
-        return regacc->regacc_write(reg, val);
+        ret = regacc->regacc_write(reg, val);
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg write method for device: %s\n",
                 uni_dev->name);
-    return -EINVAL;
+    second = ljtale_read_pmc();
+    printk(KERN_INFO "reg write, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+    return ret;
 }
 
 void _populate_regmap_config(struct register_accessor *regacc, 
