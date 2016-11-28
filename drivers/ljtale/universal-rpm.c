@@ -225,10 +225,13 @@ int process_reg_table(struct universal_device *uni_dev,
     unsigned long flags;
     int i;
     int index = 0;
+    u32 first = 0, second = 0;
     if (!tbl || !reg_ctx->array)
         return 0;
     spin_lock_irqsave(&uni_dev->ctx_array_lock, flags);
     for (i = 0; i < table_size; i++) {
+        ljtale_perf_init();
+        first = ljtale_read_pmc();
         tbl_entry = &tbl[i];
         index = tbl_entry->reg_op;
         ret = reg_process_func[index](uni_dev, tbl_entry, reg_ctx);
@@ -236,6 +239,9 @@ int process_reg_table(struct universal_device *uni_dev,
             LJTALE_LEVEL_DEBUG(3, "reg table process error: %d\n", ret);
             break;
         }
+        second = ljtale_read_pmc();
+        printk(KERN_INFO "reg-tbl-process, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+
     }
     spin_unlock_irqrestore(&uni_dev->ctx_array_lock, flags);
     return ret;

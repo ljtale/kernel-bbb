@@ -425,10 +425,6 @@ int universal_reg_read(struct universal_device *uni_dev, unsigned int reg,
     struct register_accessor *regacc = NULL;
     struct regacc_dev *regacc_dev;
     int ret = -EINVAL;
-    u32 first = 0, second = 0;
-    ljtale_perf_init();
-    first = ljtale_read_pmc();
-    
     regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* check_universal_driver already make sure the drv pointer for uni_dev
      * is not NULL */
@@ -442,8 +438,6 @@ int universal_reg_read(struct universal_device *uni_dev, unsigned int reg,
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg read method for device: %s\n",
                 uni_dev->name);
-    second = ljtale_read_pmc();
-    printk(KERN_INFO "reg read, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
     return ret;
 }
 
@@ -496,10 +490,6 @@ int universal_reg_write(struct universal_device *uni_dev, unsigned int reg,
     struct register_accessor *regacc = NULL;
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     int ret = -EINVAL; 
-    u32 first = 0, second = 0;
-    ljtale_perf_init();
-    first = ljtale_read_pmc();
-
     regacc = uni_dev->drv->regacc;
     if (regacc->mmio_support)
         ret = universal_mmio_reg_write(uni_dev, reg, val);
@@ -510,8 +500,6 @@ int universal_reg_write(struct universal_device *uni_dev, unsigned int reg,
     else 
         LJTALE_MSG(KERN_ERR, "no universal reg write method for device: %s\n",
                 uni_dev->name);
-    second = ljtale_read_pmc();
-    printk(KERN_INFO "reg write, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
     return ret;
 }
 

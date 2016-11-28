@@ -47,7 +47,7 @@
     }                               \
     while(0)
 
-#define LJTALE_PERF
+// #define LJTALE_PERF
 
 void ljtale_perf_init(void);
 u32 ljtale_read_pmc(void);
