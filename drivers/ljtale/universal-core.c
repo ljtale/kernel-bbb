@@ -379,7 +379,7 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
     struct regacc_dev *regacc_dev = &uni_dev->probe_dev.regacc_dev;
     /* in case val is NULL, such as when read is used to flush the register
      * written value, we should avoid that */
-    u32 first = 0, second = 0;
+//    u32 first = 0, second = 0;
     u32 temp_val;
     if (!val)
        val = &temp_val; 
@@ -409,11 +409,11 @@ int universal_mmio_reg_read(struct universal_device *uni_dev,
                         *((u32 *) val) = readl(regacc_dev->base + reg);
                     }
                     else {
-                        ljtale_perf_init();
-                        first = ljtale_read_pmc();
+//                        ljtale_perf_init();
+//                        first = ljtale_read_pmc();
                         *((u32 *) val) = readl_relaxed(regacc_dev->base + reg);
-                        second = ljtale_read_pmc();
-                        printk(KERN_INFO "reg-readl, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+//                        second = ljtale_read_pmc();
+//                        printk(KERN_INFO "reg-readl, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
                     }
                     break;
                 default:
@@ -481,11 +481,11 @@ int universal_mmio_reg_write(struct universal_device *uni_dev,
                         writel((u32)val, regacc_dev->base + reg);
                     }
                     else {
-                        ljtale_perf_init();
-                        first = ljtale_read_pmc();
+//                       ljtale_perf_init();
+//                       first = ljtale_read_pmc();
                         writel_relaxed((u32)val, regacc_dev->base + reg);
-                        second = ljtale_read_pmc();
-                        printk(KERN_INFO "reg-writel, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
+//                        second = ljtale_read_pmc();
+//                        printk(KERN_INFO "reg-writel, %s, %u, %u, %u\n", uni_dev->name, first, second, second-first);
                     }
                     break;
                 default:
