@@ -232,7 +232,8 @@ int universal_resume(struct device *dev) {
     pm_ops = &uni_dev->drv->pm_ops;
     LJTALE_LEVEL_DEBUG(2, "universal system resume...%s\n", uni_dev->name);
 
-    /* probably rely on the runtime resume to restore the context */
+    /* probably rely on the runtime resume to restore the context
+     * runtime_enable() is called by the PM framework before calling resume */
     if (pm_runtime_enabled(dev))
         pm_runtime_get_sync(dev);
 
@@ -257,6 +258,9 @@ int universal_resume(struct device *dev) {
         ret = pm_ops->local_resume(dev);
 
     /* lastly mark the device last busy and allow defered runtime suspend */
+    /*FIXME: possible hazard, universal suspend/resume do not work with some
+     * existing drivers on get/put, thus causing the second system-to-RAM
+     * crash.*/
     if (pm_runtime_enabled(dev)) {
         pm_runtime_mark_last_busy(dev);
         pm_runtime_put_autosuspend(dev);
